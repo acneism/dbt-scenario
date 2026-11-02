@@ -8,10 +8,12 @@ import psycopg
 from dbt_scenario import __version__
 from dbt_scenario.config import load_config
 from dbt_scenario.database import Database
-from dbt_scenario.errors import ScenarioError
+from dbt_scenario.errors import ScenarioError, display_error
+from dbt_scenario.initialize import initialize
 from dbt_scenario.lifecycle import cleanup_run
 from dbt_scenario.loader import load_scenario
 from dbt_scenario.project import Project
+from dbt_scenario.requirements import check_dependencies, project_settings
 from dbt_scenario.runner import run_scenario
 
 
@@ -26,9 +28,9 @@ def guarded(function):
         try:
             return function(*args, **kwargs)
         except ScenarioError as error:
-            click.echo(f"ERROR {error.code}", err=True)
+            click.echo(display_error(error), err=True)
         except psycopg.Error:
-            click.echo("ERROR DATABASE_ERROR", err=True)
+            click.echo(display_error(ScenarioError("DATABASE_ERROR")), err=True)
         except (OSError, ValueError, TypeError):
             click.echo("ERROR INVALID_INPUT_OR_ENVIRONMENT", err=True)
         raise click.exceptions.Exit(2)
@@ -45,17 +47,43 @@ scenario_option = click.option(
 )
 
 
-@main.command()
+@main.command(help="Create a demo or scenario template without connecting to a database.")
+@click.option(
+    "--project-dir",
+    default=".",
+    type=click.Path(path_type=Path),
+    help="Existing dbt project, or destination directory when using --demo.",
+)
+@click.option(
+    "--demo", is_flag=True, help="Create a complete runnable example with synthetic data."
+)
+@guarded
+def init(project_dir, demo):
+    created = initialize(project_dir, demo)
+    for relative in created:
+        click.echo(f"CREATED {relative}")
+    if demo:
+        click.echo("Demo ready. Set test passwords and start the disposable PostgreSQL database.")
+        click.echo("Then run plan and test with examples/shop/scenarios/orders.yml.")
+    else:
+        click.echo(
+            "Template created with synthetic data; edit model, inputs, columns and expectations."
+        )
+        click.echo("Then run plan --config scenario-runner.yml --scenario scenarios/example.yml.")
+
+
+@main.command(help="Check the test database role and installed project dependencies.")
 @config_option
 @guarded
 def doctor(config_path):
     config = load_config(config_path)
+    check_dependencies(config.project_dir, project_settings(config.project_dir))
     database = Database(config)
     database.close()
     click.echo("READY PostgreSQL 16; unprivileged test role; project found")
 
 
-@main.command()
+@main.command(help="Validate inputs and show the selected model, fixtures and steps.")
 @config_option
 @scenario_option
 @guarded
@@ -72,20 +100,25 @@ def plan(config_path, scenario_path):
                 "model": node["unique_id"],
                 "inputs": list(scenario.data["inputs"]),
                 "steps": [s["name"] for s in scenario.data["steps"]],
+                "project_env_names": sorted(config.project_env),
             },
             indent=2,
         )
     )
 
 
-@main.command("test")
+@main.command("test", help="Run scenarios against the dedicated test database.")
 @config_option
 @click.option(
     "--scenario", "scenario_paths", multiple=True, type=click.Path(exists=True, path_type=Path)
 )
 @click.option("--scenario-dir", type=click.Path(exists=True, path_type=Path))
 @click.option("--report-dir", default="artifacts/scenarios", type=click.Path(path_type=Path))
-@click.option("--keep-on-failure", is_flag=True)
+@click.option(
+    "--keep-on-failure",
+    is_flag=True,
+    help="Retain failed scenario tables for debugging; successful scenarios are cleaned.",
+)
 @guarded
 def test_command(config_path, scenario_paths, scenario_dir, report_dir, keep_on_failure):
     config = load_config(config_path)
@@ -106,6 +139,8 @@ def test_command(config_path, scenario_paths, scenario_dir, report_dir, keep_on_
                 f"  {step['status']} {step['name']} {step.get('reason_code') or ''}".rstrip()
             )
         click.echo(f"  report: {report_dir / report['run_id'] / 'summary.json'}")
+        if report.get("diagnostic", {}).get("hint"):
+            click.echo(f"  {report['diagnostic']['hint']}")
         if report["cleanup_status"] == "KEPT":
             click.echo(f"  retained schemas; cleanup --run-id {report['run_id']}")
         status = report["overall_status"]
@@ -115,10 +150,10 @@ def test_command(config_path, scenario_paths, scenario_dir, report_dir, keep_on_
     raise click.exceptions.Exit(exit_code)
 
 
-@main.command()
+@main.command(help="Clean database resources recorded for one inactive run.")
 @config_option
 @click.option("--run-id", required=True)
 @guarded
 def cleanup(config_path, run_id):
-    result = cleanup_run(load_config(config_path), run_id)
+    result = cleanup_run(load_config(config_path, load_project_env=False), run_id)
     click.echo(f"{result} {run_id}")

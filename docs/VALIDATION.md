@@ -23,3 +23,11 @@ Alpha 2 was checked on November 3, 2026 using the same local engine versions. Th
 New integration cases cover cleanup refusal while a runner holds its lock, ownership mismatch without partial deletion, foreign view dependencies without cascading deletion, deadline cancellation with transactional rollback, slow dbt queries, snapshot deadlines, setup deadlines, repeated cleanup after a retained failure, recovery after abrupt process exit and two simultaneous CLI processes.
 
 Ruff and the source-comment/docstring check passed. Wheel and source distributions for `0.1.0a2` built offline using cached build dependencies. The new Linux workflow run must validate the platform-specific tests before treating those cases as confirmed.
+
+## Initialization and configuration validation
+
+Alpha 3 was checked on November 3, 2026 using the same local engine versions. The suite contains 85 tests. Local Windows checks passed 82 tests; three cases require Linux process signals or symlink creation and are checked in CI.
+
+New cases cover a real PostgreSQL run of the initialized demo, explicit project environment forwarding, exclusion of unlisted variables, reserved runtime controls, initialization rollback and collision handling, dependency preflight checks and redacted diagnostics for invalid rows and YAML.
+
+The wheel was checked independently of the source checkout: its nine packaged demo resources generated a valid scenario from the installed archive. Wheel/source builds, Ruff checks and the no-comments/docstrings check passed. CI results must be checked for the final commit.

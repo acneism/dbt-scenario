@@ -10,11 +10,16 @@ Implemented in alpha 2:
 - Shared step/scenario deadlines covering SQL, dbt execution and snapshot creation.
 - Tests for independent CLI processes, interrupted runs, abandoned resources and query cancellation.
 
-The complete MVP still needs:
+Implemented in alpha 3:
+
+- Database-free initialization of a runnable demo and an existing-project scenario template.
+- Explicit project environment forwarding with reserved runner controls kept separate.
+- Offline checks for installed dependencies and actionable error hints.
+- Safe field paths and YAML line/column diagnostics without row values.
+
+The remaining MVP work is:
 
 - Remaining acceptance-matrix cases, including schema/type variations and complete data edge cases.
-- A supported project environment-variable allowlist and improved dependency diagnostics.
-- A user-facing `init` command and actionable, safe validation diagnostics.
 - Performance measurements and comparison against hand-written dbt scripts and existing audit packages.
 - External pilots showing that teams retain the tests in CI and can add their second scenario independently.
 

@@ -9,3 +9,4 @@ database:
   sslmode: disable
 step_timeout: 120
 scenario_timeout: 600
+env_allowlist: []

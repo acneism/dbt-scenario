@@ -20,6 +20,7 @@ from dbt_scenario.config import load_config
 from dbt_scenario.database import Database
 from dbt_scenario.deadline import Deadline
 from dbt_scenario.errors import ScenarioError
+from dbt_scenario.initialize import initialize
 from dbt_scenario.journal import Journal
 from dbt_scenario.lifecycle import cleanup_run, finish_run
 from dbt_scenario.loader import load_scenario
@@ -47,6 +48,7 @@ def config_file(config, directory):
     data["project_dir"] = str(config.project_dir)
     data["step_timeout"] = config.step_timeout
     data["scenario_timeout"] = config.scenario_timeout
+    data["env_allowlist"] = list(config.project_env)
     path = directory / "runner.yml"
     path.write_text(yaml.safe_dump(data))
     return path
@@ -438,3 +440,52 @@ def test_sigint_cleans_resources_and_returns_130(project, tmp_path):
         if process.poll() is None:
             process.kill()
             process.wait()
+
+
+def test_initialized_demo_runs_on_real_postgresql(tmp_path):
+    if "DSC_TEST_PASSWORD" not in os.environ:
+        pytest.skip("DSC_TEST_PASSWORD is required for disposable PostgreSQL")
+    destination = tmp_path / "generated-demo"
+    initialize(destination, demo=True)
+    config = load_config(destination / "scenario-runner.yml")
+    scenario = load_scenario(destination / "examples/shop/scenarios/orders.yml", config.project_dir)
+    report = run_scenario(scenario, config, tmp_path / "reports")
+    assert report["overall_status"] == "PASS", report
+    assert report["cleanup_status"] == "CLEANED"
+    assert [step["actual_rows"] for step in report["steps"]] == [2, 3, 3]
+
+
+def test_project_env_allowlist_reaches_dbt_without_forwarding_other_values(
+    project, tmp_path, monkeypatch
+):
+    config, scenario, reports = project
+    monkeypatch.setenv("SCENARIO_ADJUSTMENT", "1.00")
+    monkeypatch.setenv("SCENARIO_UNLISTED_SENTINEL", "synthetic.private@example.invalid")
+    path = config_file(config, tmp_path)
+    settings = yaml.safe_load(path.read_text())
+    settings["env_allowlist"] = ["SCENARIO_ADJUSTMENT"]
+    path.write_text(yaml.safe_dump(settings))
+    config = load_config(path)
+    model = config.project_dir / "models/fct_orders.sql"
+    code = model.read_text().replace(
+        "select order_id, event_at, updated_at, amount",
+        "select order_id, event_at, updated_at, "
+        "cast(amount + {{ env_var('SCENARIO_ADJUSTMENT') }} as numeric(12,2)) as amount",
+    )
+    code += (
+        "\n{% if env_var('SCENARIO_UNLISTED_SENTINEL', 'absent') != 'absent' %}"
+        "\n{{ exceptions.raise_compiler_error('unlisted variable leaked') }}"
+        "\n{% endif %}\n"
+    )
+    model.write_text(code)
+    from decimal import Decimal
+
+    for step in scenario.data["steps"]:
+        for row in step["expect"].get("rows", []):
+            row["amount"] = str(Decimal(row["amount"]) + Decimal("1.00"))
+    report = run_scenario(scenario, config, reports)
+    assert report["overall_status"] == "PASS", report
+    assert report["project_env_names"] == ["SCENARIO_ADJUSTMENT"]
+    encoded = json.dumps(report)
+    assert "synthetic.private@example.invalid" not in encoded
+    assert "1.00" not in encoded

@@ -78,6 +78,7 @@ def run_scenario(
         "scenario_hash": scenario.fingerprint,
         "fixture_hashes": scenario.fixture_hashes,
         "project_hash": None,
+        "project_env_names": sorted(config.project_env),
         "started_at": datetime.now(UTC).isoformat(),
         "duration_ms": 0,
         "engine_versions": {name: version(name) for name in ["dbt-core", "dbt-postgres"]},
@@ -195,6 +196,7 @@ def run_scenario(
             )
     except ScenarioError as error:
         report["reason_code"] = error.code
+        report["diagnostic"] = error.diagnostic()
     except psycopg.Error:
         report["reason_code"] = "DATABASE_ERROR"
     except KeyboardInterrupt:

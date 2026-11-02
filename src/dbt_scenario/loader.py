@@ -20,14 +20,24 @@ TYPE_PATTERN = re.compile(
 class StrictLoader(yaml.SafeLoader):
     def compose_node(self, parent, index):
         if self.check_event(yaml.AliasEvent):
-            raise ScenarioError("YAML_ALIAS_UNSUPPORTED")
+            mark = self.peek_event().start_mark
+            raise ScenarioError(
+                "YAML_ALIAS_UNSUPPORTED", line=mark.line + 1, column=mark.column + 1
+            )
         return super().compose_node(parent, index)
 
     def construct_mapping(self, node, deep=False):
         keys = [self.construct_object(key, deep=deep) for key, _ in node.value]
         try:
             if len(set(keys)) != len(keys):
-                raise ScenarioError("DUPLICATE_YAML_KEY")
+                seen = set()
+                for key, (key_node, _) in zip(keys, node.value, strict=True):
+                    if key in seen:
+                        mark = key_node.start_mark
+                        raise ScenarioError(
+                            "DUPLICATE_YAML_KEY", line=mark.line + 1, column=mark.column + 1
+                        )
+                    seen.add(key)
         except TypeError:
             raise ScenarioError("INVALID_YAML_KEY") from None
         return super().construct_mapping(node, deep=deep)
@@ -44,8 +54,13 @@ def read_yaml(path: Path):
         raise ScenarioError("FILE_TOO_LARGE")
     try:
         return yaml.load(path.read_text(encoding="utf-8"), Loader=StrictLoader)
-    except (yaml.YAMLError, UnicodeError, RecursionError):
-        raise ScenarioError("INVALID_YAML") from None
+    except (yaml.YAMLError, UnicodeError, RecursionError) as error:
+        mark = getattr(error, "problem_mark", None)
+        raise ScenarioError(
+            "INVALID_YAML",
+            line=mark.line + 1 if mark else None,
+            column=mark.column + 1 if mark else None,
+        ) from None
 
 
 def sql_type(value: str) -> str:
@@ -87,14 +102,20 @@ def converted(value, kind: str):
     raise ScenarioError("INVALID_TYPED_VALUE")
 
 
-def typed_rows(rows: list, columns: dict) -> list[tuple]:
+def typed_rows(rows: list, columns: dict, location=()) -> list[tuple]:
     if not isinstance(rows, list) or len(rows) > 100_000:
-        raise ScenarioError("INVALID_FIXTURE_SIZE")
+        raise ScenarioError("INVALID_FIXTURE_SIZE", location=location)
     result = []
-    for row in rows:
+    for index, row in enumerate(rows):
         if not isinstance(row, dict) or row.keys() != columns.keys():
-            raise ScenarioError("FIXTURE_COLUMNS_MISMATCH")
-        result.append(tuple(converted(row[name], kind) for name, kind in columns.items()))
+            raise ScenarioError("FIXTURE_COLUMNS_MISMATCH", location=(*location, index))
+        values = []
+        for name, kind in columns.items():
+            try:
+                values.append(converted(row[name], kind))
+            except ScenarioError as error:
+                raise ScenarioError(error.code, location=(*location, index, name)) from None
+        result.append(tuple(values))
     return result
 
 
@@ -113,8 +134,13 @@ def load_scenario(path: Path, project_dir: Path) -> Scenario:
         raise ScenarioError("SCENARIO_OUTSIDE_PROJECT")
     data = read_yaml(path)
     schema = json.loads(files("dbt_scenario").joinpath("scenario.schema.json").read_text())
-    if list(Draft202012Validator(schema).iter_errors(data)):
-        raise ScenarioError("INVALID_SCENARIO_SCHEMA")
+    error = next(Draft202012Validator(schema).iter_errors(data), None)
+    if error:
+        location = tuple(error.absolute_path)
+        if error.validator == "required" and isinstance(error.instance, dict):
+            missing = next(key for key in error.validator_value if key not in error.instance)
+            location = (*location, missing)
+        raise ScenarioError("INVALID_SCENARIO_SCHEMA", location=location)
     hashes = {}
 
     def resolve_fixture(fixture):
@@ -130,11 +156,16 @@ def load_scenario(path: Path, project_dir: Path) -> Scenario:
         fixture["rows"] = payload["rows"]
         del fixture["fixture"]
 
-    for definition in [*data["inputs"].values(), data["output"]]:
+    definitions = [("inputs", name, definition) for name, definition in data["inputs"].items()]
+    definitions.append(("output", data["output"]))
+    for *prefix, definition in definitions:
         for name, kind in definition["columns"].items():
             if not name or "\x00" in name or len(name.encode()) > 63:
                 raise ScenarioError("INVALID_COLUMN_NAME")
-            sql_type(kind)
+            try:
+                sql_type(kind)
+            except ScenarioError as error:
+                raise ScenarioError(error.code, location=(*prefix, "columns", name)) from None
     keys = data["output"]["primary_key"]
     columns = data["output"]["columns"]
     if len(set(keys)) != len(keys) or not set(keys) <= columns.keys():
@@ -145,30 +176,44 @@ def load_scenario(path: Path, project_dir: Path) -> Scenario:
     if len(set(nodes)) != len(nodes):
         raise ScenarioError("DUPLICATE_INPUT_NODE")
     for index, step in enumerate(data["steps"]):
+        try:
+            json.dumps(step["run"].get("vars", {}), allow_nan=False)
+        except (TypeError, ValueError):
+            raise ScenarioError(
+                "INVALID_RUN_VARS", location=("steps", index, "run", "vars")
+            ) from None
         if step["name"] in seen:
             raise ScenarioError("DUPLICATE_STEP_NAME")
         if step["run"]["mode"] != ("initial" if index == 0 else "incremental"):
-            raise ScenarioError("INVALID_STEP_ORDER")
+            raise ScenarioError("INVALID_STEP_ORDER", location=("steps", index, "run", "mode"))
         for name, update in step.get("inputs", {}).items():
             if name not in data["inputs"]:
                 raise ScenarioError("UNKNOWN_INPUT")
             fixture = update["replace"]
             resolve_fixture(fixture)
-            typed_rows(fixture["rows"], data["inputs"][name]["columns"])
+            typed_rows(
+                fixture["rows"],
+                data["inputs"][name]["columns"],
+                ("steps", index, "inputs", name, "replace", "rows"),
+            )
             initialized.add(name)
         if initialized != data["inputs"].keys():
-            raise ScenarioError("UNINITIALIZED_INPUT")
+            raise ScenarioError("UNINITIALIZED_INPUT", location=("steps", index, "inputs"))
         expected = step["expect"]
         if "same_as" in expected:
             if expected["same_as"] not in seen:
-                raise ScenarioError("INVALID_SAME_AS_REFERENCE")
+                raise ScenarioError(
+                    "INVALID_SAME_AS_REFERENCE", location=("steps", index, "expect", "same_as")
+                )
         else:
             resolve_fixture(expected)
-            rows = typed_rows(expected["rows"], columns)
+            rows = typed_rows(expected["rows"], columns, ("steps", index, "expect", "rows"))
             key_indexes = [list(columns).index(key) for key in keys]
             identities = [tuple(row[i] for i in key_indexes) for row in rows]
             if any(None in key for key in identities) or len(set(identities)) != len(identities):
-                raise ScenarioError("INVALID_EXPECTED_KEY")
+                raise ScenarioError(
+                    "INVALID_EXPECTED_KEY", location=("steps", index, "expect", "rows")
+                )
         seen.add(step["name"])
     canonical = json.dumps(data, sort_keys=True, separators=(",", ":"), allow_nan=False)
     return Scenario(data, path, hashlib.sha256(canonical.encode()).hexdigest(), hashes)

@@ -9,9 +9,10 @@ import yaml
 
 from dbt_scenario.config import Config
 from dbt_scenario.deadline import Deadline
+from dbt_scenario.environment import process_environment
 from dbt_scenario.errors import ScenarioError
-from dbt_scenario.loader import read_yaml
 from dbt_scenario.process import run_process
+from dbt_scenario.requirements import check_dependencies, project_settings
 
 MACROS = """
 {% macro generate_schema_name(custom_schema_name, node) %}
@@ -76,19 +77,9 @@ class Project:
         self.schema = schema
         self.application_name = f"dbt-scenario:{schema}"
         self.sequence = 0
-        self.environment = {
-            key: value
-            for key, value in os.environ.items()
-            if key.upper() in {"PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "LANG", "LC_ALL"}
-        }
-        self.environment.update(
-            {
-                "DBT_SEND_ANONYMOUS_USAGE_STATS": "false",
-                "DBT_PARTIAL_PARSE": "false",
-                "DBT_ENV_SECRET_DSC_PASSWORD": config.database["password"],
-                "PYTHONIOENCODING": "utf-8",
-            }
-        )
+        self.environment = process_environment(config.project_env, config.database["password"])
+        settings = project_settings(config.project_dir)
+        check_dependencies(config.project_dir, settings)
         self.project_hash = fingerprint(config.project_dir)
         ignored = shutil.ignore_patterns(
             ".git", ".venv", "target", "logs", "artifacts", ".dbt-scenario", "__pycache__"
@@ -98,7 +89,7 @@ class Project:
                 if (Path(base) / name).is_symlink():
                     raise ScenarioError("PROJECT_SYMLINK_UNSUPPORTED")
         shutil.copytree(config.project_dir, self.root, ignore=ignored)
-        self.settings = read_yaml(self.root / "dbt_project.yml")
+        self.settings = settings
         if self.settings.get("on-run-start") or self.settings.get("on-run-end"):
             raise ScenarioError("PROJECT_HOOKS_UNSUPPORTED")
         self.settings["profile"] = "dbt_scenario"
