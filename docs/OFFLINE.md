@@ -12,3 +12,5 @@ The runtime runs as the unprivileged `postgres` OS user. It requires the interfa
 The installed `dbt-scenario init --demo` creates the project from packaged resources. The test then completes its initial load, update and retry against loopback PostgreSQL, requires row counts 2/3/3, checks SQL audit status and requires CLEANED. It also queries the fresh database for leftover run schemas and stops PostgreSQL before returning success.
 
 The JSON result records package/server versions, network checks, step statuses, row counts and cleanup status. Passwords, model SQL and raw subprocess output are not published. GitHub Actions retains this result as the `offline-results` artifact. Installation, base-image downloads and image building require network access; the claim applies to execution after installation. This is a correctness check and does not enforce the separate Linux performance target.
+
+The first [alpha 6 offline job](https://github.com/acneism/dbt-scenario/actions/runs/41543901187/job/125614577872) passed for commit e4a3475: PostgreSQL 16.15, only `lo`, blocked external IPv4/IPv6 connections, three PASS steps, 2/3/3 rows and CLEANED.

@@ -981,3 +981,33 @@ def test_cte_model_passes_compiled_relation_audit(project):
     report = run_scenario(scenario, config, reports)
     assert report["overall_status"] == "PASS", report
     assert [step["sql_audit"]["checked_relations"] for step in report["steps"]] == [1, 2, 2]
+
+
+@pytest.mark.parametrize("change", ["hook", "strategy"])
+def test_later_unsupported_config_is_rejected_before_model_run(project, monkeypatch, change):
+    config, scenario, reports = project
+    if change == "hook":
+        model = config.project_dir / "models/fct_orders.sql"
+        model.write_text(
+            model.read_text().replace(
+                "materialized='incremental'",
+                "materialized='incremental', pre_hook=var('hook_sql', [])",
+            )
+        )
+        scenario.data["steps"][1]["run"]["vars"] = {"hook_sql": ["select 1"]}
+    else:
+        scenario.data["steps"][1]["run"]["vars"] = {"strategy": "unsupported_custom"}
+    original = Project.invoke
+    calls = []
+
+    def observed(self, command, timeout, args=()):
+        calls.append(command)
+        return original(self, command, timeout, args)
+
+    monkeypatch.setattr(Project, "invoke", observed)
+    report = run_scenario(scenario, config, reports)
+    assert report["overall_status"] == "ERROR", report
+    assert report["reason_code"] == "MODEL_CONFIGURATION_CHANGED"
+    assert calls.count("run") == 1
+    assert [step["status"] for step in report["steps"]] == ["PASS", "ERROR", "NOT_RUN"]
+    assert report["cleanup_status"] == "CLEANED"

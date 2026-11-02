@@ -50,14 +50,16 @@ The CLI continuation test fails the first scenario, runs a second independent sc
 
 The controlled-time scenario requires an as_of var even during parsing, filters future events across three dbt invocations and fails when a later step omits that required var. Independent unit cases cover malformed expected fixtures, each project/scenario fingerprint input and preservation of the original project during copying and mapping.
 
-Ruff checks, formatting, source comment/docstring checks and offline wheel/source builds passed. The published performance dataset still describes alpha 4; no alpha 5 timing claim is made. Full Linux CI must be checked for the final commit.
+Ruff checks, formatting, source comment/docstring checks and offline wheel/source builds passed. The published performance dataset still describes alpha 4; no alpha 5 timing claim is made. The [final alpha 5 Linux CI run](https://github.com/acneism/dbt-scenario/actions/runs/41540078132) passed all 184 tests for commit 99794e1.
 
 ## SQL relation and offline acceptance validation
 
-Alpha 6 was checked locally on November 3, 2026. The suite contains 227 tests: 160 unit cases and 67 PostgreSQL/dbt cases. Local Windows unit checks passed 158 cases with two platform-specific skips. Nine selected real-db cases passed: merge/update/retry, direct/nested/macro-generated/later-step external relations, an unsupported table function, CTE resolution and the two SQL/snapshot deadline cases. The complete suite and the separate offline container job require the final GitHub Actions result.
+Alpha 6 was checked locally on November 3, 2026. The suite contains 229 tests: 160 unit cases and 69 PostgreSQL/dbt cases. Local Windows unit checks passed 158 cases with two platform-specific skips. Eleven selected real-db cases cover merge/update/retry, direct/nested/macro-generated/later-step external relations, an unsupported table function, CTE resolution, the two SQL/snapshot deadline cases and later vars that attempt hooks/custom strategies. The complete suite and the separate offline container job require the final GitHub Actions result.
 
 SQLGlot 30.27.0 is the new pinned parser dependency. The parser's supported PostgreSQL query subset is checked before each dbt run and again against its run-compiled query. Test spies require zero model runs for forbidden first-step relations, and only the initial model run when a later step introduces an external relation. Parser diagnostics are checked for SQL/value redaction. This does not audit arbitrary Jinja execution or user-defined scalar-function behavior; see [the declared boundary](SQL-AUDIT.md).
 
 The offline image installs Python/package dependencies during build, then runs as an unprivileged OS user with `--network none`. Its acceptance program requires only loopback interfaces, blocked external IPv4/IPv6 connections, a fresh PostgreSQL cluster, the installed package's generated demo, successful 2/3/3 final-table row counts and no leftover run schemas. Local Docker is unavailable, so no local offline-container result is claimed. [The workflow and protocol](OFFLINE.md) must pass in CI.
+
+The first alpha 6 offline job passed for e4a3475 on PostgreSQL 16.15 with all three steps PASS and CLEANED. The final configuration-guard revision must also pass both CI jobs before being considered verified.
 
 Per-step compilation changes the workload and uses the original shared deadlines. The slow-query and snapshot test budgets increased to 24 seconds so their intended injected delay remains reachable. Alpha 4 performance measurements remain historical, and the benchmark protocol now records the three extra compile calls, auditing and parser version.

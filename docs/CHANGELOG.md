@@ -5,6 +5,7 @@
 - Compile and audit every step before running its model; resolve CTE/subquery scopes and allow only mapped fixtures plus an incremental target.
 - Reject external/unqualified table references, writes, locks, table functions and unsupported query grammar with redacted diagnostics.
 - Recheck run-compiled SQL and retain safe audit hashes/counts in reports.
+- Recheck supported model configuration after compilation so later-step vars cannot introduce hooks or custom strategies before model execution.
 - Add a Docker acceptance job that runs the installed demo and PostgreSQL with external networking disabled.
 - Add unit/query-scope cases and real dbt tests that verify forbidden relations fail before model execution.
 

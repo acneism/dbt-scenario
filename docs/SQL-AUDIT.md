@@ -8,6 +8,8 @@ An external table, cross-database name, ambiguous unqualified name or undeclared
 
 The runner also audits the compiled query returned by `dbt run`. Reports retain pre-run and run-compiled query hashes, the number of checked physical references and the audit method, without relation names or query text. `plan` checks declared dependencies through parsing; relation auditing takes place during `test`, when fixtures and target state are available.
 
+Every compiled step also rechecks supported model configuration. Vars cannot introduce hooks, grants, persist_docs, an enforced contract, a custom strategy or non-SQL language on a later step and proceed to model execution. Routing and materialization must remain valid for the selected isolated target.
+
 Compilation adds a dbt subprocess to each step and consumes the existing step/scenario deadline. Alpha 4's timings do not measure this version. Existing snapshot and slow-query tests have larger budgets to allow the extra compilation to finish before injecting their intended delay.
 
 This is a diagnostic check for trusted local projects, not a sandbox. dbt Jinja, `run_query`, introspective macros and user-defined scalar functions can execute code outside the compiled SELECT's table references. Compilation and execution can also render different SQL. Do not attach production data or credentials to the disposable test database; its permissions remain the isolation boundary. Custom hooks/materializations/routing macros remain unsupported. The audit does not prove that arbitrary macros or functions have no side effects.

@@ -33,6 +33,14 @@ def execution_node(manifest, node, actual_schema, database):
         or selected["database"] != database
         or selected["config"]["materialized"] != "incremental"
         or selected["config"].get("full_refresh") is True
+        or selected["config"].get("incremental_strategy")
+        not in {None, "append", "merge", "delete+insert"}
+        or any(
+            selected["config"].get(name)
+            for name in ["pre-hook", "post-hook", "grants", "persist_docs"]
+        )
+        or selected["config"].get("contract", {}).get("enforced")
+        or selected["config"].get("language", "sql") != "sql"
     ):
         raise ScenarioError("MODEL_CONFIGURATION_CHANGED")
     return selected

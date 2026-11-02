@@ -30,6 +30,9 @@ FIELDS = {
 }
 
 HINTS = {
+    "MODEL_CONFIGURATION_CHANGED": (
+        "Keep routing stable; use only supported materializations, strategies and model settings."
+    ),
     "SQL_EXTERNAL_RELATION": (
         "Use declared source/ref fixtures and this; external SQL relations are unsupported."
     ),
