@@ -2,15 +2,16 @@ import hashlib
 import json
 import os
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 
 import yaml
 
 from dbt_scenario.config import Config
+from dbt_scenario.deadline import Deadline
 from dbt_scenario.errors import ScenarioError
 from dbt_scenario.loader import read_yaml
+from dbt_scenario.process import run_process
 
 MACROS = """
 {% macro generate_schema_name(custom_schema_name, node) %}
@@ -73,6 +74,7 @@ class Project:
         self.workspace = workspace
         self.root = workspace / "project"
         self.schema = schema
+        self.application_name = f"dbt-scenario:{schema}"
         self.sequence = 0
         self.environment = {
             key: value
@@ -114,6 +116,7 @@ class Project:
             "threads": 1,
             "connect_timeout": 10,
             "sslmode": database.get("sslmode", "prefer"),
+            "application_name": self.application_name,
         }
         profile = {"dbt_scenario": {"target": "test", "outputs": {"test": output}}}
         profile_path = self.profiles / "profiles.yml"
@@ -126,9 +129,9 @@ class Project:
             yaml.safe_dump(self.settings, sort_keys=False), encoding="utf-8"
         )
 
-    def invoke(self, command: str, timeout: float, args=()) -> tuple[dict, Path]:
-        if timeout <= 0:
-            raise ScenarioError("SCENARIO_TIMEOUT")
+    def invoke(self, command: str, timeout: float | Deadline, args=()) -> tuple[dict, Path]:
+        deadline = timeout if isinstance(timeout, Deadline) else Deadline(timeout, "DBT_TIMEOUT")
+        deadline.check()
         self.sequence += 1
         artifact_dir = self.workspace / f"dbt_{self.sequence}"
         executable = Path(sys.executable).parent / ("dbt.exe" if os.name == "nt" else "dbt")
@@ -149,18 +152,13 @@ class Project:
             str(artifact_dir / "target"),
             *args,
         ]
-        try:
-            process = subprocess.run(
-                argv,
-                env=self.environment,
-                capture_output=True,
-                timeout=timeout,
-                cwd=self.root,
-                check=False,
-            )
-        except subprocess.TimeoutExpired:
-            raise ScenarioError("DBT_TIMEOUT") from None
-        if process.returncode:
+        milliseconds = deadline.milliseconds()
+        environment = {
+            **self.environment,
+            "PGOPTIONS": f"-c statement_timeout={milliseconds} -c lock_timeout=10000",
+        }
+        result = run_process(argv, environment, self.root, deadline)
+        if result:
             raise ScenarioError("DBT_EXECUTION_ERROR")
         return self.read_artifact(artifact_dir, "manifest.json"), artifact_dir
 
@@ -171,7 +169,7 @@ class Project:
         except (OSError, ValueError):
             raise ScenarioError("DBT_ARTIFACT_MISSING") from None
 
-    def inspect(self, scenario: dict, timeout: float) -> dict:
+    def inspect(self, scenario: dict, timeout: float | Deadline) -> dict:
         manifest, _ = self.invoke("parse", timeout)
         node = manifest["nodes"].get(scenario["model"])
         if not node or node["package_name"] != self.settings["name"]:

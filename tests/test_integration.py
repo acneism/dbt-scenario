@@ -2,15 +2,26 @@ import copy
 import json
 import os
 import shutil
+import signal
+import subprocess
+import sys
+import time
+import uuid
 from pathlib import Path
 
 import psycopg
 import pytest
 import yaml
 from click.testing import CliRunner
+from psycopg import sql
 
 from dbt_scenario.cli import main
 from dbt_scenario.config import load_config
+from dbt_scenario.database import Database
+from dbt_scenario.deadline import Deadline
+from dbt_scenario.errors import ScenarioError
+from dbt_scenario.journal import Journal
+from dbt_scenario.lifecycle import cleanup_run, finish_run
 from dbt_scenario.loader import load_scenario
 from dbt_scenario.project import fingerprint
 from dbt_scenario.runner import run_scenario
@@ -25,10 +36,38 @@ def project(tmp_path):
         pytest.skip("DSC_TEST_PASSWORD is required for disposable PostgreSQL")
     config = load_config(ROOT / "scenario-runner.yml")
     copied = tmp_path / "shop"
-    shutil.copytree(config.project_dir, copied)
+    shutil.copytree(config.project_dir, copied, ignore=shutil.ignore_patterns(".dbt-scenario"))
     config.project_dir = copied
     scenario = load_scenario(copied / "scenarios" / "orders.yml", copied)
     return config, scenario, tmp_path / "reports"
+
+
+def config_file(config, directory):
+    data = yaml.safe_load((ROOT / "scenario-runner.yml").read_text())
+    data["project_dir"] = str(config.project_dir)
+    data["step_timeout"] = config.step_timeout
+    data["scenario_timeout"] = config.scenario_timeout
+    path = directory / "runner.yml"
+    path.write_text(yaml.safe_dump(data))
+    return path
+
+
+def existing_schemas(config, journal):
+    with psycopg.connect(**config.connection_kwargs()) as connection:
+        return connection.execute(
+            "SELECT nspname FROM pg_namespace WHERE nspname=ANY(%s)",
+            [journal.data["schemas"]],
+        ).fetchall()
+
+
+def slow_model(config):
+    model = config.project_dir / "models" / "fct_orders.sql"
+    model.write_text(
+        model.read_text().replace(
+            "from {{ source('raw', 'orders') }}",
+            "from {{ source('raw', 'orders') }} cross join (select pg_sleep(60)) delay",
+        )
+    )
 
 
 @pytest.mark.parametrize("strategy", ["delete+insert", "merge"])
@@ -136,3 +175,266 @@ def test_cli_nonzero_and_json_junit_artifacts(project, tmp_path):
     assert len(summaries) == 1
     assert json.loads(summaries[0].read_text())["overall_status"] == "FAIL"
     assert summaries[0].with_name("junit.xml").is_file()
+
+
+def test_kept_failure_can_be_cleaned_twice_from_cli(project, tmp_path):
+    config, scenario, reports = project
+    scenario.data["steps"][0]["expect"]["rows"][0]["amount"] = "99.00"
+    result = run_scenario(scenario, config, reports, keep_on_failure=True)
+    assert result["overall_status"] == "FAIL", result
+    assert result["cleanup_status"] == "KEPT"
+    journal = Journal.load(config, result["run_id"])
+    assert len(existing_schemas(config, journal)) == 3
+    path = config_file(config, tmp_path)
+    try:
+        for _ in range(2):
+            response = CliRunner().invoke(
+                main,
+                [
+                    "cleanup",
+                    "--config",
+                    str(path),
+                    "--run-id",
+                    result["run_id"],
+                ],
+            )
+            assert response.exit_code == 0, response.output
+        assert not existing_schemas(config, journal)
+        assert Journal.load(config, result["run_id"]).data["state"] == "CLEANED"
+    finally:
+        cleanup_run(config, result["run_id"])
+
+
+def test_cleanup_refuses_an_active_runner(project):
+    config, _, _ = project
+    database = Database(config)
+    journal = Journal.create(config, uuid.uuid4().hex)
+    try:
+        database.create_schemas(journal)
+        with pytest.raises(ScenarioError, match="RUN_STILL_ACTIVE"):
+            cleanup_run(config, journal.data["run_id"])
+        assert len(existing_schemas(config, journal)) == 3
+        assert Journal.load(config, journal.data["run_id"]).data["state"] == "RUNNING"
+    finally:
+        database.close()
+        cleanup_run(config, journal.data["run_id"])
+
+
+def test_cleanup_validates_every_marker_before_deleting_anything(project):
+    config, _, _ = project
+    database = Database(config)
+    journal = Journal.create(config, uuid.uuid4().hex)
+    database.create_schemas(journal)
+    name = journal.data["schemas"][1]
+    database.execute(sql.SQL("COMMENT ON SCHEMA {} IS 'not-owned'").format(sql.Identifier(name)))
+    database.close()
+    try:
+        with pytest.raises(ScenarioError, match="CLEANUP_OWNERSHIP_MISMATCH"):
+            cleanup_run(config, journal.data["run_id"])
+        assert len(existing_schemas(config, journal)) == 3
+        assert Journal.load(config, journal.data["run_id"]).data["state"] == "CLEANUP_FAILED"
+    finally:
+        with psycopg.connect(**config.connection_kwargs(), autocommit=True) as connection:
+            connection.execute(
+                sql.SQL("COMMENT ON SCHEMA {} IS {}").format(
+                    sql.Identifier(name), sql.Literal(journal.marker())
+                )
+            )
+        cleanup_run(config, journal.data["run_id"])
+
+
+def test_cleanup_never_cascades_into_another_run(project):
+    config, _, _ = project
+    first, second = [Journal.create(config, uuid.uuid4().hex) for _ in range(2)]
+    databases = [Database(config), Database(config)]
+    try:
+        for database, journal in zip(databases, [first, second], strict=True):
+            database.create_schemas(journal)
+        table = sql.Identifier(first.data["schemas"][0], "owned")
+        view = sql.Identifier(second.data["schemas"][0], "foreign_view")
+        databases[0].execute(sql.SQL("CREATE TABLE {} (id integer)").format(table))
+        databases[1].execute(sql.SQL("CREATE VIEW {} AS SELECT * FROM {}").format(view, table))
+    finally:
+        for database in databases:
+            database.close()
+    try:
+        with pytest.raises(psycopg.errors.DependentObjectsStillExist):
+            cleanup_run(config, first.data["run_id"])
+        assert len(existing_schemas(config, first)) == 3
+        assert len(existing_schemas(config, second)) == 3
+        with psycopg.connect(**config.connection_kwargs(), autocommit=True) as connection:
+            connection.execute(sql.SQL("SELECT * FROM {}").format(view))
+            connection.execute(sql.SQL("DROP VIEW {} RESTRICT").format(view))
+    finally:
+        cleanup_run(config, first.data["run_id"])
+        cleanup_run(config, second.data["run_id"])
+
+
+def test_deadline_cancels_sql_and_rolls_back_all_input_updates(project):
+    config, _, _ = project
+    database = Database(config)
+    journal = Journal.create(config, uuid.uuid4().hex)
+    try:
+        database.create_schemas(journal)
+        name = journal.data["schemas"][1]
+        database.replace(name, "input", {"id": "integer"}, [{"id": 1}])
+        started = time.monotonic()
+        with pytest.raises(ScenarioError, match="STEP_TIMEOUT"):
+            with database.budget(Deadline(0.25, "STEP_TIMEOUT")):
+                with database.connection.transaction():
+                    database.replace(name, "input", {"id": "integer"}, [{"id": 2}])
+                    database.execute("SELECT pg_sleep(60)")
+        assert time.monotonic() - started < 4
+        assert database.execute(
+            sql.SQL("SELECT id FROM {}.input").format(sql.Identifier(name))
+        ).fetchall() == [(1,)]
+    finally:
+        finish_run(database, journal)
+        database.close()
+
+
+def test_timeout_in_dbt_stops_server_query_and_cleans_schemas(project):
+    config, scenario, reports = project
+    slow_model(config)
+    config.step_timeout = 12
+    result = run_scenario(scenario, config, reports)
+    assert result["overall_status"] == "ERROR", result
+    assert result["reason_code"] == "STEP_TIMEOUT", result
+    assert result["cleanup_status"] == "CLEANED", result
+    journal = Journal.load(config, result["run_id"])
+    assert not existing_schemas(config, journal)
+    with psycopg.connect(**config.connection_kwargs()) as connection:
+        assert not connection.execute(
+            "SELECT 1 FROM pg_stat_activity WHERE application_name=%s AND state='active'",
+            [f"dbt-scenario:{journal.data['schemas'][0]}"],
+        ).fetchall()
+
+
+def test_snapshot_is_inside_the_step_deadline(project, monkeypatch):
+    config, scenario, reports = project
+    config.step_timeout = 12
+    original = Database.snapshot
+
+    def delayed_snapshot(database, *args):
+        database.execute("SELECT pg_sleep(60)")
+        return original(database, *args)
+
+    monkeypatch.setattr(Database, "snapshot", delayed_snapshot)
+    result = run_scenario(scenario, config, reports)
+    assert result["overall_status"] == "ERROR", result
+    assert result["reason_code"] == "STEP_TIMEOUT", result
+    assert result["cleanup_status"] == "CLEANED", result
+
+
+def test_scenario_deadline_also_limits_setup(project):
+    config, scenario, reports = project
+    config.scenario_timeout = 1
+    result = run_scenario(scenario, config, reports)
+    assert result["overall_status"] == "ERROR", result
+    assert result["reason_code"] == "SCENARIO_TIMEOUT", result
+    assert result["duration_ms"] < 10000, result
+
+
+def test_abandoned_process_resources_can_be_recovered(project, tmp_path):
+    config, _, _ = project
+    run_id = uuid.uuid4().hex
+    path = config_file(config, tmp_path)
+    program = (
+        "import os,sys; from pathlib import Path; "
+        "from dbt_scenario.config import load_config; "
+        "from dbt_scenario.database import Database; "
+        "from dbt_scenario.journal import Journal; "
+        "c=load_config(Path(sys.argv[1])); j=Journal.create(c,sys.argv[2]); "
+        "d=Database(c); d.create_schemas(j); os._exit(17)"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", program, str(path), run_id],
+        capture_output=True,
+        timeout=20,
+        check=False,
+    )
+    assert result.returncode == 17, result.stderr
+    journal = Journal.load(config, run_id)
+    assert len(existing_schemas(config, journal)) == 3
+    cleanup_run(config, run_id)
+    assert not existing_schemas(config, journal)
+
+
+def test_two_cli_processes_do_not_share_state(project, tmp_path):
+    config, scenario, reports = project
+    path = config_file(config, tmp_path)
+    argv = [
+        sys.executable,
+        "-c",
+        "from dbt_scenario.cli import main; main()",
+        "test",
+        "--config",
+        str(path),
+        "--scenario",
+        str(scenario.path),
+        "--report-dir",
+        str(reports),
+    ]
+    processes = [
+        subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE) for _ in range(2)
+    ]
+    try:
+        for process in processes:
+            stdout, stderr = process.communicate(timeout=120)
+            assert process.returncode == 0, (stdout, stderr)
+        summaries = [json.loads(path.read_text()) for path in reports.glob("*/summary.json")]
+        assert len(summaries) == 2
+        assert len({report["run_id"] for report in summaries}) == 2
+        assert all(report["overall_status"] == "PASS" for report in summaries)
+        for report in summaries:
+            assert not existing_schemas(config, Journal.load(config, report["run_id"]))
+    finally:
+        for process in processes:
+            if process.poll() is None:
+                process.kill()
+                process.wait()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX SIGINT delivery")
+def test_sigint_cleans_resources_and_returns_130(project, tmp_path):
+    config, scenario, reports = project
+    slow_model(config)
+    path = config_file(config, tmp_path)
+    argv = [
+        sys.executable,
+        "-c",
+        "from dbt_scenario.cli import main; main()",
+        "test",
+        "--config",
+        str(path),
+        "--scenario",
+        str(scenario.path),
+        "--report-dir",
+        str(reports),
+    ]
+    process = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    try:
+        end = time.monotonic() + 45
+        while time.monotonic() < end:
+            with psycopg.connect(**config.connection_kwargs()) as connection:
+                active = connection.execute(
+                    "SELECT 1 FROM pg_stat_activity WHERE application_name LIKE 'dbt-scenario:%' "
+                    "AND state='active' AND query LIKE '%%pg_sleep%%'"
+                ).fetchone()
+            if active:
+                break
+            assert process.poll() is None
+            time.sleep(0.1)
+        else:
+            pytest.fail("dbt never started the slow query")
+        process.send_signal(signal.SIGINT)
+        stdout, stderr = process.communicate(timeout=20)
+        assert process.returncode == 130, (stdout, stderr)
+        report = json.loads(next(reports.glob("*/summary.json")).read_text())
+        assert report["reason_code"] == "INTERRUPTED", report
+        assert report["cleanup_status"] == "CLEANED", report
+        assert not existing_schemas(config, Journal.load(config, report["run_id"]))
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait()

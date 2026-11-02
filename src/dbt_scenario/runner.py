@@ -13,7 +13,10 @@ import sqlparse
 
 from dbt_scenario.config import Config
 from dbt_scenario.database import Database
+from dbt_scenario.deadline import Deadline
 from dbt_scenario.errors import ScenarioError
+from dbt_scenario.journal import Journal, schema_names
+from dbt_scenario.lifecycle import finish_run
 from dbt_scenario.loader import Scenario
 from dbt_scenario.project import Project
 from dbt_scenario.report import write_report
@@ -60,8 +63,11 @@ def observe_mode(
     }
 
 
-def run_scenario(scenario: Scenario, config: Config, report_dir: Path) -> dict:
+def run_scenario(
+    scenario: Scenario, config: Config, report_dir: Path, keep_on_failure: bool = False
+) -> dict:
     started = time.monotonic()
+    scenario_budget = Deadline(config.scenario_timeout, "SCENARIO_TIMEOUT")
     run_id = uuid.uuid4().hex
     definition = scenario.data
     report = {
@@ -77,32 +83,28 @@ def run_scenario(scenario: Scenario, config: Config, report_dir: Path) -> dict:
         "engine_versions": {name: version(name) for name in ["dbt-core", "dbt-postgres"]},
         "overall_status": "ERROR",
         "cleanup_status": "NOT_NEEDED",
+        "cleanup_reason_code": None,
         "reason_code": None,
         "steps": [],
     }
-    prefix = f"dsc_{run_id[:20]}"
-    actual_schema, input_schema, expected_schema = [f"{prefix}_{name}" for name in ["a", "i", "e"]]
-    database = None
-    current_step = None
+    actual_schema, input_schema, expected_schema = schema_names(run_id)
+    database = journal = current_step = step_started = None
     output_dir = report_dir / run_id
     output_dir.mkdir(parents=True)
-
-    def remaining(step_started=None):
-        budget = config.scenario_timeout - (time.monotonic() - started)
-        if step_started is not None:
-            budget = min(budget, config.step_timeout - (time.monotonic() - step_started))
-        return min(budget, config.step_timeout)
-
     try:
         with tempfile.TemporaryDirectory(prefix="dbt-scenario-") as temporary:
-            database = Database(config)
-            project = Project(config, Path(temporary), actual_schema)
-            report["project_hash"] = project.project_hash
-            node = project.inspect(definition, remaining())
-            mapping = project.install_mapping(definition, input_schema)
-            for schema in [actual_schema, input_schema, expected_schema]:
-                database.create_schema(schema, run_id)
-            report["cleanup_status"] = "PENDING"
+            database = Database(config, scenario_budget)
+            report["engine_versions"]["postgresql"] = database.connection.info.server_version
+            with database.budget(scenario_budget):
+                project = Project(config, Path(temporary), actual_schema)
+                report["project_hash"] = project.project_hash
+                scenario_budget.check()
+                node = project.inspect(definition, scenario_budget)
+                mapping = project.install_mapping(definition, input_schema)
+                database.acquire_run_lock(run_id)
+                journal = Journal.create(config, run_id)
+                database.create_schemas(journal)
+                report["cleanup_status"] = "PENDING"
             snapshots = {}
             for index, step in enumerate(definition["steps"]):
                 current_step = {
@@ -120,68 +122,76 @@ def run_scenario(scenario: Scenario, config: Config, report_dir: Path) -> dict:
                 }
                 report["steps"].append(current_step)
                 step_started = time.monotonic()
-                with database.connection.transaction():
-                    for name, update in step.get("inputs", {}).items():
-                        source = definition["inputs"][name]
+                step_budget = Deadline(config.step_timeout, "STEP_TIMEOUT", scenario_budget)
+                with database.budget(step_budget):
+                    with database.connection.transaction():
+                        for name, update in step.get("inputs", {}).items():
+                            source = definition["inputs"][name]
+                            database.replace(
+                                input_schema,
+                                mapping[source["node"]],
+                                source["columns"],
+                                update["replace"]["rows"],
+                            )
+                    before = database.oid(actual_schema, node["alias"])
+                    if (before is None) != (step["run"]["mode"] == "initial"):
+                        raise ScenarioError("INVALID_TARGET_STATE")
+                    args = [
+                        "--select",
+                        node["name"],
+                        "--vars",
+                        json.dumps(step["run"].get("vars", {})),
+                    ]
+                    manifest, artifacts = project.invoke("run", step_budget, args)
+                    run_node = manifest["nodes"].get(node["unique_id"])
+                    if (
+                        not run_node
+                        or run_node["alias"] != node["alias"]
+                        or run_node["schema"] != actual_schema
+                        or run_node["database"] != config.database["dbname"]
+                        or run_node["config"]["materialized"] != "incremental"
+                        or run_node["config"].get("full_refresh") is True
+                    ):
+                        raise ScenarioError("MODEL_CONFIGURATION_CHANGED")
+                    after = database.oid(actual_schema, node["alias"])
+                    evidence = observe_mode(
+                        project, run_node, artifacts, step["run"]["mode"], before, after
+                    )
+                    current_step.update(
+                        observed_mode=step["run"]["mode"], observed_mode_evidence=evidence
+                    )
+                    expected = step["expect"]
+                    if "same_as" in expected:
+                        expected_table = snapshots[expected["same_as"]]
+                    else:
+                        expected_table = f"expected_{index}"
                         database.replace(
-                            input_schema,
-                            mapping[source["node"]],
-                            source["columns"],
-                            update["replace"]["rows"],
+                            expected_schema,
+                            expected_table,
+                            definition["output"]["columns"],
+                            expected["rows"],
                         )
-                before = database.oid(actual_schema, node["alias"])
-                if (before is None) != (step["run"]["mode"] == "initial"):
-                    raise ScenarioError("INVALID_TARGET_STATE")
-                args = ["--select", node["name"], "--vars", json.dumps(step["run"].get("vars", {}))]
-                manifest, artifacts = project.invoke("run", remaining(step_started), args)
-                run_node = manifest["nodes"].get(node["unique_id"])
-                if (
-                    not run_node
-                    or run_node["alias"] != node["alias"]
-                    or run_node["schema"] != actual_schema
-                    or run_node["database"] != config.database["dbname"]
-                    or run_node["config"]["materialized"] != "incremental"
-                    or run_node["config"].get("full_refresh") is True
-                ):
-                    raise ScenarioError("MODEL_CONFIGURATION_CHANGED")
-                after = database.oid(actual_schema, node["alias"])
-                evidence = observe_mode(
-                    project, run_node, artifacts, step["run"]["mode"], before, after
-                )
-                current_step.update(
-                    observed_mode=step["run"]["mode"], observed_mode_evidence=evidence
-                )
-                expected = step["expect"]
-                if "same_as" in expected:
-                    expected_table = snapshots[expected["same_as"]]
-                else:
-                    expected_table = f"expected_{index}"
-                    database.replace(
-                        expected_schema,
-                        expected_table,
-                        definition["output"]["columns"],
-                        expected["rows"],
+                    current_step.update(
+                        database.compare(
+                            actual_schema,
+                            node["alias"],
+                            expected_schema,
+                            expected_table,
+                            definition["output"]["columns"],
+                            definition["output"]["primary_key"],
+                        )
                     )
-                current_step.update(
-                    database.compare(
-                        actual_schema,
-                        node["alias"],
-                        expected_schema,
-                        expected_table,
-                        definition["output"]["columns"],
-                        definition["output"]["primary_key"],
-                    )
-                )
+                    if current_step["status"] == "PASS":
+                        snapshot = f"snapshot_{index}"
+                        database.snapshot(actual_schema, node["alias"], expected_schema, snapshot)
+                        snapshots[step["name"]] = snapshot
                 current_step["duration_ms"] = round((time.monotonic() - step_started) * 1000)
-                if remaining(step_started) <= 0:
-                    raise ScenarioError("SCENARIO_TIMEOUT")
                 if current_step["status"] != "PASS":
                     break
-                snapshot = f"snapshot_{index}"
-                database.snapshot(actual_schema, node["alias"], expected_schema, snapshot)
-                snapshots[step["name"]] = snapshot
             report["overall_status"] = (
-                "PASS" if all(step["status"] == "PASS" for step in report["steps"]) else "FAIL"
+                "PASS"
+                if report["steps"] and all(s["status"] == "PASS" for s in report["steps"])
+                else "FAIL"
             )
     except ScenarioError as error:
         report["reason_code"] = error.code
@@ -196,18 +206,29 @@ def run_scenario(scenario: Scenario, config: Config, report_dir: Path) -> dict:
             report["overall_status"] = "ERROR"
             if current_step:
                 current_step.update(status="ERROR", reason_code=report["reason_code"])
+                current_step["duration_ms"] = round((time.monotonic() - step_started) * 1000)
         if database:
             try:
-                database.cleanup()
-                report["cleanup_status"] = "CLEANED"
-            except Exception:
+                if journal:
+                    report["cleanup_status"] = finish_run(
+                        database, journal, keep_on_failure and report["overall_status"] != "PASS"
+                    )
+            except Exception as error:
                 report.update(
-                    overall_status="ERROR", cleanup_status="ERROR", reason_code="CLEANUP_FAILED"
+                    overall_status="ERROR",
+                    cleanup_status="ERROR",
+                    cleanup_reason_code=error.code
+                    if isinstance(error, ScenarioError)
+                    else "CLEANUP_FAILED",
                 )
+                report["reason_code"] = report["reason_code"] or "CLEANUP_FAILED"
+                try:
+                    journal.transition("CLEANUP_FAILED")
+                except Exception:
+                    pass
             finally:
                 database.close()
-        completed = len(report["steps"])
-        for step in definition["steps"][completed:]:
+        for step in definition["steps"][len(report["steps"]) :]:
             report["steps"].append(
                 {
                     "name": step["name"],

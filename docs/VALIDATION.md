@@ -15,3 +15,11 @@ Results: 21 validation/CLI tests and 8 integration tests passed. Ruff checks and
 The integration suite ran actual PostgreSQL materializations for delete+insert and merge, detected a wrong event-time watermark, rejected duplicate keys from append, detected a value swap with unchanged row count and total, routed a ref dependency to fixtures, redacted a deliberately sensitive error and checked CLI exit codes with JSON/JUnit output. The example completed all three steps and cleaned its generated schemas.
 
 These checks do not complete the full MVP acceptance matrix or establish adoption by external teams. Linux CI is configured separately and its status must be checked after the workflow runs.
+
+## Recovery and deadlines validation
+
+Alpha 2 was checked on November 3, 2026 using the same local engine versions. The expanded suite contains 52 tests. Local Windows checks passed 50 tests; the POSIX process-group and SIGINT checks are reserved for Linux CI.
+
+New integration cases cover cleanup refusal while a runner holds its lock, ownership mismatch without partial deletion, foreign view dependencies without cascading deletion, deadline cancellation with transactional rollback, slow dbt queries, snapshot deadlines, setup deadlines, repeated cleanup after a retained failure, recovery after abrupt process exit and two simultaneous CLI processes.
+
+Ruff and the source-comment/docstring check passed. Wheel and source distributions for `0.1.0a2` built offline using cached build dependencies. The new Linux workflow run must validate the platform-specific tests before treating those cases as confirmed.

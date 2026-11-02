@@ -4,7 +4,7 @@ Test what your incremental dbt table looks like after several real runs.
 
 Define input snapshots and expected rows in YAML. dbt-scenario runs the model with dbt-postgres, checks the complete resulting table after each step, and verifies retries against an earlier successful state.
 
-This is an early alpha and the first vertical implementation of the project. It supports PostgreSQL 16, Python 3.12, dbt Core 1.11 and dbt-postgres 1.10. It requires a dedicated disposable test database and refuses superuser, CREATEDB and CREATEROLE roles. A successful test covers the supplied fixtures on this engine; it does not establish correctness for another warehouse.
+This is an early alpha. It supports PostgreSQL 16, Python 3.12, dbt Core 1.11 and dbt-postgres 1.10. It requires a dedicated disposable test database and refuses superuser, CREATEDB and CREATEROLE roles. A successful test covers the supplied fixtures on this engine; it does not establish correctness for another warehouse.
 
 ## Quickstart
 
@@ -88,6 +88,23 @@ Use repeated `--scenario` arguments or `--scenario-dir` to select multiple scena
 
 Each run writes `summary.json`, `summary.md` and `junit.xml` beneath `artifacts/scenarios/<run_id>/`. Reports contain counts and column names, without row values or raw dbt errors. dbt logs and temporary profiles are deleted with the temporary workspace. GitHub branch rules must make your test job required if you want it to block merges.
 
+## Recovery and deadlines
+
+Each run writes an atomic resource journal under `<project-dir>/.dbt-scenario/runs/<run_id>.json` before creating its schemas. It records the database identity, exact schema names and an ownership marker, without the password or fixture rows. Preserve this directory when using a persistent test database. It is ignored by Git and should not be included in public CI artifacts.
+
+To retain database tables for debugging a failed scenario:
+
+```sh
+dbt-scenario test --config scenario-runner.yml --scenario examples/shop/scenarios/orders.yml --keep-on-failure
+dbt-scenario cleanup --config scenario-runner.yml --run-id <run_id>
+```
+
+The first command still exits with FAIL or ERROR; intentionally retained data is reported as `cleanup_status: KEPT`. Successful scenarios are always cleaned. The cleanup command also recovers schemas after a process terminates without running its cleanup handler. It uses the same configuration and database role as the original run, refuses an active runner, validates every ownership marker before deleting anything and does not cascade into other schemas. Repeating a completed cleanup is a no-op. If another object depends on a run's tables, cleanup fails without partially deleting the run's resources.
+
+Journals from alpha 1 do not exist, so its abandoned schemas cannot be recovered by this command. Cleanup targets database resources; a hard process kill can also leave an OS temporary project directory.
+
+`step_timeout` covers fixture updates, the dbt process, assertions and snapshot creation together. `scenario_timeout` covers setup and all steps; steps cannot extend it. Expiry returns `STEP_TIMEOUT` or `SCENARIO_TIMEOUT` with a nonzero exit code. The runner cancels PostgreSQL work and terminates the dbt process tree. Process shutdown has a short termination grace period, and resource cleanup receives a separate 10-second budget. These deadlines do not impose an operating-system execution limit on arbitrary user Python/Jinja code or filesystem stalls.
+
 ## Current boundaries
 
 - One SQL incremental model per scenario; direct upstream models are fixtures, so their SQL is outside the test.
@@ -96,7 +113,7 @@ Each run writes `summary.json`, `summary.md` and `junit.xml` beneath `artifacts/
 - No production connection is needed. The runner is for trusted project code on a disposable test database; it is not a sandbox for malicious macros.
 - Project dependencies must already be installed. The runner does not fetch packages or forward arbitrary environment variables into dbt.
 - Time is not globally frozen. Pass an `as_of` project var for deterministic time-dependent models.
-- No `init`, persistent cleanup journal, keep-on-failure mode or adapter portability guarantee in this first alpha. Abrupt process termination may leave generated schemas; discard the disposable database before retrying.
+- No `init` or adapter portability guarantee yet. Recovery requires the run's journal; losing it means discarding the disposable test database rather than guessing resources by name prefix.
 
 ## Development
 

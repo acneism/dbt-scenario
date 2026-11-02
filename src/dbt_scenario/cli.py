@@ -9,6 +9,7 @@ from dbt_scenario import __version__
 from dbt_scenario.config import load_config
 from dbt_scenario.database import Database
 from dbt_scenario.errors import ScenarioError
+from dbt_scenario.lifecycle import cleanup_run
 from dbt_scenario.loader import load_scenario
 from dbt_scenario.project import Project
 from dbt_scenario.runner import run_scenario
@@ -84,8 +85,9 @@ def plan(config_path, scenario_path):
 )
 @click.option("--scenario-dir", type=click.Path(exists=True, path_type=Path))
 @click.option("--report-dir", default="artifacts/scenarios", type=click.Path(path_type=Path))
+@click.option("--keep-on-failure", is_flag=True)
 @guarded
-def test_command(config_path, scenario_paths, scenario_dir, report_dir):
+def test_command(config_path, scenario_paths, scenario_dir, report_dir, keep_on_failure):
     config = load_config(config_path)
     paths = list(scenario_paths)
     if scenario_dir:
@@ -97,15 +99,26 @@ def test_command(config_path, scenario_paths, scenario_dir, report_dir):
     scenarios = [load_scenario(path, config.project_dir) for path in paths]
     exit_code = 0
     for scenario in scenarios:
-        report = run_scenario(scenario, config, report_dir.resolve())
+        report = run_scenario(scenario, config, report_dir.resolve(), keep_on_failure)
         click.echo(f"{report['overall_status']} {report['scenario']}")
         for step in report["steps"]:
             click.echo(
                 f"  {step['status']} {step['name']} {step.get('reason_code') or ''}".rstrip()
             )
         click.echo(f"  report: {report_dir / report['run_id'] / 'summary.json'}")
+        if report["cleanup_status"] == "KEPT":
+            click.echo(f"  retained schemas; cleanup --run-id {report['run_id']}")
         status = report["overall_status"]
         exit_code = max(exit_code, {"PASS": 0, "FAIL": 1, "ERROR": 2}[status])
         if report["reason_code"] == "INTERRUPTED":
             raise click.exceptions.Exit(130)
     raise click.exceptions.Exit(exit_code)
+
+
+@main.command()
+@config_option
+@click.option("--run-id", required=True)
+@guarded
+def cleanup(config_path, run_id):
+    result = cleanup_run(load_config(config_path), run_id)
+    click.echo(f"{result} {run_id}")
