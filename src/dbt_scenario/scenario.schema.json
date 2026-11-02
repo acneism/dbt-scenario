@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/acneism/dbt-scenario/scenario/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "name", "model", "inputs", "output", "steps"],
+  "properties": {
+    "version": {"const": 1},
+    "name": {"$ref": "#/$defs/name"},
+    "model": {"type": "string", "pattern": "^model\\.[A-Za-z0-9_]+\\.[A-Za-z0-9_]+$"},
+    "inputs": {
+      "type": "object", "minProperties": 1, "maxProperties": 10,
+      "additionalProperties": {
+        "type": "object", "additionalProperties": false,
+        "required": ["node", "columns"],
+        "properties": {
+          "node": {"type": "string", "pattern": "^(model|source)\\.[A-Za-z0-9_.]+$"},
+          "columns": {"$ref": "#/$defs/columns"}
+        }
+      }
+    },
+    "output": {
+      "type": "object", "additionalProperties": false,
+      "required": ["columns", "primary_key"],
+      "properties": {
+        "columns": {"$ref": "#/$defs/columns"},
+        "primary_key": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+      }
+    },
+    "steps": {
+      "type": "array", "minItems": 1, "maxItems": 20,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["name", "run", "expect"],
+        "properties": {
+          "name": {"$ref": "#/$defs/name"},
+          "inputs": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object", "additionalProperties": false,
+              "required": ["replace"],
+              "properties": {"replace": {"$ref": "#/$defs/fixture"}}
+            }
+          },
+          "run": {
+            "type": "object", "additionalProperties": false, "required": ["mode"],
+            "properties": {
+              "mode": {"enum": ["initial", "incremental"]},
+              "vars": {"type": "object"}
+            }
+          },
+          "expect": {
+            "oneOf": [
+              {"$ref": "#/$defs/fixture"},
+              {
+                "type": "object", "additionalProperties": false,
+                "required": ["same_as"],
+                "properties": {"same_as": {"$ref": "#/$defs/name"}}
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "name": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,79}$"},
+    "columns": {"type": "object", "minProperties": 1, "additionalProperties": {"type": "string"}},
+    "fixture": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "rows": {"type": "array", "maxItems": 100000, "items": {"type": "object"}},
+        "fixture": {"type": "string", "minLength": 1}
+      },
+      "oneOf": [{"required": ["rows"]}, {"required": ["fixture"]}]
+    }
+  }
+}

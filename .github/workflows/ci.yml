@@ -1,0 +1,53 @@
+name: CI
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: dbt_scenario_test
+          POSTGRES_PASSWORD: disposable-admin-password
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d dbt_scenario_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      DSC_TEST_PASSWORD: disposable-test-password
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements-dev.lock.txt
+      - run: python -m pip install --no-deps -e .
+      - name: Create restricted test role
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 55432
+          PGUSER: postgres
+          PGPASSWORD: disposable-admin-password
+          POSTGRES_USER: postgres
+          POSTGRES_DB: dbt_scenario_test
+        run: bash scripts/init-test-db.sh
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: pytest -m 'not integration'
+      - run: pytest -m integration
+      - run: dbt-scenario test --config scenario-runner.yml --scenario examples/shop/scenarios/orders.yml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: scenario-results
+          path: |
+            artifacts/scenarios/**/summary.json
+            artifacts/scenarios/**/summary.md
+            artifacts/scenarios/**/junit.xml

@@ -1,0 +1,42 @@
+version: 1
+name: orders_update_late_arrival_retry
+model: model.shop.fct_orders
+inputs:
+  orders:
+    node: source.shop.raw.orders
+    columns:
+      order_id: bigint
+      event_at: timestamp
+      updated_at: timestamp
+      amount: numeric(12,2)
+output:
+  columns:
+    order_id: bigint
+    event_at: timestamp
+    updated_at: timestamp
+    amount: numeric(12,2)
+  primary_key: [order_id]
+steps:
+  - name: initial_load
+    inputs:
+      orders:
+        replace:
+          fixture: fixtures/initial.yml
+    run:
+      mode: initial
+    expect:
+      fixture: fixtures/initial.yml
+  - name: update_and_late_arrival
+    inputs:
+      orders:
+        replace:
+          fixture: fixtures/updated.yml
+    run:
+      mode: incremental
+    expect:
+      fixture: fixtures/updated.yml
+  - name: retry_without_changes
+    run:
+      mode: incremental
+    expect:
+      same_as: update_and_late_arrival

@@ -1,0 +1,11 @@
+version: 1
+project_dir: examples/shop
+database:
+  host: 127.0.0.1
+  port: 55432
+  dbname: dbt_scenario_test
+  user: dbt_scenario
+  password_env: DSC_TEST_PASSWORD
+  sslmode: disable
+step_timeout: 120
+scenario_timeout: 600

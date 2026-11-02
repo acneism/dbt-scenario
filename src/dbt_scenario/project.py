@@ -1,0 +1,234 @@
+import hashlib
+import json
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+import yaml
+
+from dbt_scenario.config import Config
+from dbt_scenario.errors import ScenarioError
+from dbt_scenario.loader import read_yaml
+
+MACROS = """
+{% macro generate_schema_name(custom_schema_name, node) %}
+  {{ return(target.schema) }}
+{% endmacro %}
+
+{% macro generate_database_name(custom_database_name, node) %}
+  {{ return(target.database) }}
+{% endmacro %}
+
+{% macro ref() %}
+  {% set relation = builtins.ref(*varargs, **kwargs) %}
+  {% if execute %}
+    {% set package = varargs[0] if varargs | length == 2 else project_name %}
+    {% set name = varargs[1] if varargs | length == 2 else varargs[0] %}
+    {{ return(dsc_input('model.' ~ package ~ '.' ~ name, relation)) }}
+  {% endif %}
+  {{ return(relation) }}
+{% endmacro %}
+
+{% macro source(source_name, table_name) %}
+  {% set relation = builtins.source(source_name, table_name) %}
+  {% if execute %}
+    {% set node_id = 'source.' ~ project_name ~ '.' ~ source_name ~ '.' ~ table_name %}
+    {{ return(dsc_input(node_id, relation)) }}
+  {% endif %}
+  {{ return(relation) }}
+{% endmacro %}
+
+{% macro dsc_input(node, relation) %}
+  {% set mapping = __MAPPING__ %}
+  {% if node not in mapping %}
+    {{ exceptions.raise_compiler_error('DSC_UNMAPPED_INPUT') }}
+  {% endif %}
+  {{ return(relation.replace_path(
+    database=target.database, schema='__INPUT_SCHEMA__', identifier=mapping[node]
+  )) }}
+{% endmacro %}
+"""
+
+
+def fingerprint(project_dir: Path) -> str:
+    digest = hashlib.sha256()
+    excluded = {".git", ".venv", "target", "logs", "artifacts", ".dbt-scenario", "__pycache__"}
+    for base, dirs, names in os.walk(project_dir):
+        dirs[:] = sorted(name for name in dirs if name not in excluded)
+        for name in sorted(names):
+            path = Path(base) / name
+            if path.is_symlink():
+                raise ScenarioError("PROJECT_SYMLINK_UNSUPPORTED")
+            if path.suffix in {".sql", ".yml", ".yaml", ".json", ".lock"}:
+                digest.update(str(path.relative_to(project_dir)).replace("\\", "/").encode())
+                digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+class Project:
+    def __init__(self, config: Config, workspace: Path, schema: str):
+        self.config = config
+        self.workspace = workspace
+        self.root = workspace / "project"
+        self.schema = schema
+        self.sequence = 0
+        self.environment = {
+            key: value
+            for key, value in os.environ.items()
+            if key.upper() in {"PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "LANG", "LC_ALL"}
+        }
+        self.environment.update(
+            {
+                "DBT_SEND_ANONYMOUS_USAGE_STATS": "false",
+                "DBT_PARTIAL_PARSE": "false",
+                "DBT_ENV_SECRET_DSC_PASSWORD": config.database["password"],
+                "PYTHONIOENCODING": "utf-8",
+            }
+        )
+        self.project_hash = fingerprint(config.project_dir)
+        ignored = shutil.ignore_patterns(
+            ".git", ".venv", "target", "logs", "artifacts", ".dbt-scenario", "__pycache__"
+        )
+        for base, dirs, names in os.walk(config.project_dir):
+            for name in dirs + names:
+                if (Path(base) / name).is_symlink():
+                    raise ScenarioError("PROJECT_SYMLINK_UNSUPPORTED")
+        shutil.copytree(config.project_dir, self.root, ignore=ignored)
+        self.settings = read_yaml(self.root / "dbt_project.yml")
+        if self.settings.get("on-run-start") or self.settings.get("on-run-end"):
+            raise ScenarioError("PROJECT_HOOKS_UNSUPPORTED")
+        self.settings["profile"] = "dbt_scenario"
+        self.profiles = workspace / "profiles"
+        self.profiles.mkdir()
+        database = config.database
+        output = {
+            "type": "postgres",
+            "host": database["host"],
+            "port": database["port"],
+            "dbname": database["dbname"],
+            "user": database["user"],
+            "pass": "{{ env_var('DBT_ENV_SECRET_DSC_PASSWORD') }}",
+            "schema": schema,
+            "threads": 1,
+            "connect_timeout": 10,
+            "sslmode": database.get("sslmode", "prefer"),
+        }
+        profile = {"dbt_scenario": {"target": "test", "outputs": {"test": output}}}
+        profile_path = self.profiles / "profiles.yml"
+        profile_path.write_text(yaml.safe_dump(profile), encoding="utf-8")
+        profile_path.chmod(0o600)
+        self.write_settings()
+
+    def write_settings(self):
+        (self.root / "dbt_project.yml").write_text(
+            yaml.safe_dump(self.settings, sort_keys=False), encoding="utf-8"
+        )
+
+    def invoke(self, command: str, timeout: float, args=()) -> tuple[dict, Path]:
+        if timeout <= 0:
+            raise ScenarioError("SCENARIO_TIMEOUT")
+        self.sequence += 1
+        artifact_dir = self.workspace / f"dbt_{self.sequence}"
+        executable = Path(sys.executable).parent / ("dbt.exe" if os.name == "nt" else "dbt")
+        argv = [
+            str(executable),
+            "--no-use-colors",
+            "--no-partial-parse",
+            "--log-path",
+            str(artifact_dir / "logs"),
+            command,
+            "--project-dir",
+            str(self.root),
+            "--profiles-dir",
+            str(self.profiles),
+            "--target",
+            "test",
+            "--target-path",
+            str(artifact_dir / "target"),
+            *args,
+        ]
+        try:
+            process = subprocess.run(
+                argv,
+                env=self.environment,
+                capture_output=True,
+                timeout=timeout,
+                cwd=self.root,
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            raise ScenarioError("DBT_TIMEOUT") from None
+        if process.returncode:
+            raise ScenarioError("DBT_EXECUTION_ERROR")
+        return self.read_artifact(artifact_dir, "manifest.json"), artifact_dir
+
+    @staticmethod
+    def read_artifact(artifact_dir: Path, name: str) -> dict:
+        try:
+            return json.loads((artifact_dir / "target" / name).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            raise ScenarioError("DBT_ARTIFACT_MISSING") from None
+
+    def inspect(self, scenario: dict, timeout: float) -> dict:
+        manifest, _ = self.invoke("parse", timeout)
+        node = manifest["nodes"].get(scenario["model"])
+        if not node or node["package_name"] != self.settings["name"]:
+            raise ScenarioError("MODEL_NOT_FOUND")
+        config = node["config"]
+        if config["materialized"] != "incremental" or config.get("full_refresh") is True:
+            raise ScenarioError("UNSUPPORTED_MATERIALIZATION")
+        if config.get("incremental_strategy") not in {None, "append", "merge", "delete+insert"}:
+            raise ScenarioError("UNSUPPORTED_INCREMENTAL_STRATEGY")
+        if any(config.get(name) for name in ["pre-hook", "post-hook", "grants", "persist_docs"]):
+            raise ScenarioError("MODEL_HOOKS_UNSUPPORTED")
+        if config.get("contract", {}).get("enforced") or config.get("language", "sql") != "sql":
+            raise ScenarioError("MODEL_CONFIG_UNSUPPORTED")
+        reserved = {
+            "ref",
+            "source",
+            "is_incremental",
+            "generate_schema_name",
+            "generate_database_name",
+            "generate_alias_name",
+            "dsc_input",
+        }
+        for macro in manifest["macros"].values():
+            if macro["package_name"] in {"dbt", "dbt_postgres"}:
+                continue
+            if macro["name"] in reserved or any(
+                text in macro["name"] for text in ["get_incremental_", "materialization_"]
+            ):
+                raise ScenarioError("CUSTOM_MACRO_UNSUPPORTED")
+        inputs = {definition["node"] for definition in scenario["inputs"].values()}
+        if set(node["depends_on"]["nodes"]) != inputs:
+            raise ScenarioError("INPUT_DEPENDENCIES_MISMATCH")
+        for identity in inputs:
+            dependency = manifest["nodes"].get(identity) or manifest["sources"].get(identity)
+            if not dependency or dependency["package_name"] != self.settings["name"]:
+                raise ScenarioError("INPUT_DEPENDENCY_UNSUPPORTED")
+            if dependency.get("config", {}).get("materialized") == "ephemeral":
+                raise ScenarioError("EPHEMERAL_INPUT_UNSUPPORTED")
+        for dependency in [node, *(manifest["nodes"].get(i, {}) for i in inputs)]:
+            code = dependency.get("raw_code", "")
+            if dependency.get("version") or "builtins.ref" in code or "builtins.source" in code:
+                raise ScenarioError("DIRECT_BUILTIN_OR_VERSIONED_REF_UNSUPPORTED")
+        return node
+
+    def install_mapping(self, scenario: dict, input_schema: str) -> dict:
+        mapping = {
+            definition["node"]: f"input_{i}"
+            for i, definition in enumerate(scenario["inputs"].values())
+        }
+        macros_dir = self.root / "dsc_internal_macros"
+        macros_dir.mkdir(exist_ok=False)
+        code = MACROS.replace("__MAPPING__", json.dumps(mapping))
+        code = code.replace("__INPUT_SCHEMA__", input_schema)
+        (macros_dir / "scenario.sql").write_text(code, encoding="utf-8")
+        self.settings["macro-paths"] = [
+            *self.settings.get("macro-paths", ["macros"]),
+            "dsc_internal_macros",
+        ]
+        self.write_settings()
+        return mapping

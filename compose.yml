@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: dbt_scenario_test
+      POSTGRES_PASSWORD: ${DSC_ADMIN_PASSWORD:?Set DSC_ADMIN_PASSWORD}
+      DSC_TEST_PASSWORD: ${DSC_TEST_PASSWORD:?Set DSC_TEST_PASSWORD}
+    ports:
+      - '127.0.0.1:55432:5432'
+    volumes:
+      - ./scripts/init-test-db.sh:/docker-entrypoint-initdb.d/10-test-role.sh:ro
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U postgres -d dbt_scenario_test]
+      interval: 2s
+      timeout: 3s
+      retries: 30

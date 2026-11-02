@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dbt-scenario"
+version = "0.1.0a1"
+description = "Run stateful scenarios against real dbt incremental models"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = "Apache-2.0"
+authors = [{name = "acneism"}]
+dependencies = [
+  "click>=8.1,<9",
+  "PyYAML>=6,<7",
+  "jsonschema>=4.23,<5",
+  "psycopg[binary]>=3.2,<4",
+  "sqlparse>=0.5,<1",
+  "dbt-core>=1.11,<1.12",
+  "dbt-postgres>=1.10,<1.11",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<9", "ruff>=0.14,<1", "build>=1,<2"]
+
+[project.scripts]
+dbt-scenario = "dbt_scenario.cli:main"
+
+[project.urls]
+Repository = "https://github.com/acneism/dbt-scenario"
+Issues = "https://github.com/acneism/dbt-scenario/issues"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["integration: requires a disposable PostgreSQL 16 database"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dbt_scenario"]
