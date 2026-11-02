@@ -298,7 +298,7 @@ def test_deadline_cancels_sql_and_rolls_back_all_input_updates(project):
 def test_timeout_in_dbt_stops_server_query_and_cleans_schemas(project):
     config, scenario, reports = project
     slow_model(config)
-    config.step_timeout = 12
+    config.step_timeout = 24
     result = run_scenario(scenario, config, reports)
     assert result["overall_status"] == "ERROR", result
     assert result["reason_code"] == "STEP_TIMEOUT", result
@@ -314,7 +314,7 @@ def test_timeout_in_dbt_stops_server_query_and_cleans_schemas(project):
 
 def test_snapshot_is_inside_the_step_deadline(project, monkeypatch):
     config, scenario, reports = project
-    config.step_timeout = 12
+    config.step_timeout = 24
     original = Database.snapshot
 
     def delayed_snapshot(database, *args):
@@ -902,3 +902,82 @@ def test_explicit_as_of_var_controls_time_for_every_step(project, omit_later):
     assert report["overall_status"] == "PASS", report
     assert [step["actual_rows"] for step in report["steps"]] == [2, 3, 3]
     assert len({step["observed_mode_evidence"]["invocation_id"] for step in report["steps"]}) == 3
+
+
+@pytest.mark.parametrize("style", ["direct", "nested", "macro", "later"])
+def test_external_relation_is_rejected_before_model_execution(project, monkeypatch, style):
+    config, scenario, reports = project
+    external = "public.synthetic_sensitive_relation"
+    model = config.project_dir / "models/fct_orders.sql"
+    clause = f" cross join {external} forbidden"
+    if style == "nested":
+        clause = f" cross join (select * from {external}) forbidden"
+    elif style == "macro":
+        macros = config.project_dir / "macros"
+        macros.mkdir(exist_ok=True)
+        (macros / "external.sql").write_text(
+            "{% macro external_relation() %}" + external + "{% endmacro %}"
+        )
+        clause = " cross join {{ external_relation() }} forbidden"
+    elif style == "later":
+        clause = "{% if var('external', false) %}" + clause + "{% endif %}"
+        scenario.data["steps"][1]["run"]["vars"] = {"external": True}
+    model.write_text(
+        model.read_text().replace(
+            "from {{ source('raw', 'orders') }}", "from {{ source('raw', 'orders') }}" + clause
+        )
+    )
+    original = Project.invoke
+    calls = []
+
+    def observed(self, command, timeout, args=()):
+        calls.append(command)
+        return original(self, command, timeout, args)
+
+    monkeypatch.setattr(Project, "invoke", observed)
+    report = run_scenario(scenario, config, reports)
+    assert report["overall_status"] == "ERROR", report
+    assert report["reason_code"] == "SQL_EXTERNAL_RELATION"
+    assert calls.count("run") == (1 if style == "later" else 0)
+    assert report["cleanup_status"] == "CLEANED"
+    assert "synthetic_sensitive_relation" not in json.dumps(report)
+
+
+def test_table_function_is_rejected_before_model_execution(project, monkeypatch):
+    config, scenario, reports = project
+    model = config.project_dir / "models/fct_orders.sql"
+    model.write_text(
+        model.read_text().replace(
+            "from {{ source('raw', 'orders') }}",
+            "from {{ source('raw', 'orders') }} cross join generate_series(1,3) series",
+        )
+    )
+    original = Project.invoke
+    calls = []
+
+    def observed(self, command, timeout, args=()):
+        calls.append(command)
+        return original(self, command, timeout, args)
+
+    monkeypatch.setattr(Project, "invoke", observed)
+    report = run_scenario(scenario, config, reports)
+    assert report["overall_status"] == "ERROR", report
+    assert report["reason_code"] == "SQL_AUDIT_UNSUPPORTED"
+    assert "run" not in calls
+    assert report["cleanup_status"] == "CLEANED"
+
+
+def test_cte_model_passes_compiled_relation_audit(project):
+    config, scenario, reports = project
+    model = config.project_dir / "models/fct_orders.sql"
+    code = model.read_text()
+    config_sql, selected = code.split("select order_id", 1)
+    model.write_text(
+        config_sql
+        + "with selected_orders as (select order_id"
+        + selected
+        + ") select * from SELECTED_ORDERS"
+    )
+    report = run_scenario(scenario, config, reports)
+    assert report["overall_status"] == "PASS", report
+    assert [step["sql_audit"]["checked_relations"] for step in report["steps"]] == [1, 2, 2]

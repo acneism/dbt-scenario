@@ -8,7 +8,7 @@ python scripts/benchmark.py --config scenario-runner.yml --samples 20 --rows 100
 
 The workload has ten columns. An initial load creates 10,000 rows. The second input snapshot changes 100 existing rows and adds 100 late-arriving events. A third dbt run retries the same snapshot. Expected target row counts are 10,000, 10,100 and 10,100.
 
-Every sample includes YAML loading/validation, project copying, dbt parsing, three real dbt subprocesses, fixture loading, exact assertions, snapshots, database cleanup and report writing. Installation, PostgreSQL startup and synthetic fixture generation are excluded. Each measured run must return PASS, preserve the exact expected row counts and finish database cleanup. A failed check stops collection and leaves the result marked incomplete.
+Every current sample includes YAML loading/validation, project copying, dbt parsing, three compile and three run subprocesses, SQL relation auditing, fixture loading, exact assertions, snapshots, database cleanup and report writing. Installation, PostgreSQL startup and synthetic fixture generation are excluded. Each measured run must return PASS, preserve the exact expected row counts and finish database cleanup. A failed check stops collection and leaves the result marked incomplete.
 
 The JSON file is updated after every sample. It includes raw wall times, fixture-loading times, per-step durations, dependency versions and hashes of the measured implementation and benchmark script. P50 is the median; p95 uses the nearest-rank method. The tool refuses to overwrite an existing result file.
 
@@ -17,6 +17,8 @@ This script does not enforce CPU/RAM limits or flush caches. Earlier validation 
 The generated workspace and run reports are local artifacts. Publish the sanitized result JSON rather than uploading the entire workspace, which includes the operator's test connection settings.
 
 ## Recorded alpha 4 result
+
+This historical result predates per-step compilation and SQL auditing. It measured three dbt runs plus the initial parse, and does not describe alpha 6 performance. No alpha 6 timing result has been collected.
 
 Measured on November 3, 2026 local time (November 2 UTC), using Python 3.12.10, PostgreSQL 16.15, dbt Core 1.11.16, dbt-postgres 1.10.2 and PyYAML 6.0.3 with CSafeLoader. The host was Windows on AMD64 with eight logical CPUs. CPU and RAM limits were not enforced, available RAM was not recorded, and caches were not flushed. There was no dedicated warmup run; earlier validation workloads had already used the machine.
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0a6 — November 3, 2026
+
+- Compile and audit every step before running its model; resolve CTE/subquery scopes and allow only mapped fixtures plus an incremental target.
+- Reject external/unqualified table references, writes, locks, table functions and unsupported query grammar with redacted diagnostics.
+- Recheck run-compiled SQL and retain safe audit hashes/counts in reports.
+- Add a Docker acceptance job that runs the installed demo and PostgreSQL with external networking disabled.
+- Add unit/query-scope cases and real dbt tests that verify forbidden relations fail before model execution.
+
 ## 0.1.0a5 — November 3, 2026
 
 - Bind dbt manifests and run-results to the current subprocess using invocation IDs and timestamp windows; reject replayed, mismatched and malformed artifacts.

@@ -197,7 +197,8 @@ def main():
             "resource_limits_enforced": False,
             "yaml_parser": YAML_BASE.__name__,
             "dependencies": {
-                name: version(name) for name in ["dbt-core", "dbt-postgres", "psycopg", "PyYAML"]
+                name: version(name)
+                for name in ["dbt-core", "dbt-postgres", "psycopg", "PyYAML", "sqlglot"]
             },
         },
         "protocol": {
@@ -209,6 +210,8 @@ def main():
                 "fixture_read_and_validation",
                 "project_copy",
                 "dbt_parse",
+                "three_dbt_compiles",
+                "sql_relation_audit",
                 "three_dbt_runs",
                 "input_loading",
                 "exact_assertions",

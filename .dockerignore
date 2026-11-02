@@ -1,0 +1,14 @@
+.git
+.venv
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+**/.dbt-scenario
+**/artifacts
+**/target
+**/logs
+**/dbt_packages
+**/.env
+**/profiles.yml
+dist
+build

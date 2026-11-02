@@ -21,6 +21,21 @@ from dbt_scenario.lifecycle import finish_run
 from dbt_scenario.loader import Scenario
 from dbt_scenario.project import Project
 from dbt_scenario.report import write_report
+from dbt_scenario.sql_audit import audit_sql
+
+
+def execution_node(manifest, node, actual_schema, database):
+    selected = manifest["nodes"].get(node["unique_id"])
+    if (
+        not selected
+        or selected["alias"] != node["alias"]
+        or selected["schema"] != actual_schema
+        or selected["database"] != database
+        or selected["config"]["materialized"] != "incremental"
+        or selected["config"].get("full_refresh") is True
+    ):
+        raise ScenarioError("MODEL_CONFIGURATION_CHANGED")
+    return selected
 
 
 def observe_mode(
@@ -111,6 +126,7 @@ def run_scenario(
                     "requested_mode": step["run"]["mode"],
                     "observed_mode": None,
                     "observed_mode_evidence": None,
+                    "sql_audit": None,
                     "status": "ERROR",
                     "reason_code": None,
                     "diff_counts": None,
@@ -141,17 +157,26 @@ def run_scenario(
                         "--vars",
                         json.dumps(step["run"].get("vars", {})),
                     ]
+                    compiled, _ = project.invoke("compile", step_budget, args)
+                    compiled_node = execution_node(
+                        compiled, node, actual_schema, config.database["dbname"]
+                    )
+                    allowed = {(input_schema, table) for table in mapping.values()}
+                    if step["run"]["mode"] == "incremental":
+                        allowed.add((actual_schema, node["alias"]))
+                    current_step["sql_audit"] = audit_sql(
+                        compiled_node.get("compiled_code"), config.database["dbname"], allowed
+                    )
                     manifest, artifacts = project.invoke("run", step_budget, args)
-                    run_node = manifest["nodes"].get(node["unique_id"])
-                    if (
-                        not run_node
-                        or run_node["alias"] != node["alias"]
-                        or run_node["schema"] != actual_schema
-                        or run_node["database"] != config.database["dbname"]
-                        or run_node["config"]["materialized"] != "incremental"
-                        or run_node["config"].get("full_refresh") is True
-                    ):
-                        raise ScenarioError("MODEL_CONFIGURATION_CHANGED")
+                    run_node = execution_node(
+                        manifest, node, actual_schema, config.database["dbname"]
+                    )
+                    executed_audit = audit_sql(
+                        run_node.get("compiled_code"), config.database["dbname"], allowed
+                    )
+                    current_step["sql_audit"]["run_compiled_sha256"] = executed_audit[
+                        "compiled_sha256"
+                    ]
                     after = database.oid(actual_schema, node["alias"])
                     evidence = observe_mode(
                         project, run_node, artifacts, step["run"]["mode"], before, after

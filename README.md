@@ -132,6 +132,8 @@ Each run writes `summary.json`, `summary.md` and `junit.xml` beneath `artifacts/
 
 Execution evidence binds manifest and run-results to the current dbt invocation, requires one successful selected model, rejects forced full refresh and checks the target OID and emitted materialization SQL. Missing, stale or inconsistent evidence returns ERROR. Reports retain the invocation ID and SQL hash. See [execution verification](docs/EXECUTION.md).
 
+Each step compiles before running its model and [audits SQL relations](docs/SQL-AUDIT.md). Physical references must point to that scenario's fixtures or, for an incremental step, its target. External/unqualified tables and unsupported query forms return ERROR. The extra compilation uses the same step deadline. SQLGlot is pinned to 30.27.0.
+
 ## Recovery and deadlines
 
 Each run writes an atomic resource journal under `<project-dir>/.dbt-scenario/runs/<run_id>.json` before creating its schemas. It records the database identity, exact schema names and an ownership marker, without the password or fixture rows. Preserve this directory when using a persistent test database. It is ignored by Git and should not be included in public CI artifacts.
@@ -154,12 +156,15 @@ Journals from alpha 1 do not exist, so its abandoned schemas cannot be recovered
 - One SQL incremental model per scenario; direct upstream models are fixtures, so their SQL is outside the test.
 - Standard PostgreSQL `append`, `delete+insert` and `merge` materializations.
 - Custom materializations, hooks, overridden routing/strategy macros, ephemeral inputs, versioned refs and Fusion are unsupported.
+- Model queries must fit the SQL audit's supported SELECT subset; table-valued functions, LATERAL, locks, writes and SQL over 1 MiB are unsupported.
 - No production connection is needed. The runner is for trusted project code on a disposable test database; it is not a sandbox for malicious macros.
 - Project dependencies must already be installed. The runner does not fetch packages or forward arbitrary environment variables into dbt.
 - Time is not globally frozen. Pass an `as_of` project var for deterministic time-dependent models.
 - No adapter portability guarantee yet. Recovery requires the run's journal; losing it means discarding the disposable test database rather than guessing resources by name prefix.
 
 [The controlled-time example](docs/TIME.md) uses a required `as_of` var. Preflight receives the initial step's vars; later steps receive their own complete vars objects without inheritance.
+
+[The offline acceptance job](docs/OFFLINE.md) runs the installed demo with PostgreSQL inside a container whose external networking is disabled. Image preparation still requires network access.
 
 ## Development
 
@@ -176,7 +181,7 @@ Validation errors show a safe field path or YAML line/column and a suggested cor
 
 For repeatable full-scenario timings, use `python scripts/benchmark.py --config scenario-runner.yml --samples 20 --rows 10000 --output artifacts/benchmark/result.json`. The benchmark generates its own synthetic project and uses only the test database settings. It includes fixture parsing, dbt startup, assertions and cleanup, while excluding dependency installation, server startup and data generation. It retains raw timings and safe run reports. Resource limits are not enforced by this script; results describe the recorded machine and workload.
 
-The [recorded local benchmark](docs/BENCHMARK.md) completed 20 valid samples at 10,000 initial rows and ten columns: P50 50.437 s, P95 54.132 s. This unconstrained Windows measurement does not establish the Linux 2 vCPU / 8 GiB target.
+The [recorded alpha 4 benchmark](docs/BENCHMARK.md) completed 20 valid samples at 10,000 initial rows and ten columns: P50 50.437 s, P95 54.132 s. It predates per-step compilation/auditing and does not describe alpha 6 speed or establish the Linux 2 vCPU / 8 GiB target.
 
 [Acceptance coverage](docs/ACCEPTANCE.md) distinguishes completed checks from remaining cases. Passing the suite does not establish adoption by external teams.
 

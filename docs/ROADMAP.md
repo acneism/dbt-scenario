@@ -32,9 +32,15 @@ Implemented in alpha 5:
 - Initial-step vars in preflight, plus a documented and tested required as_of model.
 - Separate expected-fixture and project/scenario fingerprint acceptance cases.
 
+Implemented in alpha 6:
+
+- PostgreSQL query-scope auditing before each model run, with strict refusals for external relations and unsupported SQL.
+- Real dbt tests proving direct, nested and macro-generated external relations stop before model execution.
+- A Docker CI job for the installed demo with network access removed and PostgreSQL running inside the container.
+
 The remaining work is:
 
-- Remaining cases identified in ACCEPTANCE.md: hardcoded/external SQL relation auditing and explicitly network-isolated execution.
+- Broader SQL compatibility guided by real projects, while keeping the trusted-code/disposable-database boundary explicit.
 - Controlled Linux performance measurements and comparison against hand-written dbt scripts and existing audit packages.
 - External pilots showing that teams retain the tests in CI and can add their second scenario independently.
 

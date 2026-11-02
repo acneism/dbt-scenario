@@ -30,6 +30,12 @@ FIELDS = {
 }
 
 HINTS = {
+    "SQL_EXTERNAL_RELATION": (
+        "Use declared source/ref fixtures and this; external SQL relations are unsupported."
+    ),
+    "SQL_AUDIT_UNSUPPORTED": (
+        "Use one supported SELECT query without table functions, locks, writes or unknown syntax."
+    ),
     "INVALID_CONFIG": (
         "Use a version 1 runner configuration with valid project and database fields."
     ),

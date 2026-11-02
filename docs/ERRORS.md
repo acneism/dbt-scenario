@@ -25,6 +25,8 @@
 | DBT_ARTIFACT_INVOCATION_MISMATCH | Retry; the current manifest and results must share their invocation ID. |
 | DBT_MODEL_NOT_SUCCESSFUL | Require exactly one successful result for the selected model. |
 | EXECUTION_MODE_UNVERIFIED | Use standard materializations and let dbt emit execution SQL without forced full refresh. |
+| SQL_EXTERNAL_RELATION | Use declared fixture refs/sources and this; do not hardcode external or unqualified tables. |
+| SQL_AUDIT_UNSUPPORTED | Use a single supported SELECT query without writes, locks or table functions. |
 
 For example, a bad typed value can produce:
 

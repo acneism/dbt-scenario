@@ -5,6 +5,22 @@ on:
 permissions:
   contents: read
 jobs:
+  offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare installed package and local PostgreSQL
+        run: docker build -f tests/offline/Dockerfile -t dbt-scenario-offline .
+      - name: Run demo without external networking
+        run: |
+          mkdir -p artifacts/offline
+          docker run --rm --network none --cap-drop ALL --security-opt no-new-privileges dbt-scenario-offline | tee artifacts/offline/result.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: offline-results
+          path: artifacts/offline/result.json
   tests:
     runs-on: ubuntu-latest
     services:
