@@ -3,10 +3,12 @@ import json
 import os
 import shutil
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
 
+from dbt_scenario.artifacts import read_artifact, validate_metadata
 from dbt_scenario.config import Config
 from dbt_scenario.deadline import Deadline
 from dbt_scenario.environment import process_environment
@@ -77,6 +79,8 @@ class Project:
         self.schema = schema
         self.application_name = f"dbt-scenario:{schema}"
         self.sequence = 0
+        self.invocations = {}
+        self.seen_invocations = set()
         self.environment = process_environment(config.project_env, config.database["password"])
         settings = project_settings(config.project_dir)
         check_dependencies(config.project_dir, settings)
@@ -125,6 +129,10 @@ class Project:
         deadline.check()
         self.sequence += 1
         artifact_dir = self.workspace / f"dbt_{self.sequence}"
+        try:
+            artifact_dir.mkdir()
+        except FileExistsError:
+            raise ScenarioError("DBT_ARTIFACT_DIRECTORY_EXISTS") from None
         executable = Path(sys.executable).parent / ("dbt.exe" if os.name == "nt" else "dbt")
         argv = [
             str(executable),
@@ -148,20 +156,38 @@ class Project:
             **self.environment,
             "PGOPTIONS": f"-c statement_timeout={milliseconds} -c lock_timeout=10000",
         }
+        started = datetime.now(UTC)
         result = run_process(argv, environment, self.root, deadline)
+        finished = datetime.now(UTC)
         if result:
             raise ScenarioError("DBT_EXECUTION_ERROR")
-        return self.read_artifact(artifact_dir, "manifest.json"), artifact_dir
+        manifest = read_artifact(artifact_dir, "manifest.json")
+        invocation_id = validate_metadata(manifest, "manifest", started, finished)
+        if invocation_id in self.seen_invocations:
+            raise ScenarioError("DBT_ARTIFACT_STALE")
+        self.seen_invocations.add(invocation_id)
+        self.invocations[artifact_dir] = (started, finished, invocation_id)
+        if command == "run":
+            self.read_run_results(artifact_dir)
+        return manifest, artifact_dir
 
-    @staticmethod
-    def read_artifact(artifact_dir: Path, name: str) -> dict:
-        try:
-            return json.loads((artifact_dir / "target" / name).read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            raise ScenarioError("DBT_ARTIFACT_MISSING") from None
+    def read_run_results(self, artifact_dir: Path) -> dict:
+        if artifact_dir not in self.invocations:
+            raise ScenarioError("DBT_ARTIFACT_INVOCATION_MISMATCH")
+        started, finished, invocation_id = self.invocations[artifact_dir]
+        results = read_artifact(artifact_dir, "run_results.json")
+        validate_metadata(results, "run-results", started, finished, invocation_id)
+        arguments = results.get("args")
+        if not isinstance(arguments, dict) or arguments.get("which") != "run":
+            raise ScenarioError("DBT_ARTIFACT_INVALID")
+        refresh = arguments.get("full_refresh")
+        if refresh is not None and refresh is not False:
+            raise ScenarioError("EXECUTION_MODE_UNVERIFIED")
+        return results
 
     def inspect(self, scenario: dict, timeout: float | Deadline) -> dict:
-        manifest, _ = self.invoke("parse", timeout)
+        initial_vars = scenario["steps"][0]["run"].get("vars", {})
+        manifest, _ = self.invoke("parse", timeout, ["--vars", json.dumps(initial_vars)])
         node = manifest["nodes"].get(scenario["model"])
         if not node or node["package_name"] != self.settings["name"]:
             raise ScenarioError("MODEL_NOT_FOUND")

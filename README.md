@@ -130,6 +130,8 @@ Use repeated `--scenario` arguments or `--scenario-dir` to select multiple scena
 
 Each run writes `summary.json`, `summary.md` and `junit.xml` beneath `artifacts/scenarios/<run_id>/`. Reports contain counts and column names, without row values or raw dbt errors. dbt logs and temporary profiles are deleted with the temporary workspace. GitHub branch rules must make your test job required if you want it to block merges.
 
+Execution evidence binds manifest and run-results to the current dbt invocation, requires one successful selected model, rejects forced full refresh and checks the target OID and emitted materialization SQL. Missing, stale or inconsistent evidence returns ERROR. Reports retain the invocation ID and SQL hash. See [execution verification](docs/EXECUTION.md).
+
 ## Recovery and deadlines
 
 Each run writes an atomic resource journal under `<project-dir>/.dbt-scenario/runs/<run_id>.json` before creating its schemas. It records the database identity, exact schema names and an ownership marker, without the password or fixture rows. Preserve this directory when using a persistent test database. It is ignored by Git and should not be included in public CI artifacts.
@@ -156,6 +158,8 @@ Journals from alpha 1 do not exist, so its abandoned schemas cannot be recovered
 - Project dependencies must already be installed. The runner does not fetch packages or forward arbitrary environment variables into dbt.
 - Time is not globally frozen. Pass an `as_of` project var for deterministic time-dependent models.
 - No adapter portability guarantee yet. Recovery requires the run's journal; losing it means discarding the disposable test database rather than guessing resources by name prefix.
+
+[The controlled-time example](docs/TIME.md) uses a required `as_of` var. Preflight receives the initial step's vars; later steps receive their own complete vars objects without inheritance.
 
 ## Development
 

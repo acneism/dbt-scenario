@@ -24,9 +24,17 @@ Implemented in alpha 4:
 - A repeatable benchmark that measures complete scenarios and validates every measured result.
 - An explicit acceptance-coverage table that keeps untested requirements visible.
 
+Implemented in alpha 5:
+
+- Current-invocation verification for dbt artifacts, replay refusal and safe execution IDs in reports.
+- Fault injection for forced full refresh, rebuilt targets, missing SQL and stale/skipped dbt output.
+- Independent-scenario continuation, multi-input transactional rollback and fixture-value redaction checks.
+- Initial-step vars in preflight, plus a documented and tested required as_of model.
+- Separate expected-fixture and project/scenario fingerprint acceptance cases.
+
 The remaining work is:
 
-- Remaining cases identified in ACCEPTANCE.md, including stale-artifact fault injection and network-isolated execution.
+- Remaining cases identified in ACCEPTANCE.md: hardcoded/external SQL relation auditing and explicitly network-isolated execution.
 - Controlled Linux performance measurements and comparison against hand-written dbt scripts and existing audit packages.
 - External pilots showing that teams retain the tests in CI and can add their second scenario independently.
 

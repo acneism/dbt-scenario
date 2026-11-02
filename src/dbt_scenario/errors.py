@@ -79,6 +79,25 @@ HINTS = {
     "DBT_EXECUTION_ERROR": (
         "Check project dependencies, required vars and env_allowlist; raw dbt errors are withheld."
     ),
+    "DBT_ARTIFACT_MISSING": (
+        "Retry with a writable temporary directory; dbt did not write required artifacts."
+    ),
+    "DBT_ARTIFACT_INVALID": (
+        "Use the supported dbt Core version and complete, unmodified JSON artifacts."
+    ),
+    "DBT_ARTIFACT_STALE": (
+        "Retry the scenario; artifacts must come from the current dbt invocation."
+    ),
+    "DBT_ARTIFACT_INVOCATION_MISMATCH": (
+        "Retry the scenario; manifest and results must share the current invocation ID."
+    ),
+    "DBT_ARTIFACT_DIRECTORY_EXISTS": "Use a fresh temporary workspace for every scenario run.",
+    "DBT_MODEL_NOT_SUCCESSFUL": (
+        "Select one supported model and require its successful execution result."
+    ),
+    "EXECUTION_MODE_UNVERIFIED": (
+        "Use standard materializations without forced full refresh; dbt must emit execution SQL."
+    ),
     "NO_SCENARIOS_SELECTED": (
         "Pass --scenario or select a directory containing scenario YAML files."
     ),

@@ -11,6 +11,7 @@ from pathlib import Path
 import psycopg
 import sqlparse
 
+from dbt_scenario.artifacts import successful_model_result
 from dbt_scenario.config import Config
 from dbt_scenario.database import Database
 from dbt_scenario.deadline import Deadline
@@ -29,12 +30,8 @@ def observe_mode(
         raise ScenarioError("EXECUTION_MODE_UNVERIFIED")
     if mode == "incremental" and (before is None or before != after):
         raise ScenarioError("TARGET_REBUILT")
-    results = project.read_artifact(artifact_dir, "run_results.json")
-    selected = [
-        entry for entry in results.get("results", []) if entry["unique_id"] == node["unique_id"]
-    ]
-    if len(selected) != 1 or selected[0]["status"] != "success":
-        raise ScenarioError("DBT_MODEL_NOT_SUCCESSFUL")
+    results = project.read_run_results(artifact_dir)
+    successful_model_result(results, node["unique_id"])
     run_path = artifact_dir / "target" / "run" / node["package_name"] / node["original_file_path"]
     try:
         statement = run_path.read_text(encoding="utf-8")
@@ -58,7 +55,8 @@ def observe_mode(
         raise ScenarioError("EXECUTION_MODE_UNVERIFIED")
     return {
         "operation": operation,
-        "method": "dbt_main_sql_and_target_oid",
+        "method": "dbt_invocation_main_sql_and_target_oid",
+        "invocation_id": results["metadata"]["invocation_id"],
         "statement_sha256": hashlib.sha256(statement.encode()).hexdigest(),
     }
 

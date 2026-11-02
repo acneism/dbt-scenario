@@ -19,6 +19,12 @@
 | RUN_STILL_ACTIVE | Wait for the active run before invoking cleanup. |
 | STEP_TIMEOUT | Increase step_timeout or reduce that step's work. |
 | SCENARIO_TIMEOUT | Increase scenario_timeout or reduce setup and scenario work. |
+| DBT_ARTIFACT_MISSING | Check writable temporary storage and retry; required dbt output is absent. |
+| DBT_ARTIFACT_INVALID | Use supported dbt artifacts with valid JSON, metadata and schema versions. |
+| DBT_ARTIFACT_STALE | Retry after stabilizing the host clock; artifacts must belong to the current subprocess. |
+| DBT_ARTIFACT_INVOCATION_MISMATCH | Retry; the current manifest and results must share their invocation ID. |
+| DBT_MODEL_NOT_SUCCESSFUL | Require exactly one successful result for the selected model. |
+| EXECUTION_MODE_UNVERIFIED | Use standard materializations and let dbt emit execution SQL without forced full refresh. |
 
 For example, a bad typed value can produce:
 

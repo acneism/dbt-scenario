@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.0a5 — November 3, 2026
+
+- Bind dbt manifests and run-results to the current subprocess using invocation IDs and timestamp windows; reject replayed, mismatched and malformed artifacts.
+- Require exactly one successful selected model and reject forced full-refresh flags before assertions.
+- Include the verified invocation ID in execution evidence and refuse existing artifact directories.
+- Parse preflight with initial-step vars so required model vars work without artificial project defaults.
+- Added fault-injection cases for real dbt results, full-refresh and rebuilt targets, independent-scenario continuation, multi-input rollback, report redaction and controlled model time.
+- Expanded invalid-expected-fixture and reproducibility-fingerprint coverage.
+
 ## 0.1.0a4 — November 3, 2026
 
 - Fixed validation of high-precision numeric fixtures independently of Python's global Decimal context.

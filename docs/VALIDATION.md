@@ -34,8 +34,20 @@ The wheel was checked independently of the source checkout: its nine packaged de
 
 ## Data precision and acceptance validation
 
-Alpha 4 was checked on November 3, 2026 using the same local engine versions. The final suite contains 125 tests. Before the accelerated YAML parser change, the local full suite passed 120 tests with three platform-specific skips. After that change, the unit suite passed 74 tests with two skips, and all 21 direct PostgreSQL comparison tests passed. The final Linux CI run must confirm the entire suite together.
+Alpha 4 was checked on November 3, 2026 using the same local engine versions. The final suite contains 125 tests. Before the accelerated YAML parser change, the local full suite passed 120 tests with three platform-specific skips. After that change, the unit suite passed 74 tests with two skips, and all 21 direct PostgreSQL comparison tests passed. The [final Linux CI run](https://github.com/acneism/dbt-scenario/actions/runs/41534320801) passed all 125 tests for commit 1c8a295.
 
 New cases cover high-precision decimals, rejected rounding and sub-microsecond timestamps, YAML fixture caching and independent rows, duplicate/alias/depth validation and the pure-Python parser fallback. PostgreSQL checks cover empty inputs, NULLs, compound keys, nondeterministic collations, schema changes, valid append, multiple inputs and recovery after cleanup failure. The coverage table in [ACCEPTANCE.md](ACCEPTANCE.md) records remaining gaps rather than treating the complete MVP matrix as satisfied.
 
 The final parser also completed 20 benchmark samples, comprising 60 real dbt invocations on a ten-column workload with 10,000 initial rows. Every sample passed exact assertions and cleanup. Local Windows P50 was 50.437 s and P95 was 54.132 s; see [the protocol, limitations and raw results](BENCHMARK.md). The benchmark source hashes matched the published source bytes before Git newline normalization.
+
+## Current-invocation and failure-boundary validation
+
+Alpha 5 was checked on November 3, 2026 with the same engine versions. The final suite contains 184 tests. Local Windows unit checks passed 121 tests with two platform-specific skips. Fourteen selected PostgreSQL/dbt integration cases passed; the complete integration suite is delegated to the final Linux CI run rather than described as a full local rerun.
+
+Fault injection modifies real dbt results after execution: stale timestamps, mismatched invocation IDs, a removed file and a skipped model must produce ERROR with dependent steps NOT_RUN and schemas cleaned. Additional cases force CLI/config full refresh, delete execution SQL or replace the target with an equal-valued table under a different OID. A successful-looking artifact cannot override a nonzero dbt exit.
+
+The CLI continuation test fails the first scenario, runs a second independent scenario successfully and still exits nonzero. Synthetic email/key values remain absent from JSON, Markdown, JUnit and console output. A failure after loading the second input is rolled back for both inputs; retained tables are inspected and then explicitly cleaned.
+
+The controlled-time scenario requires an as_of var even during parsing, filters future events across three dbt invocations and fails when a later step omits that required var. Independent unit cases cover malformed expected fixtures, each project/scenario fingerprint input and preservation of the original project during copying and mapping.
+
+Ruff checks, formatting, source comment/docstring checks and offline wheel/source builds passed. The published performance dataset still describes alpha 4; no alpha 5 timing claim is made. Full Linux CI must be checked for the final commit.
