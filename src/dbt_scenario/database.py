@@ -17,6 +17,13 @@ def relation(schema: str, table: str):
     return sql.Identifier(schema, table)
 
 
+def value_column(name: str, kind: str, alias: str | None = None):
+    column = sql.Identifier(alias, name) if alias else sql.Identifier(name)
+    if kind == "text":
+        return sql.SQL('{} COLLATE "C"').format(column)
+    return column
+
+
 class Database:
     def __init__(self, config: Config, deadline: Deadline | None = None):
         kwargs = config.connection_kwargs()
@@ -224,7 +231,7 @@ class Database:
             sql.SQL("SELECT EXISTS(SELECT 1 FROM {} WHERE {})").format(actual, nulls)
         ).fetchone()[0]:
             return {**base, "status": "FAIL", "reason_code": "NULL_KEY"}
-        key_columns = sql.SQL(", ").join(map(sql.Identifier, keys))
+        key_columns = sql.SQL(", ").join(value_column(key, columns[key]) for key in keys)
         if self.execute(
             sql.SQL("SELECT EXISTS(SELECT 1 FROM {} GROUP BY {} HAVING count(*)>1)").format(
                 actual, key_columns
@@ -232,13 +239,17 @@ class Database:
         ).fetchone()[0]:
             return {**base, "status": "FAIL", "reason_code": "DUPLICATE_KEY"}
         join = sql.SQL(" AND ").join(
-            sql.SQL("a.{} = e.{}").format(sql.Identifier(key), sql.Identifier(key)) for key in keys
+            sql.SQL("{} = {}").format(
+                value_column(key, columns[key], "a"), value_column(key, columns[key], "e")
+            )
+            for key in keys
         )
         differences = [
             (
                 name,
-                sql.SQL("a.{} IS DISTINCT FROM e.{}").format(
-                    sql.Identifier(name), sql.Identifier(name)
+                sql.SQL("{} IS DISTINCT FROM {}").format(
+                    value_column(name, columns[name], "a"),
+                    value_column(name, columns[name], "e"),
                 ),
             )
             for name in columns

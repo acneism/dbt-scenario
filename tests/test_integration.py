@@ -489,3 +489,170 @@ def test_project_env_allowlist_reaches_dbt_without_forwarding_other_values(
     encoded = json.dumps(report)
     assert "synthetic.private@example.invalid" not in encoded
     assert "1.00" not in encoded
+
+
+def test_incremental_model_can_grow_from_an_empty_initial_table(project):
+    config, scenario, reports = project
+    first = scenario.data["steps"][0]
+    first["inputs"]["orders"]["replace"]["rows"] = []
+    first["expect"]["rows"] = []
+    model = config.project_dir / "models/fct_orders.sql"
+    model.write_text(
+        model.read_text().replace(
+            "(select max(updated_at) from {{ this }})",
+            "coalesce((select max(updated_at) from {{ this }}), timestamp '1900-01-01')",
+        )
+    )
+    report = run_scenario(scenario, config, reports)
+    assert report["overall_status"] == "PASS", report
+    assert [step["actual_rows"] for step in report["steps"]] == [0, 3, 3]
+
+
+def test_empty_incoming_snapshot_keeps_existing_target_rows(project):
+    config, scenario, reports = project
+    scenario.data["steps"][1]["inputs"]["orders"]["replace"]["rows"] = []
+    scenario.data["steps"][1]["expect"] = {"same_as": "initial_load"}
+    report = run_scenario(scenario, config, reports)
+    assert report["overall_status"] == "PASS", report
+    assert [step["actual_rows"] for step in report["steps"]] == [2, 2, 2]
+
+
+def test_runtime_schema_addition_is_an_assertion_failure(project):
+    config, scenario, reports = project
+    model = config.project_dir / "models/fct_orders.sql"
+    code = model.read_text().replace(
+        "materialized='incremental'",
+        "materialized='incremental', on_schema_change='append_new_columns'",
+    )
+    code = code.replace(
+        "select order_id, event_at, updated_at, amount",
+        "select order_id, event_at, updated_at, amount "
+        "{% if var('add_extra', false) %}, true as extra_column{% endif %}",
+    )
+    model.write_text(code)
+    scenario.data["steps"][1]["run"]["vars"] = {"add_extra": True}
+    report = run_scenario(scenario, config, reports)
+    assert report["overall_status"] == "FAIL", report
+    assert report["steps"][0]["status"] == "PASS"
+    assert report["steps"][1]["reason_code"] == "SCHEMA_MISMATCH"
+    assert report["steps"][2]["status"] == "NOT_RUN"
+
+
+def test_append_accepts_disjoint_new_input_batches(project):
+    config, scenario, reports = project
+    first_rows = copy.deepcopy(scenario.data["steps"][0]["expect"]["rows"])
+    new_rows = [copy.deepcopy(scenario.data["steps"][1]["expect"]["rows"][-1])]
+    scenario.data["steps"] = scenario.data["steps"][:2]
+    for step in scenario.data["steps"]:
+        step["run"]["vars"] = {"strategy": "append"}
+    scenario.data["steps"][1]["inputs"]["orders"]["replace"]["rows"] = new_rows
+    scenario.data["steps"][1]["expect"]["rows"] = first_rows + copy.deepcopy(new_rows)
+    report = run_scenario(scenario, config, reports)
+    assert report["overall_status"] == "PASS", report
+    assert report["steps"][1]["observed_mode_evidence"]["operation"] == "append"
+
+
+def test_compound_model_roundtrips_all_supported_types(project):
+    config, scenario, reports = project
+    columns = {
+        "tenant_id": "integer",
+        "order_id": "bigint",
+        "amount": "numeric(38,2)",
+        "day": "date",
+        "event_at": "timestamp",
+        "instant": "timestamptz",
+        "updated_at": "timestamp",
+        "enabled": "boolean",
+        "note": "text",
+    }
+    initial = [
+        {
+            "tenant_id": tenant,
+            "order_id": 1,
+            "amount": "999999999999999999999999999999999999.99",
+            "day": "2026-01-01",
+            "event_at": "2026-01-01T00:00:00.123456",
+            "instant": "2026-01-01T03:00:00+03:00",
+            "updated_at": "2026-01-01T00:00:00",
+            "enabled": tenant == 1,
+            "note": None,
+        }
+        for tenant in [1, 2]
+    ]
+    updated = copy.deepcopy(initial)
+    updated[1].update(
+        amount="999999999999999999999999999999999999.98",
+        note="exact é",
+        updated_at="2026-01-02T00:00:00",
+    )
+    definition = scenario.data
+    definition["inputs"]["orders"]["columns"] = copy.deepcopy(columns)
+    definition["output"] = {
+        "columns": copy.deepcopy(columns),
+        "primary_key": ["tenant_id", "order_id"],
+    }
+    for step, rows in zip(definition["steps"][:2], [initial, updated], strict=True):
+        step["inputs"]["orders"]["replace"]["rows"] = copy.deepcopy(rows)
+        step["expect"]["rows"] = copy.deepcopy(rows)
+    model = config.project_dir / "models/fct_orders.sql"
+    model.write_text(
+        "{{ config(materialized='incremental', unique_key=['tenant_id','order_id'], "
+        "incremental_strategy='merge') }}\n"
+        "select * from {{ source('raw','orders') }}\n"
+        "{% if is_incremental() %}\n"
+        "where updated_at >= (select max(updated_at) from {{ this }})\n"
+        "{% endif %}\n"
+    )
+    path = config.project_dir / "scenarios/wide.yml"
+    path.write_text(yaml.safe_dump(definition))
+    report = run_scenario(load_scenario(path, config.project_dir), config, reports)
+    assert report["overall_status"] == "PASS", report
+    assert [step["actual_rows"] for step in report["steps"]] == [2, 2, 2]
+
+
+def test_unchanged_ref_fixture_survives_updates_to_another_input(project):
+    config, scenario, reports = project
+    definition = scenario.data
+    definition["inputs"]["dimensions"] = {
+        "node": "model.shop.dimensions",
+        "columns": {"region": "text"},
+    }
+    definition["steps"][0]["inputs"]["dimensions"] = {
+        "replace": {"rows": [{"region": "synthetic-region"}]},
+    }
+    definition["output"]["columns"]["region"] = "text"
+    for step in definition["steps"]:
+        for row in step["expect"].get("rows", []):
+            row["region"] = "synthetic-region"
+    (config.project_dir / "models/dimensions.sql").write_text(
+        "select * from must_not_run_upstream_sql"
+    )
+    model = config.project_dir / "models/fct_orders.sql"
+    model.write_text(
+        "{{ config(materialized='incremental', unique_key='order_id') }}\n"
+        "select o.order_id,o.event_at,o.updated_at,o.amount,d.region\n"
+        "from {{ source('raw','orders') }} o cross join {{ ref('dimensions') }} d\n"
+        "{% if is_incremental() %}\n"
+        "where o.updated_at >= (select max(updated_at) from {{ this }})\n"
+        "{% endif %}\n"
+    )
+    report = run_scenario(scenario, config, reports)
+    assert report["overall_status"] == "PASS", report
+    assert [step["actual_rows"] for step in report["steps"]] == [2, 3, 3]
+
+
+def test_unexpected_cleanup_failure_never_turns_into_pass(project, monkeypatch):
+    config, scenario, reports = project
+    scenario.data["steps"] = scenario.data["steps"][:1]
+
+    def fail_cleanup(*args):
+        raise ScenarioError("SIMULATED_CLEANUP_FAILURE")
+
+    with monkeypatch.context() as context:
+        context.setattr(Database, "cleanup", fail_cleanup)
+        report = run_scenario(scenario, config, reports)
+    assert report["overall_status"] == "ERROR", report
+    assert report["steps"][0]["status"] == "PASS"
+    assert report["cleanup_reason_code"] == "SIMULATED_CLEANUP_FAILURE"
+    assert Journal.load(config, report["run_id"]).data["state"] == "CLEANUP_FAILED"
+    cleanup_run(config, report["run_id"])

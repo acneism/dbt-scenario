@@ -116,6 +116,12 @@ All direct `source()` and `ref()` dependencies need explicit fixtures. A fixture
 
 Supported types are `integer`, `bigint`, `text`, `boolean`, `date`, `timestamp`, `timestamptz` and `numeric(p,s)`. Output keys must be unique and non-null; row ordering does not matter. Comparisons are exact and run in PostgreSQL.
 
+Numeric precision is supported from 1 to 99, with scale between 0 and precision. Decimal fixtures are validated independently of Python's global Decimal context. Values that require rounding are rejected. Timestamp fractions are limited to six digits; finer values are rejected instead of silently truncated. Text comparisons distinguish case, accents and Unicode normalization forms, including when a model uses a nondeterministic collation.
+
+A referenced fixture file is read and hashed once per scenario load. Reusing it for an input and an expectation still creates independent row snapshots; changing one in programmatic code does not change the other.
+
+YAML uses LibYAML when available, with a Python fallback. Both paths reject aliases and duplicate keys; mapping/sequence nesting is limited to 128 levels, and each file is limited to 10 MiB.
+
 ## Results and CI
 
 Exit codes are `0` for PASS, `1` for assertion FAIL, `2` for configuration or execution ERROR and `130` for an interruption. Failed steps stop their scenario; independent scenarios continue. Empty selections are errors.
@@ -163,6 +169,14 @@ pytest -m integration
 Integration tests use the same dedicated database configured by `scenario-runner.yml` and require `DSC_TEST_PASSWORD`. They run actual dbt materializations and assert both passing and deliberately failing cases. See [the roadmap](docs/ROADMAP.md) for remaining work toward the full MVP.
 
 Validation errors show a safe field path or YAML line/column and a suggested correction. Mapping-key names are masked as `[*]`; array indexes are zero-based, and YAML lines/columns are one-based. Row values and raw database/dbt exception messages are withheld. See [common errors](docs/ERRORS.md).
+
+For repeatable full-scenario timings, use `python scripts/benchmark.py --config scenario-runner.yml --samples 20 --rows 10000 --output artifacts/benchmark/result.json`. The benchmark generates its own synthetic project and uses only the test database settings. It includes fixture parsing, dbt startup, assertions and cleanup, while excluding dependency installation, server startup and data generation. It retains raw timings and safe run reports. Resource limits are not enforced by this script; results describe the recorded machine and workload.
+
+The [recorded local benchmark](docs/BENCHMARK.md) completed 20 valid samples at 10,000 initial rows and ten columns: P50 50.437 s, P95 54.132 s. This unconstrained Windows measurement does not establish the Linux 2 vCPU / 8 GiB target.
+
+[Acceptance coverage](docs/ACCEPTANCE.md) distinguishes completed checks from remaining cases. Passing the suite does not establish adoption by external teams.
+
+See [existing approaches and the comparison plan](docs/ALTERNATIVES.md) for the product hypothesis and alternatives that already support materialization checks.
 
 ## License
 

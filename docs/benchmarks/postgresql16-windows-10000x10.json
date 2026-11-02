@@ -1,0 +1,464 @@
+{
+  "schema_version": 1,
+  "benchmark_id": "06aa1615cbbc42e081b9d8166a57497f",
+  "started_at": "2026-11-02T21:46:26.635733+00:00",
+  "package_version": "0.1.0a4",
+  "benchmark_script_sha256": "361deb672b22d40661b48907d0e07be61a428f0affedade9e7ef287ded7c7c0f",
+  "implementation_sha256": "747d00b8292a979910d24a5de7791dd9776258f7b3a057f0a1d3d319059595fe",
+  "environment": {
+    "os": "Windows",
+    "os_release": "10",
+    "architecture": "AMD64",
+    "python": "3.12.10",
+    "logical_cpus": 8,
+    "resource_limits_enforced": false,
+    "yaml_parser": "CSafeLoader",
+    "dependencies": {
+      "dbt-core": "1.11.16",
+      "dbt-postgres": "1.10.2",
+      "psycopg": "3.3.6",
+      "PyYAML": "6.0.3"
+    },
+    "postgresql": 160015
+  },
+  "protocol": {
+    "samples_requested": 20,
+    "initial_rows": 10000,
+    "columns": 10,
+    "expected_rows_by_step": [
+      10000,
+      10100,
+      10100
+    ],
+    "includes": [
+      "fixture_read_and_validation",
+      "project_copy",
+      "dbt_parse",
+      "three_dbt_runs",
+      "input_loading",
+      "exact_assertions",
+      "snapshots",
+      "database_cleanup",
+      "report_writing"
+    ],
+    "excludes": [
+      "dependency_installation",
+      "postgres_startup",
+      "fixture_generation"
+    ],
+    "caches_flushed": false,
+    "unmeasured_warmup_runs": 0,
+    "percentile_method": "nearest-rank for p95; median for p50"
+  },
+  "workspace": "project_06aa1615cbbc42e081b9d8166a57497f",
+  "complete": true,
+  "samples": [
+    {
+      "index": 1,
+      "run_id": "dec0f38202f7454bac30dace04cdd43a",
+      "wall_ms": 47684.224,
+      "fixture_load_ms": 6988.478,
+      "runner_ms": 40695.746,
+      "step_ms": [
+        10594,
+        11078,
+        9391
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 2,
+      "run_id": "2872ef5390574e549bbd7fb31e894c69",
+      "wall_ms": 47347.966,
+      "fixture_load_ms": 6546.145,
+      "runner_ms": 40801.821,
+      "step_ms": [
+        10750,
+        11813,
+        9109
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 3,
+      "run_id": "1b45b95379c74450ae20d2d4a07eab36",
+      "wall_ms": 48636.751,
+      "fixture_load_ms": 6978.192,
+      "runner_ms": 41658.559,
+      "step_ms": [
+        10984,
+        11594,
+        10562
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 4,
+      "run_id": "7aaf171b2001495689d8f1ad76c231a1",
+      "wall_ms": 49788.926,
+      "fixture_load_ms": 7133.442,
+      "runner_ms": 42655.484,
+      "step_ms": [
+        12813,
+        12281,
+        9172
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 5,
+      "run_id": "c82f70244d8a44ab9e5570d0a9cb969c",
+      "wall_ms": 48706.676,
+      "fixture_load_ms": 7094.549,
+      "runner_ms": 41612.127,
+      "step_ms": [
+        12563,
+        10953,
+        9469
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 6,
+      "run_id": "9342c2633e3f484bb096574333f8fe48",
+      "wall_ms": 48547.881,
+      "fixture_load_ms": 6924.371,
+      "runner_ms": 41623.511,
+      "step_ms": [
+        11563,
+        11781,
+        10141
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 7,
+      "run_id": "71ae213a53ef4d10bb96f0f9e9e0657a",
+      "wall_ms": 50729.345,
+      "fixture_load_ms": 7027.125,
+      "runner_ms": 43702.221,
+      "step_ms": [
+        11953,
+        12516,
+        10875
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 8,
+      "run_id": "d9ea454413d4482f948f144c683eee91",
+      "wall_ms": 52025.09,
+      "fixture_load_ms": 8477.433,
+      "runner_ms": 43547.657,
+      "step_ms": [
+        11718,
+        12297,
+        10235
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 9,
+      "run_id": "d603ea1378554208a0def5629ae45a11",
+      "wall_ms": 51876.495,
+      "fixture_load_ms": 7873.121,
+      "runner_ms": 44003.374,
+      "step_ms": [
+        11922,
+        11844,
+        10781
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 10,
+      "run_id": "2d0a4e20079942f1b8ed162e065e3e97",
+      "wall_ms": 52431.032,
+      "fixture_load_ms": 8045.079,
+      "runner_ms": 44385.953,
+      "step_ms": [
+        12360,
+        11906,
+        10000
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 11,
+      "run_id": "c999ed376b8d412289fc05ab88a30497",
+      "wall_ms": 51961.434,
+      "fixture_load_ms": 7622.952,
+      "runner_ms": 44338.482,
+      "step_ms": [
+        11750,
+        12156,
+        10750
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 12,
+      "run_id": "0ee129a011f84aa3bd44a0ad0eaee2e3",
+      "wall_ms": 50422.689,
+      "fixture_load_ms": 8005.109,
+      "runner_ms": 42417.581,
+      "step_ms": [
+        11515,
+        11938,
+        9844
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 13,
+      "run_id": "1d6c106edc0c4e7382d919b840cb3531",
+      "wall_ms": 52417.579,
+      "fixture_load_ms": 8806.791,
+      "runner_ms": 43610.787,
+      "step_ms": [
+        11969,
+        12640,
+        10032
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 14,
+      "run_id": "a14842905c27442cbc1000fc07889a94",
+      "wall_ms": 50450.388,
+      "fixture_load_ms": 7517.512,
+      "runner_ms": 42932.877,
+      "step_ms": [
+        12016,
+        11859,
+        9953
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 15,
+      "run_id": "7c210d8d8cce4638b3349c4487b11bbd",
+      "wall_ms": 54132.331,
+      "fixture_load_ms": 8096.379,
+      "runner_ms": 46035.951,
+      "step_ms": [
+        11953,
+        14234,
+        10813
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 16,
+      "run_id": "1ea7173def2a4aeca5a7002d21dab170",
+      "wall_ms": 50250.278,
+      "fixture_load_ms": 7754.036,
+      "runner_ms": 42496.242,
+      "step_ms": [
+        11578,
+        11703,
+        10297
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 17,
+      "run_id": "98d599501ad64461b07ca84b414e4435",
+      "wall_ms": 49553.113,
+      "fixture_load_ms": 8163.712,
+      "runner_ms": 41389.4,
+      "step_ms": [
+        11281,
+        11860,
+        9515
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 18,
+      "run_id": "d956ae143a404b50b0cacc03680fe932",
+      "wall_ms": 51218.756,
+      "fixture_load_ms": 7782.959,
+      "runner_ms": 43435.797,
+      "step_ms": [
+        11969,
+        12203,
+        9984
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 19,
+      "run_id": "cc9f5961d47842c08ee6edbeb29391f8",
+      "wall_ms": 49705.307,
+      "fixture_load_ms": 7480.211,
+      "runner_ms": 42225.096,
+      "step_ms": [
+        11844,
+        12141,
+        9390
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 20,
+      "run_id": "fd42a33fe75544d9b175debbd0964942",
+      "wall_ms": 54866.246,
+      "fixture_load_ms": 7356.764,
+      "runner_ms": 47509.482,
+      "step_ms": [
+        12343,
+        13735,
+        12750
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    }
+  ],
+  "summary": {
+    "samples": 20,
+    "p50_ms": 50436.538499999995,
+    "p95_ms": 54132.331,
+    "min_ms": 47347.966,
+    "max_ms": 54866.246
+  }
+}

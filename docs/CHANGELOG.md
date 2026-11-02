@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.0a4 — November 3, 2026
+
+- Fixed validation of high-precision numeric fixtures independently of Python's global Decimal context.
+- Reject timestamps with more than six fractional digits instead of silently truncating them.
+- Enforce exact text/key comparison even with nondeterministic model collations.
+- Cache fixture snapshots per scenario load while preserving independent mutable input/expected rows and exact byte hashes.
+- Use the accelerated safe YAML loader when available, retaining alias/duplicate-key checks and enforcing a nesting limit.
+- Expanded PostgreSQL acceptance cases and added a reproducible full-scenario benchmark.
+
 ## 0.1.0a3 — November 3, 2026
 
 - Added `init --demo` with packaged example resources and `init` templates for existing dbt projects, without database access or file overwrites.

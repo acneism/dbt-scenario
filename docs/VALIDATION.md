@@ -31,3 +31,11 @@ Alpha 3 was checked on November 3, 2026 using the same local engine versions. Th
 New cases cover a real PostgreSQL run of the initialized demo, explicit project environment forwarding, exclusion of unlisted variables, reserved runtime controls, initialization rollback and collision handling, dependency preflight checks and redacted diagnostics for invalid rows and YAML.
 
 The wheel was checked independently of the source checkout: its nine packaged demo resources generated a valid scenario from the installed archive. Wheel/source builds, Ruff checks and the no-comments/docstrings check passed. CI results must be checked for the final commit.
+
+## Data precision and acceptance validation
+
+Alpha 4 was checked on November 3, 2026 using the same local engine versions. The final suite contains 125 tests. Before the accelerated YAML parser change, the local full suite passed 120 tests with three platform-specific skips. After that change, the unit suite passed 74 tests with two skips, and all 21 direct PostgreSQL comparison tests passed. The final Linux CI run must confirm the entire suite together.
+
+New cases cover high-precision decimals, rejected rounding and sub-microsecond timestamps, YAML fixture caching and independent rows, duplicate/alias/depth validation and the pure-Python parser fallback. PostgreSQL checks cover empty inputs, NULLs, compound keys, nondeterministic collations, schema changes, valid append, multiple inputs and recovery after cleanup failure. The coverage table in [ACCEPTANCE.md](ACCEPTANCE.md) records remaining gaps rather than treating the complete MVP matrix as satisfied.
+
+The final parser also completed 20 benchmark samples, comprising 60 real dbt invocations on a ten-column workload with 10,000 initial rows. Every sample passed exact assertions and cleanup. Local Windows P50 was 50.437 s and P95 was 54.132 s; see [the protocol, limitations and raw results](BENCHMARK.md). The benchmark source hashes matched the published source bytes before Git newline normalization.

@@ -17,10 +17,17 @@ Implemented in alpha 3:
 - Offline checks for installed dependencies and actionable error hints.
 - Safe field paths and YAML line/column diagnostics without row values.
 
-The remaining MVP work is:
+Implemented in alpha 4:
 
-- Remaining acceptance-matrix cases, including schema/type variations and complete data edge cases.
-- Performance measurements and comparison against hand-written dbt scripts and existing audit packages.
+- High-precision numeric validation, explicit timestamp precision and exact text collation semantics.
+- Additional PostgreSQL cases for empty tables, NULLs, compound keys, schema changes and failed cleanup.
+- A repeatable benchmark that measures complete scenarios and validates every measured result.
+- An explicit acceptance-coverage table that keeps untested requirements visible.
+
+The remaining work is:
+
+- Remaining cases identified in ACCEPTANCE.md, including stale-artifact fault injection and network-isolated execution.
+- Controlled Linux performance measurements and comparison against hand-written dbt scripts and existing audit packages.
 - External pilots showing that teams retain the tests in CI and can add their second scenario independently.
 
 The next adapter should be selected with a concrete pilot user. Local PostgreSQL results do not validate Snowflake or BigQuery behavior.

@@ -1,0 +1,30 @@
+# Acceptance coverage
+
+This maps the original A01–A30 requirements to executable checks. Passing the automated suite is separate from demonstrating usefulness in external projects. A partial item is not considered completed acceptance.
+
+| Requirement | Coverage | Evidence |
+|---|---|---|
+| A01–A05: initial load, updates, strategies, late events, retries | Covered | Real dbt integration scenarios for delete+insert and merge; wrong-watermark negative case |
+| A06–A07: append semantics | Covered | Duplicate-key failure and a successful append with disjoint incoming batches |
+| A08–A10: exact values, unchanged aggregates, NULL and decimals | Covered | Equal-total swaps, NULL versus zero, numeric(38,2) roundtrip and independent Decimal context |
+| A11: compound keys | Covered | Real compound merge plus duplicate and NULL component failures |
+| A12: invalid expected fixtures | Partial | Duplicate expected keys and invalid values are checked; the complete malformed-expected matrix remains to be expanded |
+| A13: empty versus missing tables | Covered | Empty initial load followed by incremental data; empty incoming batch; missing actual relation raises an error |
+| A14: schema changes | Covered | Added/removed columns, changed numeric scale and a real dbt schema addition |
+| A15: unchanged input state | Covered | Two direct inputs; one changes while the ref fixture persists |
+| A16: unsupported and external dependencies | Partial | Declared dependencies and unsupported model configurations are inspected; arbitrary hardcoded SQL relations are not fully audited |
+| A17: real incremental mode | Partial | Execution SQL and target OID are checked; the complete adversarial full-refresh matrix remains pending |
+| A18: failed, missing or stale execution artifacts | Partial | Execution failures and fresh per-invocation artifact directories are enforced; explicit stale-metadata fault injection remains pending |
+| A19: failed-step handling | Partial | Dependent steps stop; a dedicated multi-scenario continuation acceptance case remains pending |
+| A20: atomic fixture updates | Partial | Cancellation rolls back fixture changes; the complete multi-input failure matrix remains pending |
+| A21–A24: concurrency, interruption, ownership and cleanup errors | Covered | Separate CLI processes, SIGINT, deadlines, abrupt exit recovery, ownership refusal and cleanup-failure gate |
+| A25: safe reports | Partial | A secret-like compiler message is redacted; more data-bearing failure cases remain to be tested across all formats |
+| A26: reproducibility fingerprints | Partial | Fixture byte hashes, vars and original-file preservation are checked; every individual mutation path is not yet represented |
+| A27: invalid/empty selections and unsafe inputs | Covered | Empty selection, unknown schema fields, path escapes and executable YAML tags fail |
+| A28: offline execution after installation | Partial | Package fetching and telemetry are disabled by policy; an explicitly network-isolated end-to-end acceptance run remains pending |
+| A29: time values | Covered | PostgreSQL compares timestamptz instants; unsupported timezone use and sub-microsecond truncation are rejected |
+| A30: controlled model time | Partial | Time is not globally frozen; an explicit as_of demonstration case remains pending |
+
+Database comparison tests use PostgreSQL 16. ICU cases explicitly create a nondeterministic collation to prove that exact comparisons still distinguish case and accents. Such cases skip only when PostgreSQL was built without ICU.
+
+The test database and project code are trusted. Production credentials are not needed. The current tool is not an enforcement sandbox for malicious macros or arbitrary SQL side effects.

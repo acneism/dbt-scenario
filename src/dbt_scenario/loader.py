@@ -1,9 +1,10 @@
+import copy
 import hashlib
 import json
 import re
 from dataclasses import dataclass
 from datetime import date, datetime
-from decimal import Decimal, InvalidOperation
+from decimal import Context, Decimal, InvalidOperation, localcontext
 from importlib.resources import files
 from pathlib import Path
 
@@ -15,9 +16,10 @@ from dbt_scenario.errors import ScenarioError
 TYPE_PATTERN = re.compile(
     r"^(bigint|integer|text|boolean|date|timestamp|timestamptz|numeric\(([1-9]\d?),([0-9]\d?)\))$"
 )
+YAML_BASE = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
 
 
-class StrictLoader(yaml.SafeLoader):
+class StrictLoader(YAML_BASE):
     def compose_node(self, parent, index):
         if self.check_event(yaml.AliasEvent):
             mark = self.peek_event().start_mark
@@ -45,15 +47,32 @@ class StrictLoader(yaml.SafeLoader):
 
 StrictLoader.yaml_implicit_resolvers = {
     key: [(tag, rx) for tag, rx in resolvers if tag != "tag:yaml.org,2002:timestamp"]
-    for key, resolvers in yaml.SafeLoader.yaml_implicit_resolvers.items()
+    for key, resolvers in YAML_BASE.yaml_implicit_resolvers.items()
 }
 
 
-def read_yaml(path: Path):
-    if path.stat().st_size > 10 * 1024 * 1024:
+def read_yaml_document(path: Path):
+    limit = 10 * 1024 * 1024
+    with path.open("rb") as source:
+        content = source.read(limit + 1)
+    if len(content) > limit:
         raise ScenarioError("FILE_TOO_LARGE")
     try:
-        return yaml.load(path.read_text(encoding="utf-8"), Loader=StrictLoader)
+        text = content.decode("utf-8")
+        depth = 0
+        for event in yaml.parse(text, Loader=YAML_BASE):
+            if isinstance(event, yaml.AliasEvent):
+                mark = event.start_mark
+                raise ScenarioError(
+                    "YAML_ALIAS_UNSUPPORTED", line=mark.line + 1, column=mark.column + 1
+                )
+            if isinstance(event, (yaml.MappingStartEvent, yaml.SequenceStartEvent)):
+                depth += 1
+                if depth > 128:
+                    raise ScenarioError("YAML_NESTING_LIMIT")
+            elif isinstance(event, (yaml.MappingEndEvent, yaml.SequenceEndEvent)):
+                depth -= 1
+        payload = yaml.load(text, Loader=StrictLoader)
     except (yaml.YAMLError, UnicodeError, RecursionError) as error:
         mark = getattr(error, "problem_mark", None)
         raise ScenarioError(
@@ -61,6 +80,11 @@ def read_yaml(path: Path):
             line=mark.line + 1 if mark else None,
             column=mark.column + 1 if mark else None,
         ) from None
+    return payload, hashlib.sha256(content).hexdigest()
+
+
+def read_yaml(path: Path):
+    return read_yaml_document(path)[0]
 
 
 def sql_type(value: str) -> str:
@@ -87,13 +111,16 @@ def converted(value, kind: str):
         elif kind.startswith("numeric") and isinstance(value, str):
             number = Decimal(value)
             precision, scale = map(int, re.findall(r"\d+", kind))
-            if number.is_finite():
-                quantum = Decimal(1).scaleb(-scale)
-                if number == number.quantize(quantum) and abs(number) < 10 ** (precision - scale):
-                    return number
+            if number.is_finite() and number.copy_abs() < 10 ** (precision - scale):
+                with localcontext(Context(prec=precision + 2)):
+                    quantum = Decimal(1).scaleb(-scale)
+                    if number == number.quantize(quantum):
+                        return number
         elif isinstance(value, str):
             if kind == "date":
                 return date.fromisoformat(value)
+            if re.search(r"[.,]\d{7,}", value):
+                raise ValueError
             parsed = datetime.fromisoformat(value)
             if (parsed.utcoffset() is not None) == (kind == "timestamptz"):
                 return parsed
@@ -142,6 +169,7 @@ def load_scenario(path: Path, project_dir: Path) -> Scenario:
             location = (*location, missing)
         raise ScenarioError("INVALID_SCENARIO_SCHEMA", location=location)
     hashes = {}
+    fixture_cache = {}
 
     def resolve_fixture(fixture):
         if "fixture" not in fixture:
@@ -149,19 +177,21 @@ def load_scenario(path: Path, project_dir: Path) -> Scenario:
         target = (path.parent / fixture["fixture"]).resolve()
         if not target.is_relative_to(root) or not target.is_file():
             raise ScenarioError("INVALID_FIXTURE_PATH")
-        payload = read_yaml(target)
-        if not isinstance(payload, dict) or set(payload) != {"rows"}:
-            raise ScenarioError("INVALID_FIXTURE_FILE")
-        hashes[str(target.relative_to(root))] = hashlib.sha256(target.read_bytes()).hexdigest()
-        fixture["rows"] = payload["rows"]
+        if target not in fixture_cache:
+            payload, fingerprint = read_yaml_document(target)
+            if not isinstance(payload, dict) or set(payload) != {"rows"}:
+                raise ScenarioError("INVALID_FIXTURE_FILE")
+            fixture_cache[target] = payload
+            hashes[target.relative_to(root).as_posix()] = fingerprint
+        fixture["rows"] = copy.deepcopy(fixture_cache[target]["rows"])
         del fixture["fixture"]
 
     definitions = [("inputs", name, definition) for name, definition in data["inputs"].items()]
     definitions.append(("output", data["output"]))
     for *prefix, definition in definitions:
         for name, kind in definition["columns"].items():
-            if not name or "\x00" in name or len(name.encode()) > 63:
-                raise ScenarioError("INVALID_COLUMN_NAME")
+            if not isinstance(name, str) or not name or "\x00" in name or len(name.encode()) > 63:
+                raise ScenarioError("INVALID_COLUMN_NAME", location=(*prefix, "columns"))
             try:
                 sql_type(kind)
             except ScenarioError as error:
