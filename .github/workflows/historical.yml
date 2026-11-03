@@ -1,4 +1,4 @@
-name: Historical regression
+name: External model checks
 on:
   workflow_dispatch:
   push:
@@ -7,14 +7,27 @@ on:
       - historical/**
       - scripts/reproduce_history.py
       - scripts/compare_approaches.py
+      - scripts/check_watermarks.py
+      - investigations/watermark-boundary/**
       - src/**
       - requirements-dev.lock.txt
 permissions:
   contents: read
 jobs:
-  mit-empty-watermark:
+  reproduction:
+    name: ${{ matrix.case }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - case: mit-empty-watermark
+            script: reproduce_history.py
+            artifact: historical-mit-empty-watermark
+          - case: watermark-boundary
+            script: check_watermarks.py
+            artifact: watermark-boundary
     services:
       postgres:
         image: postgres:16
@@ -47,11 +60,11 @@ jobs:
           POSTGRES_DB: dbt_scenario_test
         run: bash scripts/init-test-db.sh
       - name: Download and verify immutable upstream sources
-        run: python scripts/reproduce_history.py --fetch-only --sources-dir artifacts/historical-sources
-      - name: Reproduce both revisions and compare native dbt tests
-        run: python scripts/reproduce_history.py --config scenario-runner.yml --sources-dir artifacts/historical-sources --output artifacts/historical/result.json
+        run: python scripts/${{ matrix.script }} --fetch-only --sources-dir artifacts/upstream-sources
+      - name: Execute model checks and verify expected outcomes
+        run: python scripts/${{ matrix.script }} --config scenario-runner.yml --sources-dir artifacts/upstream-sources --output artifacts/results/result.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: historical-mit-empty-watermark
-          path: artifacts/historical/result.json
+          name: ${{ matrix.artifact }}
+          path: artifacts/results/result.json

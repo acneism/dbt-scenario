@@ -1,0 +1,21 @@
+version: 1
+initial_timestamp: '2026-01-02T12:00:00Z'
+cases:
+  newer_event:
+    incoming_timestamp: '2026-01-02T12:00:01Z'
+    expected:
+      current: PASS
+      boundary_candidate: PASS
+      initial_snapshot: PASS
+  same_timestamp:
+    incoming_timestamp: '2026-01-02T12:00:00Z'
+    expected:
+      current: FAIL
+      boundary_candidate: PASS
+      initial_snapshot: PASS
+  older_event:
+    incoming_timestamp: '2026-01-02T11:59:59Z'
+    expected:
+      current: FAIL
+      boundary_candidate: FAIL
+      initial_snapshot: PASS

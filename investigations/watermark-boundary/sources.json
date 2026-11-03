@@ -1,0 +1,18 @@
+{
+  "repository": "mitodl/ol-data-platform",
+  "snapshot": "2129da1fb79bfda08453a8e62b9571463020bebc",
+  "files": {
+    "current.sql": {
+      "url": "https://raw.githubusercontent.com/mitodl/ol-data-platform/2129da1fb79bfda08453a8e62b9571463020bebc/src/ol_dbt/models/intermediate/edxorg/int__edxorg__mitx_user_activity.sql",
+      "sha256": "6b847d8fc3c373dcd6d8a3530bca674ff205108a1d2751f37b616a9057fc8dfb"
+    },
+    "macros.sql": {
+      "url": "https://raw.githubusercontent.com/mitodl/ol-data-platform/2129da1fb79bfda08453a8e62b9571463020bebc/src/ol_dbt/macros/extract_course_id.sql",
+      "sha256": "fe075d26b5cd1d993be155beed110d5b8d93fb423bb64a7eaf7b8ff555d0a875"
+    },
+    "LICENSE": {
+      "url": "https://raw.githubusercontent.com/mitodl/ol-data-platform/2129da1fb79bfda08453a8e62b9571463020bebc/LICENSE",
+      "sha256": "666627f000933664afa86b3796db7d702bb2e912cc9ebec99ab103b466e0fe4e"
+    }
+  }
+}

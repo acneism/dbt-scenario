@@ -26,8 +26,8 @@ MODEL = "int__edxorg__mitx_user_activity"
 INPUT = "stg__edxorg__s3__tracking_logs__user_activity"
 
 
-def verified_sources(directory, fetch=False):
-    specification = json.loads((ASSETS / "sources.json").read_text())
+def verified_sources(directory, fetch=False, specification_path=None):
+    specification = json.loads((specification_path or ASSETS / "sources.json").read_text())
     directory.mkdir(parents=True, exist_ok=True)
     for name, entry in specification["files"].items():
         destination = directory / name
