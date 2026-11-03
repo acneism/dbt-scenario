@@ -8,6 +8,8 @@ The script also checks package identity/version/license metadata, the installed 
 
 From 0.1.0a8, the installed-package script also validates the generated scenario with password environment variables removed. The separate offline job performs this definition check before starting PostgreSQL, then verifies database execution. Definition validity and model execution remain separate checks.
 
+From 0.1.0a9, the installed-package check also uses a real parsed manifest to discover the example model with password variables removed. Its metadata initialization report records the discovery result separately from the materialized scenario.
+
 Before publishing:
 
 1. Require green CI and distribution checks for the source commit. Keep the version in pyproject.toml and dbt_scenario.__version__ identical. A tag is never moved to replace an existing published version.
@@ -48,3 +50,15 @@ The exact [CI wheel and sdist](https://github.com/acneism/dbt-scenario/actions/r
 All seven published assets were downloaded anonymously and matched their verified copies; the tag resolved to the tested commit. This release adds definition validation and fixes type-name normalization. It does not measure external adoption or establish SQL correctness without executing the supplied scenario.
 
 A separate [public-installation check](distribution/v0.1.0a8-install.json) installed directly from the public wheel and constraints URLs into a fresh Windows environment. The installed files matched the published wheel, pip found no dependency conflicts, and no development-only packages were present. Outside the checkout, the CLI generated a valid demo, validated it without password variables, rejected an unfinished external fixture with the new diagnostic, and accepted the restored fixture.
+
+## Model discovery prerelease
+
+[`v0.1.0a9`](https://github.com/acneism/dbt-scenario/releases/tag/v0.1.0a9) points to commit `dc4a791c0e6c65f01de264e929901783f7561891`. The [full CI](https://github.com/acneism/dbt-scenario/actions/runs/41688203385) passed 264 unit and 70 integration tests, the repository demo and offline acceptance. New cases check mixed candidate inventories, per-model refusals, artifact pairing, catalog types, reserved filenames, escaped identifiers and reuse of loaded artifacts.
+
+The real PostgreSQL docs/catalog integration case now discovers the model with database access and dbt subprocesses blocked before initializing its template. It then fills explicit fixture/expected rows and completes initial/update/retry with 2 / 3 / 3 rows and cleanup.
+
+The exact [CI wheel and sdist](https://github.com/acneism/dbt-scenario/actions/runs/41688203433) passed installed-package verification on Linux and Windows. Both platform reports record discovery from a real parsed manifest with password variables absent, metadata initialization, definition validation and materialized results. All 30 packaged files match the tagged source. The [external-model regressions](https://github.com/acneism/dbt-scenario/actions/runs/41688203223) passed again.
+
+All seven published assets were downloaded anonymously and matched their verified copies; the tag resolved to the tested commit. `TEMPLATE_READY` establishes metadata preparation rather than SQL execution or external adoption.
+
+A separate [public-installation check](distribution/v0.1.0a9-install.json) installed directly from the public release URLs into a fresh Windows environment. The installed files matched the published wheel, pip found no dependency conflicts and no development-only packages were present. Outside the checkout, the installed CLI generated and validated the demo, diagnosed unfinished rows, and discovered a candidate from explicitly synthetic local metadata without password variables. The platform and real-catalog checks above cover discovery from actual dbt artifacts.
