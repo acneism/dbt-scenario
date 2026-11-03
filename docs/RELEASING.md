@@ -6,6 +6,8 @@ The [distribution workflow](../.github/workflows/package.yml) builds a source ar
 
 The script also checks package identity/version/license metadata, the installed CLI version, dependency compatibility, and packaged initialization resources. From outside the checkout it generates a demo, runs doctor, and completes the real PostgreSQL 16 initial/update/retry sequence. Required counts are 2 / 3 / 3 with successful SQL audits, cleanup and an independent schema-ownership check. The test uses a restricted database role. It does not assert a network sandbox or fixed resource limits; the separate offline job covers execution without external networking.
 
+From 0.1.0a8, the installed-package script also validates the generated scenario with password environment variables removed. The separate offline job performs this definition check before starting PostgreSQL, then verifies database execution. Definition validity and model execution remain separate checks.
+
 Before publishing:
 
 1. Require green CI and distribution checks for the source commit. Keep the version in pyproject.toml and dbt_scenario.__version__ identical. A tag is never moved to replace an existing published version.
@@ -36,3 +38,13 @@ The [distribution check](https://github.com/acneism/dbt-scenario/actions/runs/41
 All seven published assets were downloaded anonymously and matched their verified copies; the tag resolved to the tested source commit. This release improves template preparation. It does not establish measured onboarding savings, external adoption, or a new production defect.
 
 A separate [public-installation check](distribution/v0.1.0a7-install.json) installed directly from the release URLs into a fresh Windows environment. The installed files matched the published wheel, pip found no dependency conflicts, no development-only packages were present, and the CLI exposed all metadata options and generated a valid demo outside the checkout.
+
+## Definition validation prerelease
+
+[`v0.1.0a8`](https://github.com/acneism/dbt-scenario/releases/tag/v0.1.0a8) points to commit `36d1b8acfff936c43a920db07f1b27640c7d4965`. The [full CI](https://github.com/acneism/dbt-scenario/actions/runs/41683199891) passed 240 unit and 70 integration tests, the repository demo and offline acceptance. The offline result records successful definition validation before PostgreSQL startup, with password variables absent and external IPv4/IPv6 connections blocked, followed by three successful database steps and cleanup.
+
+The exact [CI wheel and sdist](https://github.com/acneism/dbt-scenario/actions/runs/41683200385) passed installed-package verification on Linux and Windows. Both reports include static validation without passwords, metadata initialization and the PostgreSQL initial/update/retry sequence with 2 / 3 / 3 rows. All 29 packaged files match the tagged source. The [external-model regressions](https://github.com/acneism/dbt-scenario/actions/runs/41683199912) passed again.
+
+All seven published assets were downloaded anonymously and matched their verified copies; the tag resolved to the tested commit. This release adds definition validation and fixes type-name normalization. It does not measure external adoption or establish SQL correctness without executing the supplied scenario.
+
+A separate [public-installation check](distribution/v0.1.0a8-install.json) installed directly from the public wheel and constraints URLs into a fresh Windows environment. The installed files matched the published wheel, pip found no dependency conflicts, and no development-only packages were present. Outside the checkout, the CLI generated a valid demo, validated it without password variables, rejected an unfinished external fixture with the new diagnostic, and accepted the restored fixture.
