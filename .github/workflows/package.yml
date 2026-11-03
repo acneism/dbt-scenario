@@ -1,0 +1,58 @@
+name: Distribution check
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/package.yml
+      - pyproject.toml
+      - requirements-dev.lock.txt
+      - scripts/check_distribution.py
+      - src/**
+permissions:
+  contents: read
+jobs:
+  wheel-and-sdist:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: dbt_scenario_test
+          POSTGRES_PASSWORD: disposable-admin-password
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d dbt_scenario_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      DSC_TEST_PASSWORD: disposable-test-password
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements-dev.lock.txt
+      - name: Build sdist and wheel from sdist
+        run: python -m build --outdir artifacts/package
+      - name: Install wheel into a fresh environment
+        run: |
+          python -m venv artifacts/package-env
+          artifacts/package-env/bin/python -m pip install -c requirements-dev.lock.txt artifacts/package/*.whl
+      - name: Create restricted test role
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 55432
+          PGUSER: postgres
+          PGPASSWORD: disposable-admin-password
+          POSTGRES_USER: postgres
+          POSTGRES_DB: dbt_scenario_test
+        run: bash scripts/init-test-db.sh
+      - name: Verify installed contents and run packaged demo
+        run: artifacts/package-env/bin/python -I scripts/check_distribution.py --wheel artifacts/package/*.whl --sdist artifacts/package/*.tar.gz --config scenario-runner.yml --output artifacts/package/verification.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-distribution
+          path: artifacts/package/*
