@@ -24,6 +24,19 @@ These key tests can pass on an empty table, so they do not establish completenes
 
 The harness accepts a completed result only if the original version retains `[0, 0, 0]` rows, its unit test fails, and dbt-scenario fails with `ROWS_MISMATCH` at the first incoming activity. The fixed version must retain `[0, 1, 1]`, pass both kinds of native tests and all three scenario steps. Both variants must clean their generated schemas. Execution errors are not counted as detected defects.
 
+## Recorded result
+
+The [Linux CI job](https://github.com/acneism/dbt-scenario/actions/runs/41649150347/job/125962391288) completed successfully against dbt-scenario commit `f0e87e1adf94dab38dc16c83443e7228dfcd038d`, using Python 3.12.15, PostgreSQL 16.15, dbt Core 1.11.16 and dbt-postgres 1.10.2. The [original JSON](evaluation/historical-mit-empty-watermark-postgresql16-linux.json) is copied unchanged from its artifact; the downloaded artifact ZIP was verified against GitHub's SHA-256 digest.
+
+| Upstream model revision | Rows after initial / incoming / retry | Native unique + not_null | Native empty-target unit test | dbt-scenario |
+|---|---|---|---|---|
+| Before fix, `b1f9a72` | 0 / 0 / 0 | PASS | FAIL | FAIL: ROWS_MISMATCH |
+| After fix, `bca689e` | 0 / 1 / 1 | PASS | PASS | PASS |
+
+The native driver executed all three runs for each revision. dbt-scenario stopped the original revision after its first failed assertion and marked the retry `NOT_RUN`; it completed all three steps for the fixed revision. Both approaches cleaned their schemas, and an independent final database query confirmed that the restricted role's owned-schema set matched its starting state.
+
+This confirms that dbt-scenario can replay this known external SQL defect under the stated fixture adaptations. It does not demonstrate that the original project's configured test suite missed it: that full suite was not run, and Copilot had already flagged it during review. The native unit test in this experiment detects it too.
+
 ## Reproduction
 
 Install the repository and its locked dependencies, then start the dedicated PostgreSQL 16 test database following the README. Keep its `DSC_TEST_PASSWORD` environment variable set. From the repository root:

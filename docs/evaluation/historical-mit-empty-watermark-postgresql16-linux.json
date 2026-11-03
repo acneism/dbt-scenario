@@ -1,0 +1,204 @@
+{
+  "schema_version": 1,
+  "complete": true,
+  "started_at": "2026-11-03T13:58:56.950366+00:00",
+  "source_commit": "f0e87e1adf94dab38dc16c83443e7228dfcd038d",
+  "package_version": "0.1.0a6",
+  "python_version": "3.12.15",
+  "dependencies": {
+    "dbt-core": "1.11.16",
+    "dbt-postgres": "1.10.2"
+  },
+  "upstream": {
+    "repository": "mitodl/ol-data-platform",
+    "pull_request": 3187,
+    "before": "b1f9a72f290907c31d5a684065a4e6d8a9ddcb14",
+    "after": "bca689e4a6570579b506e276ef31935b7b6e3704",
+    "files": {
+      "before.sql": {
+        "url": "https://raw.githubusercontent.com/mitodl/ol-data-platform/b1f9a72f290907c31d5a684065a4e6d8a9ddcb14/src/ol_dbt/models/intermediate/edxorg/int__edxorg__mitx_user_activity.sql",
+        "sha256": "4418a288d8e43dbdc0280061d239eb1a3cf9fba46a296453d5ad9a5d18a11c8a"
+      },
+      "after.sql": {
+        "url": "https://raw.githubusercontent.com/mitodl/ol-data-platform/bca689e4a6570579b506e276ef31935b7b6e3704/src/ol_dbt/models/intermediate/edxorg/int__edxorg__mitx_user_activity.sql",
+        "sha256": "6b847d8fc3c373dcd6d8a3530bca674ff205108a1d2751f37b616a9057fc8dfb"
+      },
+      "macros.sql": {
+        "url": "https://raw.githubusercontent.com/mitodl/ol-data-platform/bca689e4a6570579b506e276ef31935b7b6e3704/src/ol_dbt/macros/extract_course_id.sql",
+        "sha256": "fe075d26b5cd1d993be155beed110d5b8d93fb423bb64a7eaf7b8ff555d0a875"
+      },
+      "LICENSE": {
+        "url": "https://raw.githubusercontent.com/mitodl/ol-data-platform/bca689e4a6570579b506e276ef31935b7b6e3704/LICENSE",
+        "sha256": "666627f000933664afa86b3796db7d702bb2e912cc9ebec99ab103b466e0fe4e"
+      }
+    }
+  },
+  "scenario_sha256": "73d49ee8d8a3de1c32fce3f8dba4aeeda1b0b60eaad47ac173a28affca86ae70",
+  "protocol": {
+    "historical_premerge_regression": true,
+    "new_discovery": false,
+    "external_pilot": false,
+    "upstream_model_and_macro_bytes_unchanged": true,
+    "synthetic_fixtures": true,
+    "original_warehouse_tested": false,
+    "json_columns_represented_as_text": true,
+    "full_upstream_project_tested": false,
+    "upstream_first_reporter": "Copilot code review",
+    "repeats_per_revision": 1
+  },
+  "revisions": {
+    "before": {
+      "native": {
+        "steps": [
+          {
+            "name": "empty_initial_build",
+            "actual_rows": 0
+          },
+          {
+            "name": "first_course_activity",
+            "actual_rows": 0
+          },
+          {
+            "name": "retry_without_changes",
+            "actual_rows": 0
+          }
+        ],
+        "tests": {
+          "data": {
+            "status": "PASS",
+            "checks": [
+              {
+                "name": "test.historical.not_null_int__edxorg__mitx_user_activity_user_username.422487e4ec",
+                "status": "pass"
+              },
+              {
+                "name": "test.historical.unique_int__edxorg__mitx_user_activity_user_username.a00922576e",
+                "status": "pass"
+              }
+            ]
+          },
+          "unit": {
+            "status": "FAIL",
+            "checks": [
+              {
+                "name": "unit_test.historical.int__edxorg__mitx_user_activity.first_activity_after_empty_target",
+                "status": "fail"
+              }
+            ]
+          }
+        },
+        "cleanup_status": "CLEANED"
+      },
+      "scenario": {
+        "status": "FAIL",
+        "reason_code": null,
+        "cleanup_status": "CLEANED",
+        "engine_versions": {
+          "dbt-core": "1.11.16",
+          "dbt-postgres": "1.10.2",
+          "postgresql": 160015
+        },
+        "steps": [
+          {
+            "name": "empty_initial_build",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 0,
+            "expected_rows": 0
+          },
+          {
+            "name": "first_course_activity",
+            "status": "FAIL",
+            "reason_code": "ROWS_MISMATCH",
+            "actual_rows": 0,
+            "expected_rows": 1
+          },
+          {
+            "name": "retry_without_changes",
+            "status": "NOT_RUN",
+            "reason_code": "PREVIOUS_STEP_UNSUCCESSFUL",
+            "actual_rows": null,
+            "expected_rows": null
+          }
+        ]
+      }
+    },
+    "after": {
+      "native": {
+        "steps": [
+          {
+            "name": "empty_initial_build",
+            "actual_rows": 0
+          },
+          {
+            "name": "first_course_activity",
+            "actual_rows": 1
+          },
+          {
+            "name": "retry_without_changes",
+            "actual_rows": 1
+          }
+        ],
+        "tests": {
+          "data": {
+            "status": "PASS",
+            "checks": [
+              {
+                "name": "test.historical.not_null_int__edxorg__mitx_user_activity_user_username.422487e4ec",
+                "status": "pass"
+              },
+              {
+                "name": "test.historical.unique_int__edxorg__mitx_user_activity_user_username.a00922576e",
+                "status": "pass"
+              }
+            ]
+          },
+          "unit": {
+            "status": "PASS",
+            "checks": [
+              {
+                "name": "unit_test.historical.int__edxorg__mitx_user_activity.first_activity_after_empty_target",
+                "status": "pass"
+              }
+            ]
+          }
+        },
+        "cleanup_status": "CLEANED"
+      },
+      "scenario": {
+        "status": "PASS",
+        "reason_code": null,
+        "cleanup_status": "CLEANED",
+        "engine_versions": {
+          "dbt-core": "1.11.16",
+          "dbt-postgres": "1.10.2",
+          "postgresql": 160015
+        },
+        "steps": [
+          {
+            "name": "empty_initial_build",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 0,
+            "expected_rows": 0
+          },
+          {
+            "name": "first_course_activity",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 1,
+            "expected_rows": 1
+          },
+          {
+            "name": "retry_without_changes",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 1,
+            "expected_rows": 1
+          }
+        ]
+      }
+    }
+  },
+  "owned_schemas_unchanged": true
+}
