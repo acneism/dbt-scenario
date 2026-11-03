@@ -63,3 +63,11 @@ The offline image installs Python/package dependencies during build, then runs a
 The first alpha 6 offline job passed for e4a3475 on PostgreSQL 16.15 with all three steps PASS and CLEANED. The final configuration-guard revision must also pass both CI jobs before being considered verified.
 
 Per-step compilation changes the workload and uses the original shared deadlines. The slow-query and snapshot test budgets increased to 24 seconds so their intended injected delay remains reachable. Alpha 4 performance measurements remain historical, and the benchmark protocol now records the three extra compile calls, auditing and parser version.
+
+## Controlled evaluation
+
+On November 3, 2026, commit 080ec1c completed separate controlled Linux comparison and performance jobs. Resource probing verified a two-CPU time quota, an 8 GiB memory cap and zero extra swap; only loopback networking was available. The package implementation hash was checked against the repository's canonical LF source. Downloaded artifact ZIPs were verified against GitHub's SHA-256 digests before preserving their original JSON.
+
+All 20 10,000-row/ten-column samples passed exact assertions and cleanup. P50 was 32.562 s and p95 was 33.081 s, meeting the workload's 60 s target. The comparison's 15 case/approach executions and its focused native-dbt checks completed: the append retry unit test passed while native unique and dbt-scenario failed; the wrong-watermark unit test failed while unique/not_null passed. These deliberately constructed cases do not establish external bug discovery or user demand. See [recorded results](EVALUATION-RESULTS.md).
+
+Fourteen unit tests were added for resource-claim verification and interpretation of the package gate's exit/status evidence. Local checks passed 172 unit cases with two platform-specific skips. The [full Linux CI run](https://github.com/acneism/dbt-scenario/actions/runs/41631791260) passed all 243 tests (174 unit, 69 integration), the demo and the separate offline job for 080ec1c. Research results do not replace this regression suite.

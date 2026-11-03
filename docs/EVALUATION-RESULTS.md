@@ -36,3 +36,9 @@ The pinned dependencies are audit-helper-ext revision `d7c85bf54065c77bb4c7fc492
 Both the comparison and its native-test experiments ran with only loopback networking, a CPU quota of 200000/100000 microseconds, an 8589934592-byte memory cap and zero additional swap. The host exposed CPUs 0-3; the quota supplies two CPUs of execution time, not two dedicated cores. Peak container memory was 461094912 bytes, including PostgreSQL setup. Single-run durations are retained for diagnosis and are not a fair speed ranking between unequal feature sets.
 
 Human onboarding time, effort to add a second scenario and sustained use by external teams remain unmeasured. The original product hypothesis still needs an external pilot.
+
+## Current runner performance
+
+The separate [controlled performance job](https://github.com/acneism/dbt-scenario/actions/runs/41631791262/job/125902931701) completed all 20 samples, with 10,000 initial rows, ten columns and three sequential materializations per sample. P50 was 32.562 s and p95 was 33.081 s. All assertions and cleanup passed under verified two-CPU time quota / 8 GiB / zero-extra-swap controls, with only loopback networking.
+
+The workload met its p95 <= 60 s target. This measures the runner alone and does not establish a speed advantage over the two other approaches. The [benchmark report](BENCHMARK.md) and [original JSON](benchmarks/postgresql16-linux-2cpu-8g-10000x10.json) contain the protocol, all samples and source/version evidence.

@@ -179,9 +179,9 @@ Integration tests use the same dedicated database configured by `scenario-runner
 
 Validation errors show a safe field path or YAML line/column and a suggested correction. Mapping-key names are masked as `[*]`; array indexes are zero-based, and YAML lines/columns are one-based. Row values and raw database/dbt exception messages are withheld. See [common errors](docs/ERRORS.md).
 
-For repeatable full-scenario timings, use `python scripts/benchmark.py --config scenario-runner.yml --samples 20 --rows 10000 --output artifacts/benchmark/result.json`. The benchmark generates its own synthetic project and uses only the test database settings. It includes fixture parsing, dbt startup, assertions and cleanup, while excluding dependency installation, server startup and data generation. It retains raw timings and safe run reports. Resource limits are not enforced by this script; results describe the recorded machine and workload.
+For repeatable full-scenario timings, use `python scripts/benchmark.py --config scenario-runner.yml --samples 20 --rows 10000 --output artifacts/benchmark/result.json`. The benchmark generates its own synthetic project and uses only the test database settings. It includes fixture parsing, dbt startup, assertions and cleanup, while excluding dependency installation, server startup and data generation. It retains raw timings and safe run reports. The script records/verifies resource controls; the controlled workflow enforces them with Docker.
 
-The [recorded alpha 4 benchmark](docs/BENCHMARK.md) completed 20 valid samples at 10,000 initial rows and ten columns: P50 50.437 s, P95 54.132 s. It predates per-step compilation/auditing and does not describe alpha 6 speed or establish the Linux 2 vCPU / 8 GiB target.
+The [recorded alpha 6 Linux benchmark](docs/BENCHMARK.md) completed 20 valid samples at 10,000 initial rows and ten columns: P50 32.562 s, P95 33.081 s, including per-step compilation/auditing. The container enforced a two-CPU time quota and 8 GiB memory cap with no extra swap. The p95 <= 60 s target was met for that workload; these shared-runner measurements are not a production latency guarantee.
 
 [Acceptance coverage](docs/ACCEPTANCE.md) distinguishes completed checks from remaining cases. Passing the suite does not establish adoption by external teams.
 

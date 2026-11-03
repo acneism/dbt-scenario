@@ -1,0 +1,495 @@
+{
+  "schema_version": 1,
+  "benchmark_id": "44fcf5e0f679476da4441a7bb30a01af",
+  "started_at": "2026-11-03T11:59:10.102395+00:00",
+  "package_version": "0.1.0a6",
+  "benchmark_script_sha256": "b3921f58132661741bb87693224271385ebd77886a2b75a9998a7573be513226",
+  "implementation_sha256": "f60a8a16c4ff1dfa398bedfde8716f39023b23e47fcd222f6be7f5cb499a0413",
+  "environment": {
+    "os": "Linux",
+    "os_release": "7.0.0-1017-azure",
+    "architecture": "x86_64",
+    "python": "3.12.16",
+    "logical_cpus": 4,
+    "resource_limits_enforced": true,
+    "resource_limits": {
+      "verified": true,
+      "mechanism": "linux_cgroup_v2",
+      "cpu_max": "200000 100000",
+      "cpu_limit": 2.0,
+      "memory_limit_bytes": 8589934592,
+      "swap_limit_bytes": 0,
+      "cpu_set": "0-3"
+    },
+    "yaml_parser": "CSafeLoader",
+    "dependencies": {
+      "dbt-core": "1.11.16",
+      "dbt-postgres": "1.10.2",
+      "psycopg": "3.3.6",
+      "PyYAML": "6.0.3",
+      "sqlglot": "30.27.0"
+    },
+    "postgresql": 160015,
+    "network": {
+      "interfaces": [
+        "lo"
+      ],
+      "external_connections_blocked": {
+        "ipv4": true,
+        "ipv6": true
+      }
+    },
+    "platform": "Linux-7.0.0-1017-azure-x86_64-with-glibc2.36",
+    "container_peak_memory_bytes": 606879744
+  },
+  "protocol": {
+    "samples_requested": 20,
+    "initial_rows": 10000,
+    "columns": 10,
+    "expected_rows_by_step": [
+      10000,
+      10100,
+      10100
+    ],
+    "includes": [
+      "fixture_read_and_validation",
+      "project_copy",
+      "dbt_parse",
+      "three_dbt_compiles",
+      "sql_relation_audit",
+      "three_dbt_runs",
+      "input_loading",
+      "exact_assertions",
+      "snapshots",
+      "database_cleanup",
+      "report_writing"
+    ],
+    "excludes": [
+      "dependency_installation",
+      "postgres_startup",
+      "fixture_generation"
+    ],
+    "caches_flushed": false,
+    "unmeasured_warmup_runs": 0,
+    "percentile_method": "nearest-rank for p95; median for p50"
+  },
+  "workspace": "project_44fcf5e0f679476da4441a7bb30a01af",
+  "complete": true,
+  "samples": [
+    {
+      "index": 1,
+      "run_id": "daf1418c1be04b0b9ee169895e1ed04d",
+      "wall_ms": 31527.555,
+      "fixture_load_ms": 4611.437,
+      "runner_ms": 26916.118,
+      "step_ms": [
+        7948,
+        7981,
+        7491
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 2,
+      "run_id": "a1cbbf1f25e54b5984e96aaab4406d8c",
+      "wall_ms": 31656.767,
+      "fixture_load_ms": 4809.422,
+      "runner_ms": 26847.344,
+      "step_ms": [
+        7947,
+        7949,
+        7504
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 3,
+      "run_id": "164de30ad1d243c9ba83d0fdd72485de",
+      "wall_ms": 32177.073,
+      "fixture_load_ms": 5182.415,
+      "runner_ms": 26994.658,
+      "step_ms": [
+        7961,
+        8067,
+        7472
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 4,
+      "run_id": "5973b536e73440adaf1a9e3c460a97bb",
+      "wall_ms": 32276.819,
+      "fixture_load_ms": 5254.683,
+      "runner_ms": 27022.136,
+      "step_ms": [
+        7974,
+        8106,
+        7481
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 5,
+      "run_id": "777a5a709c6f464ba27c17b8b6d097d8",
+      "wall_ms": 32678.221,
+      "fixture_load_ms": 5539.284,
+      "runner_ms": 27138.937,
+      "step_ms": [
+        8083,
+        8040,
+        7486
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 6,
+      "run_id": "ad79cdf7c9004d5a8df71b04846eb6e8",
+      "wall_ms": 32304.902,
+      "fixture_load_ms": 5356.943,
+      "runner_ms": 26947.96,
+      "step_ms": [
+        7974,
+        8074,
+        7447
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 7,
+      "run_id": "f9e78d7d0c39497cadaef5657c636a99",
+      "wall_ms": 32560.643,
+      "fixture_load_ms": 5368.595,
+      "runner_ms": 27192.048,
+      "step_ms": [
+        8202,
+        8205,
+        7406
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 8,
+      "run_id": "c87efe8072fb412f999bfb502d3c9346",
+      "wall_ms": 32763.555,
+      "fixture_load_ms": 5389.052,
+      "runner_ms": 27374.503,
+      "step_ms": [
+        8098,
+        8197,
+        7551
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 9,
+      "run_id": "cd96ee6676b04477a2e3201dfbc80c7f",
+      "wall_ms": 33375.004,
+      "fixture_load_ms": 5786.114,
+      "runner_ms": 27588.89,
+      "step_ms": [
+        8090,
+        8217,
+        7691
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 10,
+      "run_id": "f383320d65b74e16b2bb0be93efbcd73",
+      "wall_ms": 32563.789,
+      "fixture_load_ms": 5502.379,
+      "runner_ms": 27061.41,
+      "step_ms": [
+        8105,
+        8152,
+        7414
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 11,
+      "run_id": "c49422dab44f4f6782e4cbe88674fbc9",
+      "wall_ms": 32294.439,
+      "fixture_load_ms": 5323.071,
+      "runner_ms": 26971.367,
+      "step_ms": [
+        7971,
+        8091,
+        7473
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 12,
+      "run_id": "26b45870d0cf4f2687d9905c9cfb47b5",
+      "wall_ms": 32937.573,
+      "fixture_load_ms": 5595.168,
+      "runner_ms": 27342.405,
+      "step_ms": [
+        8044,
+        8283,
+        7502
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 13,
+      "run_id": "7db861a416d64361abdbf75b8f8720a7",
+      "wall_ms": 32504.432,
+      "fixture_load_ms": 5459.929,
+      "runner_ms": 27044.503,
+      "step_ms": [
+        7950,
+        8039,
+        7528
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 14,
+      "run_id": "69dadc4852814918b15d289f49ca0b7d",
+      "wall_ms": 32650.905,
+      "fixture_load_ms": 5446.836,
+      "runner_ms": 27204.069,
+      "step_ms": [
+        8029,
+        8108,
+        7512
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 15,
+      "run_id": "49e9957dba484277841421c2bf25eac3",
+      "wall_ms": 32458.115,
+      "fixture_load_ms": 5432.119,
+      "runner_ms": 27025.996,
+      "step_ms": [
+        8000,
+        8095,
+        7502
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 16,
+      "run_id": "964cc3fc1996498ca9f4955e79ed0db1",
+      "wall_ms": 33080.745,
+      "fixture_load_ms": 5733.681,
+      "runner_ms": 27347.064,
+      "step_ms": [
+        8057,
+        8106,
+        7604
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 17,
+      "run_id": "fb2a16e726ab49ebbc69c0a121ea073f",
+      "wall_ms": 33059.68,
+      "fixture_load_ms": 5446.542,
+      "runner_ms": 27613.139,
+      "step_ms": [
+        8195,
+        8193,
+        7669
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 18,
+      "run_id": "3185ea8960464dad817cc4535c1c94e9",
+      "wall_ms": 32726.001,
+      "fixture_load_ms": 5414.624,
+      "runner_ms": 27311.377,
+      "step_ms": [
+        8148,
+        8155,
+        7430
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 19,
+      "run_id": "a23ca719585748bbb34b5d55d3d8a8c6",
+      "wall_ms": 32570.84,
+      "fixture_load_ms": 5651.891,
+      "runner_ms": 26918.949,
+      "step_ms": [
+        8110,
+        8078,
+        7296
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    },
+    {
+      "index": 20,
+      "run_id": "2bd7a23f78d84a8ab79b901c7ae73ae0",
+      "wall_ms": 32384.302,
+      "fixture_load_ms": 5440.383,
+      "runner_ms": 26943.919,
+      "step_ms": [
+        7939,
+        8029,
+        7526
+      ],
+      "actual_rows": [
+        10000,
+        10100,
+        10100
+      ],
+      "status": "PASS",
+      "cleanup_status": "CLEANED",
+      "checks_passed": true
+    }
+  ],
+  "summary": {
+    "samples": 20,
+    "p50_ms": 32562.216,
+    "p95_ms": 33080.745,
+    "min_ms": 31527.555,
+    "max_ms": 33375.004
+  },
+  "performance_target": {
+    "eligible": true,
+    "p95_limit_ms": 60000,
+    "met": true
+  },
+  "evaluation_script_sha256": "c52db38f402f2328257f14ecac4e47ed99994ae99933dacff4e4f432ab18c10c",
+  "source_commit": "080ec1c4813f5d51f04c6cd9d3ae5489e712c006",
+  "database_cleanup_verified": true
+}

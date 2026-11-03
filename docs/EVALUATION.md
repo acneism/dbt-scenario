@@ -2,6 +2,8 @@
 
 The evaluation separates two questions: whether the runner meets its performance target, and how its behavior compares with other ways to test an incremental model. Both use synthetic data. Neither establishes adoption or superiority in human setup/maintenance effort.
 
+[Recorded results and original JSON](EVALUATION-RESULTS.md) are available for the November 3, 2026 run.
+
 ## Reproduce
 
 ```sh

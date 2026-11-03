@@ -41,7 +41,7 @@ Implemented in alpha 6:
 The remaining work is:
 
 - Broader SQL compatibility guided by real projects, while keeping the trusted-code/disposable-database boundary explicit.
-- Controlled Linux performance measurements and comparison against hand-written dbt scripts and existing audit packages.
+- Human setup/maintenance comparison on real projects; controlled Linux timings and synthetic manual/audit-helper-ext/native-dbt results are recorded in EVALUATION-RESULTS.md.
 - External pilots showing that teams retain the tests in CI and can add their second scenario independently.
 
 The next adapter should be selected with a concrete pilot user. Local PostgreSQL results do not validate Snowflake or BigQuery behavior.

@@ -12,13 +12,31 @@ Every current sample includes YAML loading/validation, project copying, dbt pars
 
 The JSON file is updated after every sample. It includes raw wall times, fixture-loading times, per-step durations, dependency versions and hashes of the measured implementation and benchmark script. P50 is the median; p95 uses the nearest-rank method. The tool refuses to overwrite an existing result file.
 
-This script does not enforce CPU/RAM limits or flush caches. Earlier validation workloads may have warmed the machine. An unconstrained Windows result does not establish the original target for a Linux runner with 2 vCPU and 8 GiB RAM, production warehouse performance or scalability to larger datasets. An isolated Linux measurement and comparisons against existing test approaches remain separate work.
+Docker enforces CPU/RAM limits in the [controlled evaluation](EVALUATION.md), and `--require-limits` verifies the Linux cgroup settings before collection. Without that option, timings describe the recorded environment. Caches are not flushed; earlier work and fixture generation can warm them. Results do not establish production warehouse performance, larger-dataset scalability or an advantage over another approach.
 
 The generated workspace and run reports are local artifacts. Publish the sanitized result JSON rather than uploading the entire workspace, which includes the operator's test connection settings.
 
-## Recorded alpha 4 result
+## Recorded alpha 6 Linux result
 
-This historical result predates per-step compilation and SQL auditing. It measured three dbt runs plus the initial parse, and does not describe alpha 6 performance. No alpha 6 timing result has been collected.
+Measured on November 3, 2026 for source commit `080ec1c4813f5d51f04c6cd9d3ae5489e712c006`. The installed package hash matches the current Git source with LF checkout bytes. [CI job](https://github.com/acneism/dbt-scenario/actions/runs/41631791262/job/125902931701), [original measurements](benchmarks/postgresql16-linux-2cpu-8g-10000x10.json).
+
+| Metric | Full scenario |
+|---|---:|
+| Valid samples | 20 of 20 |
+| P50 | 32.562 s |
+| P95, nearest rank | 33.081 s |
+| Minimum | 31.528 s |
+| Maximum | 33.375 s |
+
+The environment used Python 3.12.16, PostgreSQL 16.15, dbt Core 1.11.16, dbt-postgres 1.10.2, psycopg 3.3.6, PyYAML 6.0.3/CSafeLoader and SQLGlot 30.27.0. The host exposed four logical CPUs. The container's verified CPU quota was 200000/100000 microseconds (two CPUs of execution time), memory was capped at 8589934592 bytes and extra swap at zero. These are limits on a shared runner, not dedicated physical cores.
+
+Every sample checked the 10,000 -> 10,100 -> 10,100 target states and completed cleanup. Across the dataset this included 20 parses, 60 compile subprocesses and 60 run subprocesses. A separate database check found no leftover run schemas. Only loopback networking was available. Peak cgroup container memory was 606879744 bytes (578.766 MiB), including cluster startup, fixture generation and measurement.
+
+The p95 <= 60 s target was met for this specific workload and recorded environment. The original JSON retains all timings, protocol details, versions, verified controls and source/script hashes. This is not a general latency guarantee or a direct speed comparison with the earlier Windows result.
+
+## Recorded alpha 4 Windows result
+
+This historical result predates per-step compilation and SQL auditing. It measured three dbt runs plus the initial parse, and does not describe alpha 6 performance.
 
 Measured on November 3, 2026 local time (November 2 UTC), using Python 3.12.10, PostgreSQL 16.15, dbt Core 1.11.16, dbt-postgres 1.10.2 and PyYAML 6.0.3 with CSafeLoader. The host was Windows on AMD64 with eight logical CPUs. CPU and RAM limits were not enforced, available RAM was not recorded, and caches were not flushed. There was no dedicated warmup run; earlier validation workloads had already used the machine.
 
