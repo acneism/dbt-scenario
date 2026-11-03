@@ -16,6 +16,8 @@ The pinned [tracking-log ingestion inventory](https://github.com/mitodl/ol-data-
 
 The preparation command downloads the pinned original model, complete course-ID macro file and BSD-3-Clause license, verifying each against [sources.json](../investigations/watermark-boundary/sources.json). The current variant executes those model and macro bytes unchanged. As in the historical replay, the fixture project uses PostgreSQL 16 and two JSON fields represented as text, replaces staging with a mock relation and does not load the original project's configuration or adapters.
 
+Fixture types are declared explicitly rather than inferred from the upstream schema. In particular, `user_id` uses `bigint` in the fixture while the upstream staging SQL casts it to `integer`. That field is projected unchanged by the tested intermediate model and is not used in the watermark predicate. These tests establish the declared fixture schema's behavior, not byte-for-byte equivalence of upstream storage types.
+
 The initial input contains one synthetic student's event at `2026-01-02T12:00:00Z`. A subsequent snapshot retains that row and adds a second student's event, with the timestamp defined in [cases.yml](../investigations/watermark-boundary/cases.yml). The rows have different composite keys. The expected materialized table contains both transformed rows. An unchanged retry must preserve those two rows.
 
 Each case has three independently executed variants:

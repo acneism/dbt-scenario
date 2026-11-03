@@ -16,6 +16,8 @@ The fixture project replaces the upstream staging model with a typed mock relati
 
 The upstream PR concerns Trino and a StarRocks migration and also mentions DuckDB. This reproduction uses PostgreSQL 16 and dbt-postgres. Two upstream JSON fields are represented as `text` containing `{}` because the runner does not support JSON fixtures. The timestamp remains ISO `text`, as described in the upstream fix. The course-ID macro's default branch uses PostgreSQL-compatible `replace` calls. The fixture project retains the model's composite key and `delete+insert` strategy; it does not load the complete upstream project's configuration, adapters, staging logic, or data. Results apply to this PostgreSQL fixture environment, not the original warehouse.
 
+Fixture column types are declared explicitly rather than inferred. The fixture uses `bigint` for `user_id`; the upstream staging SQL casts it to `integer`. This projected field does not participate in the timestamp predicate, but the fixture replay does not establish complete upstream-schema equivalence.
+
 ## Native comparison
 
 Alongside dbt-scenario, the script drives ordinary `dbt run` through the same three input states. It checks each model invocation's run-results artifact, records target row counts, and runs two native data tests (`unique` and `not_null` on `user_username`). It then runs a native dbt unit test with `is_incremental: true`, an empty `this` fixture, the first incoming activity, and the same expected transformed row.
