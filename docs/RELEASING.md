@@ -16,3 +16,13 @@ Before publishing:
 6. Download the public assets again and verify their hashes before adding installation links to the README. Preserve the release assets rather than replacing them silently.
 
 An alpha release establishes availability of tested artifacts. It does not establish external adoption, a new production bug discovery, or support for another warehouse.
+
+## First published prerelease
+
+[`v0.1.0a6`](https://github.com/acneism/dbt-scenario/releases/tag/v0.1.0a6) points to commit `8e83523e141e9025204a2600766ad215fa2a494c`. Its uploaded wheel and sdist are the unchanged artifacts from the [successful distribution job](https://github.com/acneism/dbt-scenario/actions/runs/41659976719/job/126000296926). The same pair passed the installed-package PostgreSQL check on Linux/Python 3.12.15 and Windows/Python 3.12.10. All 28 runtime/resource files also match the earlier validated source at `27f2ea8e272d3533b33ba0bc4cd57bcb094444f7` byte for byte; this release adds distribution and verification rather than changing runtime behavior.
+
+The source commit's [full CI](https://github.com/acneism/dbt-scenario/actions/runs/41659976788) passed 180 unit and 69 integration tests, the repository demo and the separate offline acceptance job. All seven public release assets were downloaded anonymously after publication and matched their verified copies. The published tag resolves to the tested source commit.
+
+The release's SHA256SUMS covers the wheel, sdist, constraints, both platform reports and release.json. The latter records source/CI provenance and the original Actions artifact digest. The release does not include an offline dependency bundle; installing the wheel and its dependencies requires network access.
+
+After publication, a separate fresh Windows environment installed directly from the public wheel and constraints URLs with pip. Dependency checks passed, the installed files matched the published wheel, no development-only packages were installed, and the CLI generated a valid three-step demo outside the checkout. The [installation report](distribution/v0.1.0a6-install.json) records the public URL and wheel hash. The database execution checks are recorded in the release's platform reports.

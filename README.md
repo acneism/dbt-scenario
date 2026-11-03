@@ -8,10 +8,17 @@ This is an early alpha. It supports PostgreSQL 16, Python 3.12, dbt Core 1.11 an
 
 ## Quickstart
 
-Install from the checkout, then start the example database:
+In a Python 3.12 virtual environment, install the [verified alpha release](https://github.com/acneism/dbt-scenario/releases/tag/v0.1.0a6) and generate its example project. PostgreSQL 16 runs through Docker Compose; no repository checkout is needed.
 
 ```sh
-python -m pip install -e '.[dev]'
+python -m pip install -c https://github.com/acneism/dbt-scenario/releases/download/v0.1.0a6/constraints.txt https://github.com/acneism/dbt-scenario/releases/download/v0.1.0a6/dbt_scenario-0.1.0a6-py3-none-any.whl
+dbt-scenario init --demo --project-dir scenario-demo
+cd scenario-demo
+```
+
+The constraints pin the dependencies used in validation. Start the example database:
+
+```sh
 export DSC_ADMIN_PASSWORD="$(python -c 'import secrets; print(secrets.token_urlsafe(24))')"
 export DSC_TEST_PASSWORD="$(python -c 'import secrets; print(secrets.token_urlsafe(24))')"
 docker compose up -d --wait
@@ -20,10 +27,9 @@ dbt-scenario plan --config scenario-runner.yml --scenario examples/shop/scenario
 dbt-scenario test --config scenario-runner.yml --scenario examples/shop/scenarios/orders.yml
 ```
 
-PowerShell environment setup:
+PowerShell environment setup after generating the same demo:
 
 ```powershell
-python -m pip install -e '.[dev]'
 $env:DSC_ADMIN_PASSWORD = python -c 'import secrets; print(secrets.token_urlsafe(24))'
 $env:DSC_TEST_PASSWORD = python -c 'import secrets; print(secrets.token_urlsafe(24))'
 docker compose up -d --wait
@@ -31,6 +37,8 @@ dbt-scenario test --config scenario-runner.yml --scenario examples/shop/scenario
 ```
 
 The example tests an initial load, an update together with a late-arriving order, and an unchanged retry. Input `replace` operations replace the full input snapshot while retaining the model's existing target table. The model SQL stays unchanged in your project; fixture routing is installed only in a temporary project copy.
+
+The prerelease includes a wheel, source archive, SHA256SUMS and Linux/Windows verification reports. It is distributed through GitHub Releases; the [release procedure](docs/RELEASING.md) explains the checks. A contributor checkout can still be installed with `python -m pip install -e '.[dev]'`.
 
 Run `docker compose down` after using the example. The database is disposable and has no persistent volume. Keep the two passwords unchanged while the container is running.
 
@@ -168,7 +176,10 @@ Journals from alpha 1 do not exist, so its abandoned schemas cannot be recovered
 
 ## Development
 
+From a checkout, install the development dependencies before running checks:
+
 ```sh
+python -m pip install -e '.[dev]'
 ruff check .
 ruff format --check .
 pytest -m 'not integration'

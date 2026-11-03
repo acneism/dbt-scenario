@@ -2,6 +2,7 @@
 
 ## 0.1.0a6 — November 3, 2026
 
+- Publish the first GitHub prerelease with a wheel, source archive, dependency constraints, SHA-256 checksums and installed-package verification on Linux and Windows.
 - Compile and audit every step before running its model; resolve CTE/subquery scopes and allow only mapped fixtures plus an incremental target.
 - Reject external/unqualified table references, writes, locks, table functions and unsupported query grammar with redacted diagnostics.
 - Recheck run-compiled SQL and retain safe audit hashes/counts in reports.
