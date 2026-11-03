@@ -10,6 +10,8 @@ The [upstream staging model](https://github.com/mitodl/ol-data-platform/blob/212
 
 The synthetic input contract permits an existing staging snapshot to gain another event with a distinct composite key, independently of its timestamp. If the real source instead guarantees complete timestamp groups before advancing a watermark, the equal-timestamp input would not occur during a normal incremental run. This investigation has not verified the real delivery guarantee, ordering, late-arrival frequency, or any production loss. The strict predicate alone does not prove that the running pipeline violates its intended contract.
 
+The pinned [tracking-log ingestion inventory](https://github.com/mitodl/ol-data-platform/blob/2129da1fb79bfda08453a8e62b9571463020bebc/ingestion/inventory/units/edxorg__tracking_logs.yml) declares daily Airbyte S3 incremental append using `_ab_source_file_last_modified` as its cursor. That is a file-arrival cursor rather than the event timestamp used by the staging filter. This makes delivery ordering a relevant question, but the inventory does not establish that late events actually occur, and its live production configuration has not been checked. The raw ingestion and staging filters would need to be examined together before choosing a fix.
+
 ## Fixture experiment
 
 The preparation command downloads the pinned original model, complete course-ID macro file and BSD-3-Clause license, verifying each against [sources.json](../investigations/watermark-boundary/sources.json). The current variant executes those model and macro bytes unchanged. As in the historical replay, the fixture project uses PostgreSQL 16 and two JSON fields represented as text, replaces staging with a mock relation and does not load the original project's configuration or adapters.
@@ -37,6 +39,14 @@ The required outcome matrix is:
 For a successful incremental scenario, row counts must be `1 / 2 / 2`. An expected failure must occur at arrival with `ROWS_MISMATCH`, leaving one actual row versus two expected; the runner marks retry `NOT_RUN`. Every initial-snapshot variant must produce two rows. Execution errors, another failure reason or failed cleanup invalidate the experiment. A final independent query must confirm that the role's owned-schema set matches its starting state.
 
 Native dbt key and unit tests are not executed in this matrix, so it makes no additional claim about what they detect. The prior [native comparison](HISTORICAL-REGRESSION.md#recorded-result) already demonstrates that correctly supplied native unit fixtures can catch a watermark SQL error.
+
+## Recorded result
+
+The [Linux job](https://github.com/acneism/dbt-scenario/actions/runs/41655509195/job/125984606750) completed all nine variants successfully against runner commit `27f2ea8e272d3533b33ba0bc4cd57bcb094444f7`. The matrix matched every required outcome above: newer arrivals passed both incremental variants, equal-time arrivals failed only the unchanged predicate, and older arrivals failed both. All complete initial-snapshot controls passed.
+
+The [original JSON](evaluation/watermark-boundary-postgresql16-linux.json) was copied unchanged from the CI artifact after verifying its ZIP against GitHub's SHA-256 digest. It records source and candidate hashes, exact candidate replacement, fixture hashes, verified execution modes, per-step row counts and engine versions. Current and candidate variants had identical scenario hashes within each case. Every scenario reported `CLEANED`, and the independent owned-schema check passed. The earlier historical regression also [passed again](https://github.com/acneism/dbt-scenario/actions/runs/41655509195/job/125984607288) using the shared source-verification helper.
+
+This confirms the conditional fixture behavior on PostgreSQL 16. It does not validate the hypothetical late-arrival contract against the original pipeline or make the local candidate a sufficient production fix.
 
 ## Reproduce
 

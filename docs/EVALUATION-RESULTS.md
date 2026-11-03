@@ -21,6 +21,10 @@ The supported conclusion is narrower than “dbt-scenario finds bugs that dbt ca
 
 The [historical regression replay](HISTORICAL-REGRESSION.md#recorded-result) completed on Linux using unchanged model and macro bytes from MIT Open Learning's public PR 3187, with synthetic PostgreSQL fixtures and two JSON fields represented as text. The known premerge NULL-watermark defect left the target at zero rows after incoming activity; dbt-scenario failed with `ROWS_MISMATCH`, native `unique`/`not_null` passed, and the empty-target native unit test failed. The upstream fix passed both the scenario and native tests, retaining zero / one / one rows. No new discovery, original-warehouse validation, or external pilot is claimed.
 
+## Conditional watermark counterexamples
+
+The separate [watermark boundary investigation](WATERMARK-BOUNDARY.md#recorded-result) adds nine runs against a newer pinned upstream snapshot: three event-time cases, the unchanged model, a local `>=` candidate, and a complete initial-snapshot control. Equal-time arrivals fail only the unchanged predicate; older arrivals fail both incremental variants. The original source's delivery guarantees remain unverified, and no production defect or newly missed native test is claimed.
+
 ## Three approach integrations
 
 All three approaches used byte-identical model SQL and shared fixtures within each case. FAIL means the gate detected an intentionally invalid result; PASS is expected only for the correct case.

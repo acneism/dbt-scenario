@@ -1,0 +1,349 @@
+{
+  "schema_version": 1,
+  "complete": true,
+  "source_commit": "27f2ea8e272d3533b33ba0bc4cd57bcb094444f7",
+  "package_version": "0.1.0a6",
+  "python_version": "3.12.15",
+  "started_at": "2026-11-03T14:37:53.755426+00:00",
+  "upstream": {
+    "repository": "mitodl/ol-data-platform",
+    "snapshot": "2129da1fb79bfda08453a8e62b9571463020bebc",
+    "files": {
+      "current.sql": {
+        "url": "https://raw.githubusercontent.com/mitodl/ol-data-platform/2129da1fb79bfda08453a8e62b9571463020bebc/src/ol_dbt/models/intermediate/edxorg/int__edxorg__mitx_user_activity.sql",
+        "sha256": "6b847d8fc3c373dcd6d8a3530bca674ff205108a1d2751f37b616a9057fc8dfb"
+      },
+      "macros.sql": {
+        "url": "https://raw.githubusercontent.com/mitodl/ol-data-platform/2129da1fb79bfda08453a8e62b9571463020bebc/src/ol_dbt/macros/extract_course_id.sql",
+        "sha256": "fe075d26b5cd1d993be155beed110d5b8d93fb423bb64a7eaf7b8ff555d0a875"
+      },
+      "LICENSE": {
+        "url": "https://raw.githubusercontent.com/mitodl/ol-data-platform/2129da1fb79bfda08453a8e62b9571463020bebc/LICENSE",
+        "sha256": "666627f000933664afa86b3796db7d702bb2e912cc9ebec99ab103b466e0fe4e"
+      }
+    }
+  },
+  "case_specification_sha256": "adf43fb7102ded05663166f029902aad224bf7489ac9dd3c019ae5e1da876400",
+  "protocol": {
+    "conditional_counterexample": true,
+    "confirmed_production_incident": false,
+    "novelty_verified": false,
+    "external_pilot": false,
+    "original_warehouse_tested": false,
+    "upstream_staging_executed": false,
+    "source_delivery_assumption_verified": false,
+    "json_columns_represented_as_text": true,
+    "native_tests_executed": false,
+    "current_model_and_macro_bytes_unchanged": true,
+    "candidate_patch_is_upstream_fix": false,
+    "synthetic_fixtures": true,
+    "selected_cases": [
+      "newer_event",
+      "same_timestamp",
+      "older_event"
+    ],
+    "repeats_per_case_variant": 1
+  },
+  "cases": {
+    "newer_event": {
+      "current": {
+        "status": "PASS",
+        "reason_code": null,
+        "cleanup_status": "CLEANED",
+        "engine_versions": {
+          "dbt-core": "1.11.16",
+          "dbt-postgres": "1.10.2",
+          "postgresql": 160015
+        },
+        "scenario_hash": "9371ec47bfa23cb213f5e5e825f4a19bf72a0274b1ea7d604404096a929a160a",
+        "steps": [
+          {
+            "name": "initial",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 1,
+            "expected_rows": 1,
+            "observed_mode": "initial"
+          },
+          {
+            "name": "arrival",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 2,
+            "expected_rows": 2,
+            "observed_mode": "incremental"
+          },
+          {
+            "name": "retry",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 2,
+            "expected_rows": 2,
+            "observed_mode": "incremental"
+          }
+        ]
+      },
+      "boundary_candidate": {
+        "status": "PASS",
+        "reason_code": null,
+        "cleanup_status": "CLEANED",
+        "engine_versions": {
+          "dbt-core": "1.11.16",
+          "dbt-postgres": "1.10.2",
+          "postgresql": 160015
+        },
+        "scenario_hash": "9371ec47bfa23cb213f5e5e825f4a19bf72a0274b1ea7d604404096a929a160a",
+        "steps": [
+          {
+            "name": "initial",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 1,
+            "expected_rows": 1,
+            "observed_mode": "initial"
+          },
+          {
+            "name": "arrival",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 2,
+            "expected_rows": 2,
+            "observed_mode": "incremental"
+          },
+          {
+            "name": "retry",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 2,
+            "expected_rows": 2,
+            "observed_mode": "incremental"
+          }
+        ]
+      },
+      "initial_snapshot": {
+        "status": "PASS",
+        "reason_code": null,
+        "cleanup_status": "CLEANED",
+        "engine_versions": {
+          "dbt-core": "1.11.16",
+          "dbt-postgres": "1.10.2",
+          "postgresql": 160015
+        },
+        "scenario_hash": "e8ad4cc296e1c4a76e5ef02eaa3838a51962a5c8fc1018ec2ff939536e23a110",
+        "steps": [
+          {
+            "name": "initial_snapshot",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 2,
+            "expected_rows": 2,
+            "observed_mode": "initial"
+          }
+        ]
+      }
+    },
+    "same_timestamp": {
+      "current": {
+        "status": "FAIL",
+        "reason_code": null,
+        "cleanup_status": "CLEANED",
+        "engine_versions": {
+          "dbt-core": "1.11.16",
+          "dbt-postgres": "1.10.2",
+          "postgresql": 160015
+        },
+        "scenario_hash": "a683d907156b8fab1b2c255ddb89527621ca7aadcc2ead7a983d61478c27ee84",
+        "steps": [
+          {
+            "name": "initial",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 1,
+            "expected_rows": 1,
+            "observed_mode": "initial"
+          },
+          {
+            "name": "arrival",
+            "status": "FAIL",
+            "reason_code": "ROWS_MISMATCH",
+            "actual_rows": 1,
+            "expected_rows": 2,
+            "observed_mode": "incremental"
+          },
+          {
+            "name": "retry",
+            "status": "NOT_RUN",
+            "reason_code": "PREVIOUS_STEP_UNSUCCESSFUL",
+            "actual_rows": null,
+            "expected_rows": null,
+            "observed_mode": null
+          }
+        ]
+      },
+      "boundary_candidate": {
+        "status": "PASS",
+        "reason_code": null,
+        "cleanup_status": "CLEANED",
+        "engine_versions": {
+          "dbt-core": "1.11.16",
+          "dbt-postgres": "1.10.2",
+          "postgresql": 160015
+        },
+        "scenario_hash": "a683d907156b8fab1b2c255ddb89527621ca7aadcc2ead7a983d61478c27ee84",
+        "steps": [
+          {
+            "name": "initial",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 1,
+            "expected_rows": 1,
+            "observed_mode": "initial"
+          },
+          {
+            "name": "arrival",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 2,
+            "expected_rows": 2,
+            "observed_mode": "incremental"
+          },
+          {
+            "name": "retry",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 2,
+            "expected_rows": 2,
+            "observed_mode": "incremental"
+          }
+        ]
+      },
+      "initial_snapshot": {
+        "status": "PASS",
+        "reason_code": null,
+        "cleanup_status": "CLEANED",
+        "engine_versions": {
+          "dbt-core": "1.11.16",
+          "dbt-postgres": "1.10.2",
+          "postgresql": 160015
+        },
+        "scenario_hash": "7e074825d722ab5dae5d658f370b6fb24e5bf6b1b38239db7e54698101400ffe",
+        "steps": [
+          {
+            "name": "initial_snapshot",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 2,
+            "expected_rows": 2,
+            "observed_mode": "initial"
+          }
+        ]
+      }
+    },
+    "older_event": {
+      "current": {
+        "status": "FAIL",
+        "reason_code": null,
+        "cleanup_status": "CLEANED",
+        "engine_versions": {
+          "dbt-core": "1.11.16",
+          "dbt-postgres": "1.10.2",
+          "postgresql": 160015
+        },
+        "scenario_hash": "327915f693531db50f78ca68a2e2943a0203cef80bc708f16603695dc10b5163",
+        "steps": [
+          {
+            "name": "initial",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 1,
+            "expected_rows": 1,
+            "observed_mode": "initial"
+          },
+          {
+            "name": "arrival",
+            "status": "FAIL",
+            "reason_code": "ROWS_MISMATCH",
+            "actual_rows": 1,
+            "expected_rows": 2,
+            "observed_mode": "incremental"
+          },
+          {
+            "name": "retry",
+            "status": "NOT_RUN",
+            "reason_code": "PREVIOUS_STEP_UNSUCCESSFUL",
+            "actual_rows": null,
+            "expected_rows": null,
+            "observed_mode": null
+          }
+        ]
+      },
+      "boundary_candidate": {
+        "status": "FAIL",
+        "reason_code": null,
+        "cleanup_status": "CLEANED",
+        "engine_versions": {
+          "dbt-core": "1.11.16",
+          "dbt-postgres": "1.10.2",
+          "postgresql": 160015
+        },
+        "scenario_hash": "327915f693531db50f78ca68a2e2943a0203cef80bc708f16603695dc10b5163",
+        "steps": [
+          {
+            "name": "initial",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 1,
+            "expected_rows": 1,
+            "observed_mode": "initial"
+          },
+          {
+            "name": "arrival",
+            "status": "FAIL",
+            "reason_code": "ROWS_MISMATCH",
+            "actual_rows": 1,
+            "expected_rows": 2,
+            "observed_mode": "incremental"
+          },
+          {
+            "name": "retry",
+            "status": "NOT_RUN",
+            "reason_code": "PREVIOUS_STEP_UNSUCCESSFUL",
+            "actual_rows": null,
+            "expected_rows": null,
+            "observed_mode": null
+          }
+        ]
+      },
+      "initial_snapshot": {
+        "status": "PASS",
+        "reason_code": null,
+        "cleanup_status": "CLEANED",
+        "engine_versions": {
+          "dbt-core": "1.11.16",
+          "dbt-postgres": "1.10.2",
+          "postgresql": 160015
+        },
+        "scenario_hash": "0da772bd94fcc00ffaeadcbfc0cfc4f0870bf01a9cf8a5b12fdbde81b930441c",
+        "steps": [
+          {
+            "name": "initial_snapshot",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 2,
+            "expected_rows": 2,
+            "observed_mode": "initial"
+          }
+        ]
+      }
+    }
+  },
+  "candidate": {
+    "current_sha256": "6b847d8fc3c373dcd6d8a3530bca674ff205108a1d2751f37b616a9057fc8dfb",
+    "boundary_candidate_sha256": "86eb86dae91c6019be579085afa7e90146929b55ec346a519fcc9e7ff9509300",
+    "replacement": {
+      "before": "and useractivity_timestamp > (",
+      "after": "and useractivity_timestamp >= ("
+    }
+  },
+  "owned_schemas_unchanged": true
+}
