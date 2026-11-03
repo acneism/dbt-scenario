@@ -12,6 +12,7 @@
 | MODEL_NOT_FOUND | Replace the template model with its real model.project.name unique_id. |
 | INPUT_DEPENDENCIES_MISMATCH | Supply one fixture for each direct source() or ref() dependency. |
 | INVALID_SCENARIO_SCHEMA | Check the indicated field against the version 1 scenario schema. |
+| UNFILLED_TEMPLATE_ROWS | Replace the indicated rows placeholder with an explicit YAML row list; use [] for intentionally empty data. |
 | INVALID_TYPED_VALUE | Match the declared column type; quote decimal and timestamp values. |
 | FIXTURE_COLUMNS_MISMATCH | Include every declared column exactly once in each row. |
 | INVALID_RUN_VARS | Use JSON-compatible vars without non-finite numbers or binary values. |
@@ -38,3 +39,5 @@ ERROR INVALID_TYPED_VALUE at $.steps[1].inputs[*].replace.rows[2][*]
 The path identifies the third row of the second step. Mapping names are masked to keep arbitrary keys out of diagnostics. Values are never included in these messages. YAML syntax errors instead report one-based line and column positions.
 
 Execution errors keep stable reason codes and safe hints in summary JSON. They do not include raw SQL, credentials or exception text. A generic DBT_EXECUTION_ERROR can also mean a project compilation/runtime error that the preflight checks cannot classify.
+
+`validate --project-dir ... --scenario ...` checks the definition and fixtures before database setup. It uses these same redacted diagnostics. A placeholder is special only as an entire row-list value; the same text inside a legitimate text cell remains ordinary data. A valid definition does not establish that its model exists or executes correctly.

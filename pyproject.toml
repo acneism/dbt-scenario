@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dbt-scenario"
-version = "0.1.0a7"
+version = "0.1.0a8"
 description = "Run stateful scenarios against real dbt incremental models"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"

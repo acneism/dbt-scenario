@@ -88,12 +88,32 @@ def init(project_dir, demo, model, manifest_path, catalog_path, primary_key, sce
         click.echo(
             "Template created from metadata; replace every rows placeholder with a row list."
         )
-        click.echo("Review columns and keys, set the test database, then run plan and test.")
+        click.echo(
+            "Run validate to check the edited fixtures, then configure the database and test."
+        )
     else:
         click.echo(
             "Template created with synthetic data; edit model, inputs, columns and expectations."
         )
         click.echo("Then run plan --config scenario-runner.yml --scenario scenarios/example.yml.")
+
+
+@main.command(help="Check scenario definitions and fixture values without database access.")
+@click.option(
+    "--project-dir",
+    default=".",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help="Root directory containing the scenario and fixture files.",
+)
+@scenario_option
+@guarded
+def validate(project_dir, scenario_path):
+    scenario = load_scenario(scenario_path, project_dir)
+    click.echo(
+        f"VALID definition: {len(scenario.data['inputs'])} inputs, "
+        f"{len(scenario.data['steps'])} steps."
+    )
+    click.echo("Next: plan and test the model against the disposable database.")
 
 
 @main.command(help="Check the test database role and installed project dependencies.")

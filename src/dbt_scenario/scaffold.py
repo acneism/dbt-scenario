@@ -76,17 +76,21 @@ def column_types(node, location, catalog=False):
         kind = info.get("type" if catalog else "data_type")
         if not isinstance(kind, str) or not kind.strip():
             raise ScenarioError("INIT_COLUMN_TYPE_MISSING", location=(*location, name))
-        normalized = re.sub(r"\s+", "", kind.lower())
+        normalized = " ".join(kind.lower().split())
         aliases = {
             "int": "integer",
             "int4": "integer",
             "int8": "bigint",
             "bool": "boolean",
-            "timestampwithouttimezone": "timestamp",
-            "timestampwithtimezone": "timestamptz",
+            "timestamp without time zone": "timestamp",
+            "timestamp with time zone": "timestamptz",
         }
         normalized = aliases.get(normalized, normalized)
-        normalized = re.sub(r"^decimal\(", "numeric(", normalized)
+        numeric = re.fullmatch(
+            r"(?:numeric|decimal)\s*\(\s*([0-9]+)\s*,\s*([0-9]+)\s*\)", normalized
+        )
+        if numeric:
+            normalized = f"numeric({numeric[1]},{numeric[2]})"
         try:
             result[name] = sql_type(normalized)
         except ScenarioError as error:

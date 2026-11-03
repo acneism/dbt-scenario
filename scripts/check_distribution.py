@@ -22,7 +22,7 @@ from dbt_scenario.loader import load_scenario, read_yaml
 from dbt_scenario.project import Project
 
 
-def command(arguments, directory):
+def command(arguments, directory, environment=None):
     try:
         return subprocess.run(
             arguments,
@@ -30,6 +30,7 @@ def command(arguments, directory):
             check=True,
             capture_output=True,
             timeout=360,
+            env=environment,
         ).stdout.decode("utf-8")
     except (OSError, subprocess.SubprocessError, UnicodeError):
         raise RuntimeError("DISTRIBUTION_COMMAND_FAILED") from None
@@ -137,7 +138,7 @@ def check_metadata_template(executable, project, root):
     try:
         load_scenario(path, config.project_dir)
     except ScenarioError as error:
-        if error.code != "INVALID_SCENARIO_SCHEMA":
+        if error.code != "UNFILLED_TEMPLATE_ROWS":
             raise RuntimeError("DISTRIBUTION_TEMPLATE_VALIDATION_FAILED") from None
     else:
         raise RuntimeError("DISTRIBUTION_TEMPLATE_MUST_REQUIRE_ROWS")
@@ -188,6 +189,26 @@ def main():
         result["dependency_check"] = "PASS"
         project = root / "demo"
         command([str(executable), "init", "--demo", "--project-dir", str(project)], root)
+        static_environment = {
+            key: value
+            for key, value in os.environ.items()
+            if key not in {"DSC_TEST_PASSWORD", "DBT_ENV_SECRET_DSC_PASSWORD"}
+        }
+        output = command(
+            [
+                str(executable),
+                "validate",
+                "--project-dir",
+                str(project / "examples/shop"),
+                "--scenario",
+                str(project / "examples/shop/scenarios/orders.yml"),
+            ],
+            root,
+            static_environment,
+        )
+        if not output.startswith("VALID definition:"):
+            raise RuntimeError("DISTRIBUTION_STATIC_VALIDATION_FAILED")
+        result["static_validation"] = {"status": "PASS", "without_password_env": True}
         result["metadata_initialization"] = check_metadata_template(executable, project, root)
         generated = load_config(project / "scenario-runner.yml")
         if generated.database != config.database:

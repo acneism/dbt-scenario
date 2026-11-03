@@ -30,6 +30,10 @@ FIELDS = {
 }
 
 HINTS = {
+    "UNFILLED_TEMPLATE_ROWS": (
+        "Replace this rows placeholder with an explicit YAML row list; use [] for empty data."
+    ),
+    "SCENARIO_OUTSIDE_PROJECT": "Keep the scenario and fixtures inside the project directory.",
     "INIT_OPTIONS_INVALID": "Use --demo alone, or --model with --manifest and optional --catalog.",
     "INIT_METADATA_INVALID": "Use manifest v12 or catalog v1 JSON, at most 64 MiB each.",
     "INIT_ADAPTER_UNSUPPORTED": "Use metadata from a PostgreSQL project.",

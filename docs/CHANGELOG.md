@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0a8 — November 3, 2026
+
+- Add static `validate` for YAML, fixtures, keys and step references without credentials, a dbt profile or database access.
+- Identify unfinished inline and external-fixture row placeholders with a dedicated redacted diagnostic and an explicit row-list hint.
+- Keep placeholder-like text inside actual data cells valid.
+- Preserve word boundaries when normalizing metadata types so misspellings cannot silently become accepted PostgreSQL type names.
+- Validate the installed demo without password variables before PostgreSQL startup in the network-isolated acceptance job.
+
 ## 0.1.0a7 — November 3, 2026
 
 - Initialize scenario identifiers, column types and keys from local dbt manifest/catalog metadata without database access.

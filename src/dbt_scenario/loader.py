@@ -129,7 +129,32 @@ def converted(value, kind: str):
     raise ScenarioError("INVALID_TYPED_VALUE")
 
 
+def unfinished_rows(value):
+    return (
+        isinstance(value, str)
+        and re.fullmatch(r"replace_with_[A-Za-z0-9_]+_rows", value) is not None
+    )
+
+
+def unfinished_rows_error(error):
+    location = tuple(error.absolute_path)
+    if (
+        error.validator == "type"
+        and error.validator_value == "array"
+        and location[-1:] == ("rows",)
+        and unfinished_rows(error.instance)
+    ):
+        return location
+    for child in error.context:
+        found = unfinished_rows_error(child)
+        if found is not None:
+            return found
+    return None
+
+
 def typed_rows(rows: list, columns: dict, location=()) -> list[tuple]:
+    if unfinished_rows(rows):
+        raise ScenarioError("UNFILLED_TEMPLATE_ROWS", location=location)
     if not isinstance(rows, list) or len(rows) > 100_000:
         raise ScenarioError("INVALID_FIXTURE_SIZE", location=location)
     result = []
@@ -163,6 +188,9 @@ def load_scenario(path: Path, project_dir: Path) -> Scenario:
     schema = json.loads(files("dbt_scenario").joinpath("scenario.schema.json").read_text())
     error = next(Draft202012Validator(schema).iter_errors(data), None)
     if error:
+        unfinished = unfinished_rows_error(error)
+        if unfinished is not None:
+            raise ScenarioError("UNFILLED_TEMPLATE_ROWS", location=unfinished)
         location = tuple(error.absolute_path)
         if error.validator == "required" and isinstance(error.instance, dict):
             missing = next(key for key in error.validator_value if key not in error.instance)

@@ -120,7 +120,7 @@ def test_metadata_template_uses_real_ids_and_types_but_requires_explicit_rows(
         "primary_key": ["order_id"],
     }
     assert data["steps"][2]["expect"] == {"same_as": "incremental"}
-    with pytest.raises(ScenarioError, match="INVALID_SCENARIO_SCHEMA"):
+    with pytest.raises(ScenarioError, match="UNFILLED_TEMPLATE_ROWS"):
         load_scenario(path, root)
 
 
@@ -185,7 +185,19 @@ def test_missing_or_expression_key_requires_explicit_valid_output_columns(artifa
 
 
 @pytest.mark.parametrize(
-    "kind", ["jsonb", "double precision", "varchar(80)", "numeric", "smallint"]
+    "kind",
+    [
+        "jsonb",
+        "double precision",
+        "varchar(80)",
+        "numeric",
+        "smallint",
+        "in teger",
+        "big int",
+        "time stamp",
+        "timestampwithouttimezone",
+        "nu meric(12,2)",
+    ],
 )
 def test_incompatible_types_are_not_guessed_or_upcast(artifacts, kind):
     root, manifest, _ = artifacts

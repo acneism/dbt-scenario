@@ -48,6 +48,27 @@ def main():
     admin_password, test_password = [secrets.token_urlsafe(24) for _ in range(2)]
     with tempfile.TemporaryDirectory(prefix="dbt-scenario-offline-") as temporary:
         root = Path(temporary)
+        project = root / "demo"
+        static_environment = {
+            key: value
+            for key, value in os.environ.items()
+            if key not in {"DSC_TEST_PASSWORD", "DBT_ENV_SECRET_DSC_PASSWORD"}
+        }
+        run(
+            ["dbt-scenario", "init", "--demo", "--project-dir", str(project)],
+            env=static_environment,
+        )
+        run(
+            [
+                "dbt-scenario",
+                "validate",
+                "--project-dir",
+                str(project / "examples/shop"),
+                "--scenario",
+                str(project / "examples/shop/scenarios/orders.yml"),
+            ],
+            env=static_environment,
+        )
         data = root / "pgdata"
         password_file = root / "admin-password"
         password_file.write_text(admin_password + "\n")
@@ -105,8 +126,6 @@ def main():
             with psycopg.connect(**connection) as database:
                 database.execute("REVOKE CREATE ON SCHEMA public FROM PUBLIC")
             environment = {**os.environ, "DSC_TEST_PASSWORD": test_password}
-            project = root / "demo"
-            run(["dbt-scenario", "init", "--demo", "--project-dir", str(project)], env=environment)
             reports = root / "reports"
             run(
                 [
@@ -144,6 +163,11 @@ def main():
                 "package_version": __version__,
                 "postgresql": server_version,
                 "network": network,
+                "static_validation": {
+                    "status": "PASS",
+                    "ran_before_postgres_start": True,
+                    "without_password_env": True,
+                },
                 "steps": [step["status"] for step in report["steps"]],
                 "actual_rows": [step["actual_rows"] for step in report["steps"]],
                 "cleanup_status": report["cleanup_status"],

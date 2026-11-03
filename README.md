@@ -71,6 +71,16 @@ The manual mode creates `scenario-runner.yml` and `scenarios/example.yml` with s
 
 Initialization checks destination collisions before writing and refuses to overwrite any file. If a write fails, it removes the files it created during that attempt.
 
+## Check definitions before connecting
+
+From 0.1.0a8, check YAML, fixture values, key validity and step references before configuring database access:
+
+```sh
+dbt-scenario validate --project-dir examples/shop --scenario examples/shop/scenarios/orders.yml
+```
+
+This uses the same fixture validation as `plan` and `test`, with no password, dbt profile, dbt subprocess or database connection. The project directory contains the scenario and its fixtures. A valid definition still needs `plan` and `test` to check model existence, dependencies, compiled SQL and materialized output. Unfilled metadata-template rows produce `UNFILLED_TEMPLATE_ROWS` with a safe location and an explicit row-list hint.
+
 ## Project environment and dependencies
 
 Forward only explicitly selected environment variables:

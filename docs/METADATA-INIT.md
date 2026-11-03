@@ -36,6 +36,14 @@ Every initial and incremental input, and both expected outputs, contain a `repla
 
 Use complete input snapshots for each replacement and the complete retained target as each expectation. The retry reuses the incremental input and asserts the previous successful output through `same_as`. Required project vars and environment forwarding remain your responsibility. Review metadata-derived columns and keys, then run the usual `plan` and `test` commands.
 
+From 0.1.0a8, validate the edited rows without database credentials:
+
+```sh
+dbt-scenario validate --project-dir ./analytics --scenario ./analytics/scenarios/fct_orders.yml
+```
+
+Unfilled inline or external-fixture row placeholders produce `UNFILLED_TEMPLATE_ROWS`. The diagnostic identifies a safe field path and asks for an explicit YAML row list; `[]` is valid for an intentionally empty snapshot. Fixture cell values and arbitrary mapping names remain hidden. Static validation does not compile or execute the model.
+
 ## Add another scenario
 
 Give another case for the same model its own filename:
