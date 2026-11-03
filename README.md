@@ -193,6 +193,8 @@ The [recorded comparison](docs/EVALUATION-RESULTS.md) includes a built-in unit t
 
 A separate [historical regression replay](docs/HISTORICAL-REGRESSION.md) uses unchanged model SQL from two public MIT Open Learning commits with synthetic PostgreSQL fixtures. It checks recovery after an empty first build and compares native key and unit tests. This is a previously identified premerge defect, not an external pilot or validation of the original warehouse.
 
+The [existing-project trial guide](docs/PILOT.md) covers the first scenario, an equivalent baseline, an independently added second scenario and keeping the tests in CI. It includes a report template for setup effort, compatibility and continued use.
+
 ## License
 
 [Apache License 2.0](LICENSE).
