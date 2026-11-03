@@ -8,6 +8,7 @@ import psycopg
 from dbt_scenario import __version__
 from dbt_scenario.config import load_config
 from dbt_scenario.database import Database
+from dbt_scenario.discovery import discover_models
 from dbt_scenario.errors import ScenarioError, display_error
 from dbt_scenario.initialize import initialize
 from dbt_scenario.lifecycle import cleanup_run
@@ -96,6 +97,24 @@ def init(project_dir, demo, model, manifest_path, catalog_path, primary_key, sce
             "Template created with synthetic data; edit model, inputs, columns and expectations."
         )
         click.echo("Then run plan --config scenario-runner.yml --scenario scenarios/example.yml.")
+
+
+@main.command(help="List incremental models and metadata blockers without database access.")
+@click.option(
+    "--project-dir", default=".", type=click.Path(exists=True, file_okay=False, path_type=Path)
+)
+@click.option(
+    "--manifest",
+    "manifest_path",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option(
+    "--catalog", "catalog_path", type=click.Path(exists=True, dir_okay=False, path_type=Path)
+)
+@guarded
+def discover(project_dir, manifest_path, catalog_path):
+    click.echo(json.dumps(discover_models(project_dir, manifest_path, catalog_path), indent=2))
 
 
 @main.command(help="Check scenario definitions and fixture values without database access.")

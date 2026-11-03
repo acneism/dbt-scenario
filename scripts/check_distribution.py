@@ -93,7 +93,7 @@ def owned_schemas(config):
         )
 
 
-def check_metadata_template(executable, project, root):
+def check_metadata_template(executable, project, root, static_environment):
     config = load_config(project / "scenario-runner.yml")
     scenario_path = config.project_dir / "scenarios/orders.yml"
     definition = read_yaml(scenario_path)
@@ -111,6 +111,29 @@ def check_metadata_template(executable, project, root):
     before = model.read_bytes()
     parsed = Project(config, root / "metadata_parse", "dsc_distribution_metadata")
     _, artifacts = parsed.invoke("parse", config.step_timeout)
+    inventory = json.loads(
+        command(
+            [
+                str(executable),
+                "discover",
+                "--project-dir",
+                str(config.project_dir),
+                "--manifest",
+                str(artifacts / "target/manifest.json"),
+            ],
+            root,
+            static_environment,
+        )
+    )
+    if inventory.get("execution_checked") is not False or inventory.get("models") != [
+        {
+            "model": "model.shop.fct_orders",
+            "status": "TEMPLATE_READY",
+            "reason_code": None,
+            "input_count": 1,
+        }
+    ]:
+        raise RuntimeError("DISTRIBUTION_MODEL_DISCOVERY_FAILED")
     command(
         [
             str(executable),
@@ -142,7 +165,12 @@ def check_metadata_template(executable, project, root):
             raise RuntimeError("DISTRIBUTION_TEMPLATE_VALIDATION_FAILED") from None
     else:
         raise RuntimeError("DISTRIBUTION_TEMPLATE_MUST_REQUIRE_ROWS")
-    return {"status": "PASS", "explicit_rows_required": True, "model_sql_unchanged": True}
+    return {
+        "status": "PASS",
+        "explicit_rows_required": True,
+        "model_sql_unchanged": True,
+        "model_discovery": {"status": "PASS", "without_password_env": True},
+    }
 
 
 def main():
@@ -209,7 +237,9 @@ def main():
         if not output.startswith("VALID definition:"):
             raise RuntimeError("DISTRIBUTION_STATIC_VALIDATION_FAILED")
         result["static_validation"] = {"status": "PASS", "without_password_env": True}
-        result["metadata_initialization"] = check_metadata_template(executable, project, root)
+        result["metadata_initialization"] = check_metadata_template(
+            executable, project, root, static_environment
+        )
         generated = load_config(project / "scenario-runner.yml")
         if generated.database != config.database:
             raise RuntimeError("DEMO_DATABASE_CONFIG_MISMATCH")

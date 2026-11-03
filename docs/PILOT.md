@@ -4,6 +4,14 @@ The open question is whether a team finds this runner easier to keep in CI than 
 
 ## Choose one model
 
+From 0.1.0a9, list incremental models before choosing one, using existing local dbt artifacts:
+
+```sh
+dbt-scenario discover --project-dir ./your-dbt-project --manifest ./your-dbt-project/target/manifest.json --catalog ./your-dbt-project/target/catalog.json
+```
+
+The catalog is optional when column types are declared in the manifest. The inventory reports the first template blocker for each model and does not modify the project, evaluate model Jinja or use database credentials. `TEMPLATE_READY` means metadata can prepare the default template; it does not validate model SQL or write business assertions. See [model discovery](DISCOVERY.md).
+
 Use an incremental SQL model in an existing PostgreSQL 16 project, with Python 3.12, dbt Core 1.11 and dbt-postgres 1.10. Use a dedicated disposable database and a restricted role as described in the [README](../README.md). Install the original project's dependencies before running the scenario.
 
 Start with a model that uses supported scalar types and ordinary append, delete+insert or merge. The current runner does not cover JSON/arrays/floating-point fixtures, custom materializations, hooks, versioned refs or another warehouse. Record a compatibility refusal as a trial result; rewriting the project's model just to fit the runner would measure a different workflow.
@@ -24,7 +32,13 @@ With 0.1.0a7, the [metadata initialization mode](METADATA-INIT.md) can import th
 
 Declare an initial input and expected target, a changed input and expected retained target, then an unchanged incremental retry using `same_as`. Input replacement describes the full input snapshot visible at that step. A retry reuses the previous input and must execute the model again.
 
-From the project directory, after exporting the database password variable named by the configuration:
+Before exporting database passwords, validate the edited scenario from the project directory:
+
+```sh
+dbt-scenario validate --project-dir . --scenario scenarios/example.yml
+```
+
+Then export the database password variable named by the configuration:
 
 ```sh
 dbt-scenario doctor --config scenario-runner.yml

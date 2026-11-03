@@ -1,13 +1,13 @@
 import contextlib
 import re
 from importlib.resources import files
-from pathlib import Path, PureWindowsPath
+from pathlib import Path
 
 import yaml
 
 from dbt_scenario.errors import ScenarioError
 from dbt_scenario.requirements import project_settings
-from dbt_scenario.scaffold import scaffold
+from dbt_scenario.scaffold import scaffold, scenario_filename
 
 
 def template_files(directory, prefix="") -> dict[str, str]:
@@ -93,9 +93,7 @@ def initialize(
                 raise ScenarioError("INIT_SCENARIO_NAME_INVALID")
             name = scenario_name
             scenario["name"] = scenario_name
-        if PureWindowsPath(name + ".yml").is_reserved():
-            raise ScenarioError("INIT_SCENARIO_NAME_INVALID")
-        generated = {f"scenarios/{name}.yml": yaml.safe_dump(scenario, sort_keys=False)}
+        generated = {scenario_filename(name): yaml.safe_dump(scenario, sort_keys=False)}
         config_path = project_dir / "scenario-runner.yml"
         if not config_path.exists():
             config = yaml.safe_load(contents["scenario-runner.yml"])

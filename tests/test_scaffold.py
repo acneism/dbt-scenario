@@ -6,6 +6,7 @@ import pytest
 from click.testing import CliRunner
 
 from dbt_scenario.cli import main
+from dbt_scenario.discovery import discover_models
 from dbt_scenario.errors import ScenarioError
 from dbt_scenario.initialize import initialize
 from dbt_scenario.loader import load_scenario, read_yaml
@@ -94,6 +95,223 @@ def generate(artifacts, *, with_catalog=False, **kwargs):
         manifest_path=manifest_path,
         catalog_path=catalog_path if with_catalog else None,
         **kwargs,
+    )
+
+
+def add_model(manifest, name):
+    identity = f"model.analytics.{name}"
+    model = copy.deepcopy(manifest["nodes"]["model.analytics.fct_orders"])
+    model.update(name=name, unique_id=identity)
+    manifest["nodes"][identity] = model
+    return model
+
+
+def discover(artifacts, *, with_catalog=False):
+    root, manifest, catalog = artifacts
+    (root / "manifest.json").write_text(json.dumps(manifest))
+    (root / "catalog.json").write_text(json.dumps(catalog))
+    arguments = ["discover", "--project-dir", str(root), "--manifest", str(root / "manifest.json")]
+    if with_catalog:
+        arguments.extend(["--catalog", str(root / "catalog.json")])
+    return CliRunner().invoke(main, arguments)
+
+
+def test_discovery_lists_first_blockers_without_credentials_execution_or_writes(
+    artifacts, monkeypatch
+):
+    root, manifest, _ = artifacts
+    add_model(manifest, "no_key")["config"]["unique_key"] = None
+    add_model(manifest, "no_type")["columns"]["amount"]["data_type"] = None
+    add_model(manifest, "bad_type")["columns"]["amount"]["data_type"] = "jsonb"
+    add_model(manifest, "hooked")["config"]["post-hook"] = ["synthetic.private@example.invalid"]
+    add_model(manifest, "ordinary_view")["config"]["materialized"] = "view"
+    add_model(manifest, "foreign")["package_name"] = "another_package"
+    monkeypatch.delenv("DSC_TEST_PASSWORD", raising=False)
+    monkeypatch.delenv("DBT_ENV_SECRET_DSC_PASSWORD", raising=False)
+    monkeypatch.setattr("psycopg.connect", lambda *a, **kw: pytest.fail("database accessed"))
+    monkeypatch.setattr("subprocess.Popen", lambda *a, **kw: pytest.fail("subprocess started"))
+    original_project = (root / "dbt_project.yml").read_bytes()
+    result = discover(artifacts)
+    assert result.exit_code == 0, result.output
+    report = json.loads(result.output)
+    assert report["scope"] == "template_initialization" and not report["execution_checked"]
+    assert not report["catalog_used"]
+    assert [entry["model"] for entry in report["models"]] == sorted(
+        f"model.analytics.{name}"
+        for name in ["fct_orders", "no_key", "no_type", "bad_type", "hooked"]
+    )
+    entries = {entry["model"].split(".")[-1]: entry for entry in report["models"]}
+    assert entries["fct_orders"]["status"] == "TEMPLATE_READY"
+    assert entries["fct_orders"]["input_count"] == 2
+    assert entries["no_key"]["status"] == "NEEDS_PRIMARY_KEY"
+    assert entries["no_type"]["status"] == "NEEDS_COLUMN_TYPES"
+    assert entries["bad_type"]["reason_code"] == "UNSUPPORTED_COLUMN_TYPE"
+    assert entries["hooked"]["reason_code"] == "MODEL_HOOKS_UNSUPPORTED"
+    assert report["summary"] == {
+        "TEMPLATE_READY": 1,
+        "NEEDS_PRIMARY_KEY": 1,
+        "NEEDS_COLUMN_TYPES": 1,
+        "NEEDS_SCENARIO_NAME": 0,
+        "BLOCKED": 2,
+    }
+    assert "synthetic.private@example.invalid" not in result.output
+    assert (root / "dbt_project.yml").read_bytes() == original_project
+    assert {path.name for path in root.iterdir()} == {
+        "dbt_project.yml",
+        "manifest.json",
+        "catalog.json",
+    }
+    before = {path.name: path.read_bytes() for path in root.iterdir()}
+    assert discover(artifacts).output == result.output
+    assert {path.name: path.read_bytes() for path in root.iterdir()} == before
+
+
+@pytest.mark.parametrize("with_catalog", [False, True])
+def test_discovery_can_use_catalog_types_when_declarations_are_absent(artifacts, with_catalog):
+    _, manifest, _ = artifacts
+    for collection in ["nodes", "sources"]:
+        for node in manifest[collection].values():
+            node["columns"] = {}
+    result = discover(artifacts, with_catalog=with_catalog)
+    assert result.exit_code == 0, result.output
+    assert "synthetic.private@example.invalid" not in result.output
+    entry = json.loads(result.output)["models"][0]
+    assert entry["status"] == ("TEMPLATE_READY" if with_catalog else "NEEDS_COLUMN_TYPES")
+    if with_catalog:
+        generate(artifacts, with_catalog=True)
+
+
+@pytest.mark.parametrize(
+    "change,code",
+    [
+        ("key", "INIT_PRIMARY_KEY_REQUIRED"),
+        ("columns", "INIT_COLUMNS_MISSING"),
+        ("type", "INIT_COLUMN_TYPE_MISSING"),
+        ("unsupported_type", "UNSUPPORTED_COLUMN_TYPE"),
+        ("dependency", "INPUT_DEPENDENCY_UNSUPPORTED"),
+        ("ephemeral", "EPHEMERAL_INPUT_UNSUPPORTED"),
+        ("version", "DIRECT_BUILTIN_OR_VERSIONED_REF_UNSUPPORTED"),
+        ("hook", "MODEL_HOOKS_UNSUPPORTED"),
+        ("contract", "MODEL_CONFIG_UNSUPPORTED"),
+        ("strategy", "UNSUPPORTED_INCREMENTAL_STRATEGY"),
+        ("refresh", "UNSUPPORTED_MATERIALIZATION"),
+    ],
+)
+def test_discovery_and_initializer_share_the_same_refusal(artifacts, change, code):
+    _, manifest, _ = artifacts
+    model = manifest["nodes"]["model.analytics.fct_orders"]
+    if change == "key":
+        model["config"]["unique_key"] = None
+    elif change == "columns":
+        model["columns"] = {}
+    elif change == "type":
+        model["columns"]["amount"]["data_type"] = None
+    elif change == "unsupported_type":
+        model["columns"]["amount"]["data_type"] = "jsonb"
+    elif change == "dependency":
+        model["depends_on"]["nodes"] = ["seed.analytics.orders"]
+    elif change == "ephemeral":
+        manifest["nodes"]["model.analytics.stg_orders"]["config"]["materialized"] = "ephemeral"
+    elif change == "version":
+        model["version"] = 1
+    elif change == "hook":
+        model["config"]["post-hook"] = ["select 1"]
+    elif change == "contract":
+        model["config"]["contract"] = {"enforced": True}
+    elif change == "strategy":
+        model["config"]["incremental_strategy"] = "microbatch"
+    else:
+        model["config"]["full_refresh"] = True
+    result = discover(artifacts)
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["models"][0]["reason_code"] == code
+    with pytest.raises(ScenarioError, match=code):
+        generate(artifacts)
+
+
+@pytest.mark.parametrize("change", ["adapter", "project", "schema", "invocation", "errors"])
+def test_discovery_fails_globally_for_unusable_artifact_pairs(artifacts, change):
+    _, manifest, catalog = artifacts
+    if change == "adapter":
+        manifest["metadata"]["adapter_type"] = "snowflake"
+    elif change == "project":
+        manifest["metadata"]["project_name"] = "other"
+    elif change == "schema":
+        manifest["metadata"]["dbt_schema_version"] = "unsupported"
+    elif change == "invocation":
+        catalog["metadata"]["invocation_id"] = str(uuid.uuid4())
+    else:
+        catalog["errors"] = ["synthetic.private@example.invalid"]
+    result = discover(artifacts, with_catalog=True)
+    assert result.exit_code == 2
+    assert result.output.startswith("ERROR INIT_")
+    assert "synthetic.private@example.invalid" not in result.output
+
+
+def test_incomplete_catalog_blocks_one_model_without_hiding_another(artifacts):
+    _, manifest, catalog = artifacts
+    add_model(manifest, "another")
+    entry = copy.deepcopy(catalog["nodes"].pop("model.analytics.fct_orders"))
+    entry["unique_id"] = "model.analytics.another"
+    catalog["nodes"][entry["unique_id"]] = entry
+    result = discover(artifacts, with_catalog=True)
+    assert result.exit_code == 0, result.output
+    entries = {entry["model"]: entry for entry in json.loads(result.output)["models"]}
+    assert entries["model.analytics.another"]["status"] == "TEMPLATE_READY"
+    assert entries["model.analytics.fct_orders"]["reason_code"] == "INIT_CATALOG_MISMATCH"
+
+
+def test_discovery_identifies_reserved_default_filenames_and_allows_a_named_case(artifacts):
+    root, manifest, _ = artifacts
+    add_model(manifest, "CON")
+    result = discover(artifacts)
+    entry = next(
+        entry for entry in json.loads(result.output)["models"] if entry["model"].endswith(".CON")
+    )
+    assert entry["status"] == "NEEDS_SCENARIO_NAME"
+    generate(artifacts, model="CON", scenario_name="portable_case")
+    assert (root / "scenarios/portable_case.yml").is_file()
+
+
+def test_discovery_reads_each_artifact_once_for_many_models(artifacts, monkeypatch):
+    root, manifest, _ = artifacts
+    for number in range(25):
+        add_model(manifest, f"orders_{number}")
+    discover(artifacts)
+    from dbt_scenario import scaffold as module
+
+    original = module.read_metadata
+    reads = []
+
+    def observed(path, schema):
+        reads.append(path.name)
+        return original(path, schema)
+
+    monkeypatch.setattr(module, "read_metadata", observed)
+    report = discover_models(root, root / "manifest.json", root / "catalog.json")
+    assert len(report["models"]) == 26
+    assert reads == ["manifest.json", "catalog.json"]
+
+
+def test_discovery_with_no_incremental_models_returns_an_empty_inventory(artifacts):
+    _, manifest, _ = artifacts
+    manifest["nodes"]["model.analytics.fct_orders"]["config"]["materialized"] = "table"
+    result = discover(artifacts)
+    assert result.exit_code == 0, result.output
+    report = json.loads(result.output)
+    assert report["models"] == [] and not any(report["summary"].values())
+
+
+def test_discovery_escapes_control_characters_in_reported_model_ids(artifacts):
+    _, manifest, _ = artifacts
+    add_model(manifest, "control\x1b[31m")
+    result = discover(artifacts)
+    assert result.exit_code == 0, result.output
+    assert "\x1b" not in result.output
+    report = json.loads(result.output)
+    assert any(
+        entry["reason_code"] == "DIRECT_BUILTIN_OR_VERSIONED_REF_UNSUPPORTED"
+        for entry in report["models"]
     )
 
 

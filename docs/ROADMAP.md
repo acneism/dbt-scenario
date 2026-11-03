@@ -38,6 +38,13 @@ Implemented in alpha 6:
 - Real dbt tests proving direct, nested and macro-generated external relations stop before model execution.
 - A Docker CI job for the installed demo with network access removed and PostgreSQL running inside the container.
 
+Implemented in alpha 7–9:
+
+- Manifest/catalog-based templates with explicit unfinished row lists and preservation of existing files.
+- Static fixture validation without database access, including dedicated unfinished-row diagnostics.
+- Read-only discovery of incremental model candidates and their first metadata/template blocker.
+- Installed-package checks and public installation reports for released artifacts.
+
 The remaining work is:
 
 - Broader SQL compatibility guided by real projects, while keeping the trusted-code/disposable-database boundary explicit.

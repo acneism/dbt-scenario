@@ -60,6 +60,14 @@ For an existing dbt project:
 dbt-scenario init --project-dir ./my-dbt-project
 ```
 
+From 0.1.0a9, [discover candidate models](docs/DISCOVERY.md) from existing metadata before creating a template:
+
+```sh
+dbt-scenario discover --project-dir ./my-dbt-project --manifest ./my-dbt-project/target/manifest.json
+```
+
+This read-only inventory lists root-project incremental models, missing types/keys and the first unsupported configuration for each candidate. Add a paired `--catalog` when manifest column declarations are incomplete. `TEMPLATE_READY` describes template metadata; SQL compatibility and execution still require `plan` and `test`.
+
 Version 0.1.0a7 also accepts existing [dbt metadata to fill identifiers and types](docs/METADATA-INIT.md):
 
 ```sh

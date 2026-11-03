@@ -517,6 +517,30 @@ def test_metadata_template_from_real_catalog_runs_after_explicit_fixture_edits(
         before = model.read_bytes()
         with monkeypatch.context() as patch:
             patch.setattr("psycopg.connect", lambda *a, **kw: pytest.fail("init accessed database"))
+            patch.setattr("subprocess.Popen", lambda *a, **kw: pytest.fail("subprocess started"))
+            discovered = CliRunner().invoke(
+                main,
+                [
+                    "discover",
+                    "--project-dir",
+                    str(config.project_dir),
+                    "--manifest",
+                    str(artifacts / "manifest.json"),
+                    "--catalog",
+                    str(artifacts / "catalog.json"),
+                ],
+            )
+            assert discovered.exit_code == 0, discovered.output
+            inventory = json.loads(discovered.output)
+            assert not inventory["execution_checked"]
+            assert inventory["models"] == [
+                {
+                    "model": "model.shop.fct_orders",
+                    "status": "TEMPLATE_READY",
+                    "reason_code": None,
+                    "input_count": 1,
+                }
+            ]
             result = CliRunner().invoke(
                 main,
                 [

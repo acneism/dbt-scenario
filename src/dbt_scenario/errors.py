@@ -30,6 +30,13 @@ FIELDS = {
 }
 
 HINTS = {
+    "UNSUPPORTED_MATERIALIZATION": "Choose an incremental model without forced full refresh.",
+    "UNSUPPORTED_INCREMENTAL_STRATEGY": "Choose append, delete+insert or merge on PostgreSQL 16.",
+    "MODEL_HOOKS_UNSUPPORTED": "Choose a model without hooks, grants or persisted documentation.",
+    "MODEL_CONFIG_UNSUPPORTED": "Choose a SQL model without an enforced contract.",
+    "INPUT_DEPENDENCY_UNSUPPORTED": "Use direct model/source inputs in the root project.",
+    "EPHEMERAL_INPUT_UNSUPPORTED": "Choose a model whose direct inputs are not ephemeral.",
+    "DIRECT_BUILTIN_OR_VERSIONED_REF_UNSUPPORTED": "Choose an unversioned root-project model.",
     "UNFILLED_TEMPLATE_ROWS": (
         "Replace this rows placeholder with an explicit YAML row list; use [] for empty data."
     ),

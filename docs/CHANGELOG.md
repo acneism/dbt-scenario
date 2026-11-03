@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0a9 — November 3, 2026
+
+- Add read-only `discover` to list root-project incremental models and their first template-initialization blocker from local manifest/catalog metadata.
+- Separate ready metadata, missing column types, missing assertion keys, reserved default scenario filenames and unsupported configurations.
+- Share metadata loading and eligibility checks with `init`; read each artifact once per inventory.
+- Check discovery through the installed CLI and against real PostgreSQL dbt docs artifacts without database access during discovery.
+
 ## 0.1.0a8 — November 3, 2026
 
 - Add static `validate` for YAML, fixtures, keys and step references without credentials, a dbt profile or database access.

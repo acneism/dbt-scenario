@@ -2,7 +2,7 @@ import copy
 import json
 import re
 from importlib.resources import files
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from uuid import UUID
 
 from jsonschema import Draft202012Validator
@@ -98,7 +98,7 @@ def column_types(node, location, catalog=False):
     return result
 
 
-def scaffold(settings, selector, manifest_path, catalog_path=None, primary_key=()):
+def load_scaffold_metadata(settings, manifest_path, catalog_path=None):
     manifest = read_metadata(manifest_path, "https://schemas.getdbt.com/dbt/manifest/v12.json")
     project = settings["name"]
     metadata = manifest["metadata"]
@@ -106,9 +106,38 @@ def scaffold(settings, selector, manifest_path, catalog_path=None, primary_key=(
         raise ScenarioError("INIT_ADAPTER_UNSUPPORTED")
     if metadata.get("project_name") is not None and metadata["project_name"] != project:
         raise ScenarioError("INIT_PROJECT_MISMATCH")
+    catalog = None
+    if catalog_path:
+        catalog = read_metadata(catalog_path, "https://schemas.getdbt.com/dbt/catalog/v1.json")
+        try:
+            invocation = str(UUID(metadata["invocation_id"]))
+            if invocation != str(UUID(catalog["metadata"]["invocation_id"])):
+                raise ValueError
+        except (KeyError, TypeError, ValueError, AttributeError):
+            raise ScenarioError("INIT_CATALOG_MISMATCH") from None
+        if catalog.get("errors"):
+            raise ScenarioError("INIT_CATALOG_MISMATCH")
+    return manifest, catalog
+
+
+def scaffold(settings, selector, manifest_path, catalog_path=None, primary_key=()):
+    manifest, catalog = load_scaffold_metadata(settings, manifest_path, catalog_path)
+    return scaffold_from_metadata(settings, selector, manifest, catalog, primary_key)
+
+
+def scenario_filename(name):
+    if PureWindowsPath(name + ".yml").is_reserved():
+        raise ScenarioError("INIT_SCENARIO_NAME_INVALID")
+    return f"scenarios/{name}.yml"
+
+
+def scaffold_from_metadata(settings, selector, manifest, catalog=None, primary_key=()):
+    project = settings["name"]
+    direct = manifest["nodes"].get(selector)
+    entries = [(selector, direct)] if isinstance(direct, dict) else manifest["nodes"].items()
     candidates = [
         (identity, node)
-        for identity, node in manifest["nodes"].items()
+        for identity, node in entries
         if isinstance(node, dict)
         and node.get("resource_type") == "model"
         and node.get("package_name") == project
@@ -138,17 +167,6 @@ def scaffold(settings, selector, manifest_path, catalog_path=None, primary_key=(
         or len(set(dependencies)) != len(dependencies)
     ):
         raise ScenarioError("INPUT_DEPENDENCIES_MISMATCH")
-    catalog = None
-    if catalog_path:
-        catalog = read_metadata(catalog_path, "https://schemas.getdbt.com/dbt/catalog/v1.json")
-        try:
-            invocation = str(UUID(metadata["invocation_id"]))
-            if invocation != str(UUID(catalog["metadata"]["invocation_id"])):
-                raise ValueError
-        except (KeyError, TypeError, ValueError, AttributeError):
-            raise ScenarioError("INIT_CATALOG_MISMATCH") from None
-        if catalog.get("errors"):
-            raise ScenarioError("INIT_CATALOG_MISMATCH")
 
     def columns(node_id, node, location):
         if catalog is None:
