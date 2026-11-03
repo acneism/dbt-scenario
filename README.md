@@ -189,6 +189,8 @@ See [existing approaches and the comparison plan](docs/ALTERNATIVES.md) for the 
 
 [Controlled evaluation](docs/EVALUATION.md) reproduces native-dbt checks, a manual gate and audit-helper-ext integration on synthetic cases, and measures the current runner under verified Linux resource limits. These checks do not establish a real-world bug discovery or adoption advantage.
 
+The [recorded comparison](docs/EVALUATION-RESULTS.md) includes a built-in unit test that passes despite duplicate append materialization; a native unique test after the retry catches those duplicates too. No external-project bug discovery has been confirmed.
+
 ## License
 
 [Apache License 2.0](LICENSE).

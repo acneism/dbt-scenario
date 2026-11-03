@@ -15,3 +15,5 @@ The product hypothesis is convenience for small, repeatable materialization test
 Before expanding the adapter list, compare the same late-arrival and retry scenario through a manual harness, audit-helper-ext and dbt-scenario. Record setup time, project edits, test-specific code, diagnostic clarity and effort to add a second case. PostgreSQL schema-addition and numeric-scale cases should also be compared explicitly.
 
 The existing local performance result describes dbt-scenario alone. It does not establish a speed or setup advantage over another approach. The strongest adoption signal remains external teams keeping these scenarios in CI and independently adding their next test.
+
+[Recorded synthetic comparison results](EVALUATION-RESULTS.md) now cover five cases and two native-dbt experiments. They show that manual and package-based gates detect the materialization bugs too; the comparison does not establish an onboarding or adoption advantage.

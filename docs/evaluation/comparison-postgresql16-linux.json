@@ -1,0 +1,504 @@
+{
+  "schema_version": 1,
+  "package_version": "0.1.0a6",
+  "complete": true,
+  "model_sha256": "857c308c65d1eaeba8a4b6f1a2048f64a17e59c098ce2e37bbd2f9e51295b8a4",
+  "fixtures_sha256": "f5da2547c2f4b26e2af309356411d9879359249d380307ba8b4e6291e2192fbb",
+  "dependencies": [
+    {
+      "git": "https://github.com/infinitelambda/dbt-audit-helper-ext.git",
+      "name": "audit_helper_ext",
+      "revision": "d7c85bf54065c77bb4c7fc4923daced63796a43a"
+    },
+    {
+      "name": "audit_helper",
+      "package": "dbt-labs/audit_helper",
+      "version": "0.14.0"
+    },
+    {
+      "name": "dbt_utils",
+      "package": "dbt-labs/dbt_utils",
+      "version": "1.3.3"
+    }
+  ],
+  "protocol": {
+    "synthetic_project": true,
+    "repeats_per_case": 1,
+    "human_setup_time_measured": false,
+    "feature_equivalent_timing": false,
+    "case_order": [
+      "correct",
+      "late_arrival_loss",
+      "duplicate_retry",
+      "extra_column",
+      "numeric_scale_drift"
+    ],
+    "approach_order": [
+      "manual",
+      "audit_helper_ext",
+      "dbt_scenario"
+    ],
+    "excludes": [
+      "project_generation",
+      "dependency_installation",
+      "native_dbt_checks"
+    ]
+  },
+  "cases": {
+    "correct": {
+      "manual": {
+        "status": "PASS",
+        "steps": [
+          {
+            "name": "initial",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 2
+          },
+          {
+            "name": "incremental",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 3
+          },
+          {
+            "name": "retry",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 3
+          }
+        ],
+        "cleanup_status": "CLEANED",
+        "duration_ms": 11290.686,
+        "native_dbt_checks": null,
+        "native_dbt_checks_duration_ms": 0,
+        "matches_expected_detection": true
+      },
+      "audit_helper_ext": {
+        "status": "PASS",
+        "steps": [
+          {
+            "name": "initial",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 2
+          },
+          {
+            "name": "incremental",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 3
+          },
+          {
+            "name": "retry",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 3
+          }
+        ],
+        "cleanup_status": "CLEANED",
+        "duration_ms": 29752.521,
+        "native_dbt_checks": null,
+        "native_dbt_checks_duration_ms": 0,
+        "matches_expected_detection": true
+      },
+      "dbt_scenario": {
+        "status": "PASS",
+        "cleanup_status": "CLEANED",
+        "duration_ms": 25605.21,
+        "steps": [
+          {
+            "name": "initial",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 2
+          },
+          {
+            "name": "incremental",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 3
+          },
+          {
+            "name": "retry",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 3
+          }
+        ],
+        "matches_expected_detection": true
+      }
+    },
+    "late_arrival_loss": {
+      "manual": {
+        "status": "FAIL",
+        "steps": [
+          {
+            "name": "initial",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 2
+          },
+          {
+            "name": "incremental",
+            "status": "FAIL",
+            "reason_code": "ROWS_MISMATCH",
+            "actual_rows": 2
+          }
+        ],
+        "cleanup_status": "CLEANED",
+        "duration_ms": 7458.847,
+        "native_dbt_checks": {
+          "unit": {
+            "status": "FAIL",
+            "checks": [
+              {
+                "name": "unit_test.comparison.fct_orders.incremental_select_batch",
+                "status": "fail"
+              }
+            ]
+          },
+          "data": {
+            "status": "PASS",
+            "checks": [
+              {
+                "name": "test.comparison.not_null_fct_orders_order_id.4e687af8d0",
+                "status": "pass"
+              },
+              {
+                "name": "test.comparison.unique_fct_orders_order_id.523ddb6ce5",
+                "status": "pass"
+              }
+            ]
+          },
+          "this_fixture_rows": 2
+        },
+        "native_dbt_checks_duration_ms": 7828.949,
+        "matches_expected_detection": true
+      },
+      "audit_helper_ext": {
+        "status": "FAIL",
+        "steps": [
+          {
+            "name": "initial",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 2
+          },
+          {
+            "name": "incremental",
+            "status": "FAIL",
+            "reason_code": "ROW_COUNT_MISMATCH",
+            "actual_rows": 2
+          }
+        ],
+        "cleanup_status": "CLEANED",
+        "duration_ms": 19529.101,
+        "native_dbt_checks": null,
+        "native_dbt_checks_duration_ms": 0,
+        "matches_expected_detection": true
+      },
+      "dbt_scenario": {
+        "status": "FAIL",
+        "cleanup_status": "CLEANED",
+        "duration_ms": 18163.95,
+        "steps": [
+          {
+            "name": "initial",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 2
+          },
+          {
+            "name": "incremental",
+            "status": "FAIL",
+            "reason_code": "ROWS_MISMATCH",
+            "actual_rows": 2
+          },
+          {
+            "name": "retry",
+            "status": "NOT_RUN",
+            "reason_code": "PREVIOUS_STEP_UNSUCCESSFUL",
+            "actual_rows": null
+          }
+        ],
+        "matches_expected_detection": true
+      }
+    },
+    "duplicate_retry": {
+      "manual": {
+        "status": "FAIL",
+        "steps": [
+          {
+            "name": "initial",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 2
+          },
+          {
+            "name": "incremental",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 3
+          },
+          {
+            "name": "retry",
+            "status": "FAIL",
+            "reason_code": "INVALID_KEY",
+            "actual_rows": 4
+          }
+        ],
+        "cleanup_status": "CLEANED",
+        "duration_ms": 10990.293,
+        "native_dbt_checks": {
+          "unit": {
+            "status": "PASS",
+            "checks": [
+              {
+                "name": "unit_test.comparison.fct_orders.incremental_select_batch",
+                "status": "pass"
+              }
+            ]
+          },
+          "data": {
+            "status": "FAIL",
+            "checks": [
+              {
+                "name": "test.comparison.not_null_fct_orders_order_id.4e687af8d0",
+                "status": "pass"
+              },
+              {
+                "name": "test.comparison.unique_fct_orders_order_id.523ddb6ce5",
+                "status": "fail"
+              }
+            ]
+          },
+          "this_fixture_rows": 4
+        },
+        "native_dbt_checks_duration_ms": 7904.576,
+        "matches_expected_detection": true
+      },
+      "audit_helper_ext": {
+        "status": "FAIL",
+        "steps": [
+          {
+            "name": "initial",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 2
+          },
+          {
+            "name": "incremental",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 3
+          },
+          {
+            "name": "retry",
+            "status": "FAIL",
+            "reason_code": "ROW_COUNT_MISMATCH",
+            "actual_rows": 4
+          }
+        ],
+        "cleanup_status": "CLEANED",
+        "duration_ms": 29431.282,
+        "native_dbt_checks": null,
+        "native_dbt_checks_duration_ms": 0,
+        "matches_expected_detection": true
+      },
+      "dbt_scenario": {
+        "status": "FAIL",
+        "cleanup_status": "CLEANED",
+        "duration_ms": 25426.812,
+        "steps": [
+          {
+            "name": "initial",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 2
+          },
+          {
+            "name": "incremental",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 3
+          },
+          {
+            "name": "retry",
+            "status": "FAIL",
+            "reason_code": "DUPLICATE_KEY",
+            "actual_rows": 4
+          }
+        ],
+        "matches_expected_detection": true
+      }
+    },
+    "extra_column": {
+      "manual": {
+        "status": "FAIL",
+        "steps": [
+          {
+            "name": "initial",
+            "status": "FAIL",
+            "reason_code": "SCHEMA_MISMATCH",
+            "actual_rows": 2
+          }
+        ],
+        "cleanup_status": "CLEANED",
+        "duration_ms": 3634.345,
+        "native_dbt_checks": null,
+        "native_dbt_checks_duration_ms": 0,
+        "matches_expected_detection": true
+      },
+      "audit_helper_ext": {
+        "status": "FAIL",
+        "steps": [
+          {
+            "name": "initial",
+            "status": "FAIL",
+            "reason_code": "SCHEMA_MISMATCH",
+            "actual_rows": 2
+          }
+        ],
+        "cleanup_status": "CLEANED",
+        "duration_ms": 9608.917,
+        "native_dbt_checks": null,
+        "native_dbt_checks_duration_ms": 0,
+        "matches_expected_detection": true
+      },
+      "dbt_scenario": {
+        "status": "FAIL",
+        "cleanup_status": "CLEANED",
+        "duration_ms": 11039.063,
+        "steps": [
+          {
+            "name": "initial",
+            "status": "FAIL",
+            "reason_code": "SCHEMA_MISMATCH",
+            "actual_rows": null
+          },
+          {
+            "name": "incremental",
+            "status": "NOT_RUN",
+            "reason_code": "PREVIOUS_STEP_UNSUCCESSFUL",
+            "actual_rows": null
+          },
+          {
+            "name": "retry",
+            "status": "NOT_RUN",
+            "reason_code": "PREVIOUS_STEP_UNSUCCESSFUL",
+            "actual_rows": null
+          }
+        ],
+        "matches_expected_detection": true
+      }
+    },
+    "numeric_scale_drift": {
+      "manual": {
+        "status": "FAIL",
+        "steps": [
+          {
+            "name": "initial",
+            "status": "FAIL",
+            "reason_code": "SCHEMA_MISMATCH",
+            "actual_rows": 2
+          }
+        ],
+        "cleanup_status": "CLEANED",
+        "duration_ms": 3624.667,
+        "native_dbt_checks": null,
+        "native_dbt_checks_duration_ms": 0,
+        "matches_expected_detection": true
+      },
+      "audit_helper_ext": {
+        "status": "PASS",
+        "steps": [
+          {
+            "name": "initial",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 2
+          },
+          {
+            "name": "incremental",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 3
+          },
+          {
+            "name": "retry",
+            "status": "PASS",
+            "reason_code": null,
+            "actual_rows": 3
+          }
+        ],
+        "cleanup_status": "CLEANED",
+        "duration_ms": 29352.081,
+        "native_dbt_checks": null,
+        "native_dbt_checks_duration_ms": 0,
+        "matches_expected_detection": false
+      },
+      "dbt_scenario": {
+        "status": "FAIL",
+        "cleanup_status": "CLEANED",
+        "duration_ms": 11070.774,
+        "steps": [
+          {
+            "name": "initial",
+            "status": "FAIL",
+            "reason_code": "SCHEMA_MISMATCH",
+            "actual_rows": null
+          },
+          {
+            "name": "incremental",
+            "status": "NOT_RUN",
+            "reason_code": "PREVIOUS_STEP_UNSUCCESSFUL",
+            "actual_rows": null
+          },
+          {
+            "name": "retry",
+            "status": "NOT_RUN",
+            "reason_code": "PREVIOUS_STEP_UNSUCCESSFUL",
+            "actual_rows": null
+          }
+        ],
+        "matches_expected_detection": true
+      }
+    }
+  },
+  "environment": {
+    "resource_limits": {
+      "verified": true,
+      "mechanism": "linux_cgroup_v2",
+      "cpu_max": "200000 100000",
+      "cpu_limit": 2.0,
+      "memory_limit_bytes": 8589934592,
+      "swap_limit_bytes": 0,
+      "cpu_set": "0-3"
+    },
+    "resource_limits_enforced": true,
+    "network": {
+      "interfaces": [
+        "lo"
+      ],
+      "external_connections_blocked": {
+        "ipv4": true,
+        "ipv6": true
+      }
+    },
+    "postgresql": 160015,
+    "python": "3.12.16",
+    "platform": "Linux-7.0.0-1017-azure-x86_64-with-glibc2.36",
+    "dependencies": {
+      "dbt-core": "1.11.16",
+      "dbt-postgres": "1.10.2",
+      "psycopg": "3.3.6",
+      "PyYAML": "6.0.3",
+      "sqlglot": "30.27.0"
+    },
+    "container_peak_memory_bytes": 461094912
+  },
+  "evaluation_script_sha256": "c52db38f402f2328257f14ecac4e47ed99994ae99933dacff4e4f432ab18c10c",
+  "source_commit": "080ec1c4813f5d51f04c6cd9d3ae5489e712c006",
+  "database_cleanup_verified": true
+}
