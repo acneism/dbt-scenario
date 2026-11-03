@@ -135,6 +135,8 @@ def main():
                     "scenario-runner.yml",
                     "--scenario",
                     "examples/shop/scenarios/orders.yml",
+                    "--scenario",
+                    "examples/shop/scenarios/empty-start.yml",
                     "--report-dir",
                     str(reports),
                 ],
@@ -142,16 +144,29 @@ def main():
                 env=environment,
             )
             summaries = list(reports.glob("*/summary.json"))
-            if len(summaries) != 1:
+            if len(summaries) != 2:
                 raise AcceptanceError("REPORT_MISSING")
-            report = json.loads(summaries[0].read_text())
-            if (
-                report["overall_status"] != "PASS"
-                or report["cleanup_status"] != "CLEANED"
-                or [step["actual_rows"] for step in report["steps"]] != [2, 3, 3]
-                or not all(step["sql_audit"]["status"] == "PASS" for step in report["steps"])
-            ):
-                raise AcceptanceError("SCENARIO_NOT_SUCCESSFUL")
+            indexed = {
+                report["scenario"]: report
+                for path in summaries
+                for report in [json.loads(path.read_text())]
+            }
+            if set(indexed) != {"orders_update_late_arrival_retry", "orders_empty_start"}:
+                raise AcceptanceError("REPORT_MISMATCH")
+            for name, expected in [
+                ("orders_update_late_arrival_retry", [2, 3, 3]),
+                ("orders_empty_start", [0, 3, 3]),
+            ]:
+                report = indexed[name]
+                if (
+                    report["overall_status"] != "PASS"
+                    or report["cleanup_status"] != "CLEANED"
+                    or [step.get("actual_rows") for step in report["steps"]] != expected
+                    or not all(step["sql_audit"]["status"] == "PASS" for step in report["steps"])
+                ):
+                    raise AcceptanceError("SCENARIO_NOT_SUCCESSFUL")
+            report = indexed["orders_update_late_arrival_retry"]
+            empty = indexed["orders_empty_start"]
             with psycopg.connect(**connection) as database:
                 if database.execute(
                     "SELECT 1 FROM pg_namespace WHERE nspname LIKE 'dsc_%'"
@@ -171,6 +186,11 @@ def main():
                 "steps": [step["status"] for step in report["steps"]],
                 "actual_rows": [step["actual_rows"] for step in report["steps"]],
                 "cleanup_status": report["cleanup_status"],
+                "empty_start_demo": {
+                    "status": empty["overall_status"],
+                    "actual_rows": [step["actual_rows"] for step in empty["steps"]],
+                    "cleanup_status": empty["cleanup_status"],
+                },
             }
         finally:
             if started:

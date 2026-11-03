@@ -39,6 +39,14 @@ dbt-scenario test --config scenario-runner.yml --scenario examples/shop/scenario
 
 The example tests an initial load, an update together with a late-arriving order, and an unchanged retry. Input `replace` operations replace the full input snapshot while retaining the model's existing target table. The model SQL stays unchanged in your project; fixture routing is installed only in a temporary project copy.
 
+From 0.1.0a10, the example also includes an empty initial load followed by data and a retry:
+
+```sh
+dbt-scenario test --config scenario-runner.yml --scenario examples/shop/scenarios/empty-start.yml
+```
+
+Expected row counts are 0 / 3 / 3. The demo SQL uses a PostgreSQL `-infinity` timestamp when the target watermark is NULL, so an empty first table does not filter out its first batch. This does not infer business rules for arbitrary NULL source timestamps or events delivered behind an existing watermark.
+
 The prerelease includes a wheel, source archive, SHA256SUMS and Linux/Windows verification reports. It is distributed through GitHub Releases; the [release procedure](docs/RELEASING.md) explains the checks. A contributor checkout can still be installed with `python -m pip install -e '.[dev]'`.
 
 Run `docker compose down` after using the example. The database is disposable and has no persistent volume. Keep the two passwords unchanged while the container is running.

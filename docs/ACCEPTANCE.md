@@ -9,7 +9,7 @@ This maps the original A01–A30 requirements to executable checks. Passing the 
 | A08–A10: exact values, unchanged aggregates, NULL and decimals | Covered | Equal-total swaps, NULL versus zero, numeric(38,2) roundtrip and independent Decimal context |
 | A11: compound keys | Covered | Real compound merge plus duplicate and NULL component failures |
 | A12: invalid expected fixtures | Covered | Missing/extra columns, scalar rows, invalid containers and values, duplicate and NULL expected keys are rejected before execution |
-| A13: empty versus missing tables | Covered | Empty initial load followed by incremental data; empty incoming batch; missing actual relation raises an error |
+| A13: empty versus missing tables | Covered | Packaged empty-start scenario with unchanged example SQL, delete+insert/merge and modern/pre-1900 timestamps; empty incoming batch; missing actual relation raises an error |
 | A14: schema changes | Covered | Added/removed columns, changed numeric scale and a real dbt schema addition |
 | A15: unchanged input state | Covered | Two direct inputs; one changes while the ref fixture persists |
 | A16: unsupported and external dependencies | Covered within the declared SQL subset | Declared dependencies are checked; per-step compiled SQL permits only fixtures/current target and scoped CTEs. Direct, nested and macro-generated external tables are rejected before model run. Trusted Jinja/scalar functions are not a sandbox; see SQL-AUDIT.md |

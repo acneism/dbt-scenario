@@ -1,0 +1,42 @@
+version: 1
+name: orders_empty_start
+model: model.shop.fct_orders
+inputs:
+  orders:
+    node: source.shop.raw.orders
+    columns:
+      order_id: bigint
+      event_at: timestamp
+      updated_at: timestamp
+      amount: numeric(12,2)
+output:
+  columns:
+    order_id: bigint
+    event_at: timestamp
+    updated_at: timestamp
+    amount: numeric(12,2)
+  primary_key: [order_id]
+steps:
+  - name: empty_initial
+    inputs:
+      orders:
+        replace:
+          rows: []
+    run:
+      mode: initial
+    expect:
+      rows: []
+  - name: first_data
+    inputs:
+      orders:
+        replace:
+          fixture: fixtures/updated.yml
+    run:
+      mode: incremental
+    expect:
+      fixture: fixtures/updated.yml
+  - name: retry_without_changes
+    run:
+      mode: incremental
+    expect:
+      same_as: first_data

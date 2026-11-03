@@ -255,28 +255,49 @@ def main():
                 "scenario-runner.yml",
                 "--scenario",
                 "examples/shop/scenarios/orders.yml",
+                "--scenario",
+                "examples/shop/scenarios/empty-start.yml",
                 "--report-dir",
                 str(root / "reports"),
             ],
             project,
         )
         summaries = list((root / "reports").glob("*/summary.json"))
-        if len(summaries) != 1:
+        if len(summaries) != 2:
             raise RuntimeError("DISTRIBUTION_REPORT_MISSING")
-        report = json.loads(summaries[0].read_text(encoding="utf-8"))
+        indexed = {
+            report["scenario"]: report
+            for path in summaries
+            for report in [json.loads(path.read_text(encoding="utf-8"))]
+        }
+        if set(indexed) != {"orders_update_late_arrival_retry", "orders_empty_start"}:
+            raise RuntimeError("DISTRIBUTION_REPORT_MISMATCH")
+        for name, expected in [
+            ("orders_update_late_arrival_retry", [2, 3, 3]),
+            ("orders_empty_start", [0, 3, 3]),
+        ]:
+            report = indexed[name]
+            if (
+                report["overall_status"] != "PASS"
+                or report["cleanup_status"] != "CLEANED"
+                or [step.get("actual_rows") for step in report["steps"]] != expected
+                or any(step["sql_audit"]["status"] != "PASS" for step in report["steps"])
+            ):
+                raise RuntimeError("DISTRIBUTION_SCENARIO_FAILED")
+        report = indexed["orders_update_late_arrival_retry"]
         counts = [step["actual_rows"] for step in report["steps"]]
-        if (
-            report["overall_status"] != "PASS"
-            or report["cleanup_status"] != "CLEANED"
-            or counts != [2, 3, 3]
-            or any(step["sql_audit"]["status"] != "PASS" for step in report["steps"])
-        ):
-            raise RuntimeError("DISTRIBUTION_SCENARIO_FAILED")
         result["demo"] = {
             "steps": [step["status"] for step in report["steps"]],
             "actual_rows": counts,
             "cleanup_status": report["cleanup_status"],
             "engine_versions": report["engine_versions"],
+        }
+        empty = indexed["orders_empty_start"]
+        result["empty_start_demo"] = {
+            "status": empty["overall_status"],
+            "steps": [step["status"] for step in empty["steps"]],
+            "actual_rows": [step["actual_rows"] for step in empty["steps"]],
+            "cleanup_status": empty["cleanup_status"],
         }
     if owned_schemas(config) != baseline:
         raise RuntimeError("DISTRIBUTION_CLEANUP_MISMATCH")

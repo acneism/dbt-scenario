@@ -13,4 +13,6 @@ The installed `dbt-scenario init --demo` creates the project from packaged resou
 
 The JSON result records package/server versions, network checks, step statuses, row counts and cleanup status. Passwords, model SQL and raw subprocess output are not published. GitHub Actions retains this result as the `offline-results` artifact. Installation, base-image downloads and image building require network access; the claim applies to execution after installation. This is a correctness check and does not enforce the separate Linux performance target.
 
+From 0.1.0a10, the same installed-package run also executes the packaged `empty-start.yml` scenario and requires PASS, 0 / 3 / 3 rows and CLEANED. Its result is recorded as `empty_start_demo`.
+
 The first [alpha 6 offline job](https://github.com/acneism/dbt-scenario/actions/runs/41543901187/job/125614577872) passed for commit e4a3475: PostgreSQL 16.15, only `lo`, blocked external IPv4/IPv6 connections, three PASS steps, 2/3/3 rows and CLEANED.

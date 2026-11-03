@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0a10 — November 3, 2026
+
+- Fix the example and packaged demo SQL dropping the first incoming batch after an empty initial table: use PostgreSQL timestamp `-infinity` for a NULL watermark.
+- Include an explicit empty-start scenario in both example copies, preserving initial/update/retry coverage.
+- Run the example unchanged in regression tests for delete+insert and merge with modern and pre-1900 timestamps.
+- Verify the packaged empty-start scenario on both platforms and in the network-isolated acceptance job.
+
 ## 0.1.0a9 — November 3, 2026
 
 - Add read-only `discover` to list root-project incremental models and their first template-initialization blocker from local manifest/catalog metadata.

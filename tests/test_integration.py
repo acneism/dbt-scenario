@@ -614,21 +614,30 @@ def test_project_env_allowlist_reaches_dbt_without_forwarding_other_values(
     assert "1.00" not in encoded
 
 
-def test_incremental_model_can_grow_from_an_empty_initial_table(project):
-    config, scenario, reports = project
-    first = scenario.data["steps"][0]
-    first["inputs"]["orders"]["replace"]["rows"] = []
-    first["expect"]["rows"] = []
+@pytest.mark.parametrize("strategy", ["delete+insert", "merge"])
+@pytest.mark.parametrize("historical", [False, True])
+def test_incremental_model_can_grow_from_an_empty_initial_table(project, strategy, historical):
+    config, _, reports = project
+    scenario = load_scenario(config.project_dir / "scenarios/empty-start.yml", config.project_dir)
+    for step in scenario.data["steps"]:
+        step["run"]["vars"] = {"strategy": strategy}
+        if historical:
+            snapshots = [update["replace"] for update in step.get("inputs", {}).values()]
+            snapshots.append(step["expect"])
+            for snapshot in snapshots:
+                for row in snapshot.get("rows", []):
+                    for column in ["event_at", "updated_at"]:
+                        row[column] = (
+                            row[column].replace("2026-", "1800-").replace("2025-", "1799-")
+                        )
     model = config.project_dir / "models/fct_orders.sql"
-    model.write_text(
-        model.read_text().replace(
-            "(select max(updated_at) from {{ this }})",
-            "coalesce((select max(updated_at) from {{ this }}), timestamp '1900-01-01')",
-        )
-    )
+    before = model.read_bytes()
     report = run_scenario(scenario, config, reports)
     assert report["overall_status"] == "PASS", report
     assert [step["actual_rows"] for step in report["steps"]] == [0, 3, 3]
+    assert report["steps"][1]["observed_mode_evidence"]["operation"] == strategy
+    assert report["cleanup_status"] == "CLEANED"
+    assert model.read_bytes() == before
 
 
 def test_empty_incoming_snapshot_keeps_existing_target_rows(project):
