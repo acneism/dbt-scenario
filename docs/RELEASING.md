@@ -26,3 +26,13 @@ The source commit's [full CI](https://github.com/acneism/dbt-scenario/actions/ru
 The release's SHA256SUMS covers the wheel, sdist, constraints, both platform reports and release.json. The latter records source/CI provenance and the original Actions artifact digest. The release does not include an offline dependency bundle; installing the wheel and its dependencies requires network access.
 
 After publication, a separate fresh Windows environment installed directly from the public wheel and constraints URLs with pip. Dependency checks passed, the installed files matched the published wheel, no development-only packages were installed, and the CLI generated a valid three-step demo outside the checkout. The [installation report](distribution/v0.1.0a6-install.json) records the public URL and wheel hash. The database execution checks are recorded in the release's platform reports.
+
+## Metadata initialization prerelease
+
+[`v0.1.0a7`](https://github.com/acneism/dbt-scenario/releases/tag/v0.1.0a7) points to commit `db4f38807760140dc1b9171f636304560b98d8cf`. The [full CI](https://github.com/acneism/dbt-scenario/actions/runs/41674656675) passed 223 unit and 70 integration tests. A new integration case generates a real PostgreSQL dbt catalog, initializes a template with database access blocked, fills explicit fixture/expected rows and completes initial/update/retry with 2 / 3 / 3 rows and cleanup.
+
+The [distribution check](https://github.com/acneism/dbt-scenario/actions/runs/41674656589) also tests metadata initialization through the installed CLI with a real parsed manifest, including rejection of unfinished rows and preservation of model SQL. The exact CI wheel/sdist pair passed this check and the PostgreSQL demo on Linux and Windows. All 29 packaged files match the tagged source. The [external-model regressions](https://github.com/acneism/dbt-scenario/actions/runs/41674656720) passed again.
+
+All seven published assets were downloaded anonymously and matched their verified copies; the tag resolved to the tested source commit. This release improves template preparation. It does not establish measured onboarding savings, external adoption, or a new production defect.
+
+A separate [public-installation check](distribution/v0.1.0a7-install.json) installed directly from the release URLs into a fresh Windows environment. The installed files matched the published wheel, pip found no dependency conflicts, no development-only packages were present, and the CLI exposed all metadata options and generated a valid demo outside the checkout.

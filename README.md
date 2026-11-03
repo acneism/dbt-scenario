@@ -8,10 +8,10 @@ This is an early alpha. It supports PostgreSQL 16, Python 3.12, dbt Core 1.11 an
 
 ## Quickstart
 
-In a Python 3.12 virtual environment, install the [verified alpha release](https://github.com/acneism/dbt-scenario/releases/tag/v0.1.0a6) and generate its example project. PostgreSQL 16 runs through Docker Compose; no repository checkout is needed.
+In a Python 3.12 virtual environment, install the [verified alpha release](https://github.com/acneism/dbt-scenario/releases/tag/v0.1.0a7) and generate its example project. PostgreSQL 16 runs through Docker Compose; no repository checkout is needed.
 
 ```sh
-python -m pip install -c https://github.com/acneism/dbt-scenario/releases/download/v0.1.0a6/constraints.txt https://github.com/acneism/dbt-scenario/releases/download/v0.1.0a6/dbt_scenario-0.1.0a6-py3-none-any.whl
+python -m pip install -c https://github.com/acneism/dbt-scenario/releases/download/v0.1.0a7/constraints.txt https://github.com/acneism/dbt-scenario/releases/download/v0.1.0a7/dbt_scenario-0.1.0a7-py3-none-any.whl
 dbt-scenario init --demo --project-dir scenario-demo
 cd scenario-demo
 ```
