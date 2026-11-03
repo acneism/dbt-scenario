@@ -8,10 +8,10 @@ This is an early alpha. It supports PostgreSQL 16, Python 3.12, dbt Core 1.11 an
 
 ## Quickstart
 
-In a Python 3.12 virtual environment, install the [verified alpha release](https://github.com/acneism/dbt-scenario/releases/tag/v0.1.0a9) and generate its example project. PostgreSQL 16 runs through Docker Compose; no repository checkout is needed.
+In a Python 3.12 virtual environment, install the [verified alpha release](https://github.com/acneism/dbt-scenario/releases/tag/v0.1.0a10) and generate its example project. PostgreSQL 16 runs through Docker Compose; no repository checkout is needed.
 
 ```sh
-python -m pip install -c https://github.com/acneism/dbt-scenario/releases/download/v0.1.0a9/constraints.txt https://github.com/acneism/dbt-scenario/releases/download/v0.1.0a9/dbt_scenario-0.1.0a9-py3-none-any.whl
+python -m pip install -c https://github.com/acneism/dbt-scenario/releases/download/v0.1.0a10/constraints.txt https://github.com/acneism/dbt-scenario/releases/download/v0.1.0a10/dbt_scenario-0.1.0a10-py3-none-any.whl
 dbt-scenario init --demo --project-dir scenario-demo
 cd scenario-demo
 dbt-scenario validate --project-dir examples/shop --scenario examples/shop/scenarios/orders.yml
@@ -45,7 +45,7 @@ From 0.1.0a10, the example also includes an empty initial load followed by data 
 dbt-scenario test --config scenario-runner.yml --scenario examples/shop/scenarios/empty-start.yml
 ```
 
-Expected row counts are 0 / 3 / 3. The demo SQL uses a PostgreSQL `-infinity` timestamp when the target watermark is NULL, so an empty first table does not filter out its first batch. This does not infer business rules for arbitrary NULL source timestamps or events delivered behind an existing watermark.
+Expected row counts are 0 / 3 / 3. The demo SQL uses a PostgreSQL `-infinity` timestamp when the target watermark is NULL, so an empty first table does not filter out its first batch. See the [regression and before/after evidence](docs/EMPTY-START.md). This does not infer business rules for arbitrary NULL source timestamps or events delivered behind an existing watermark.
 
 The prerelease includes a wheel, source archive, SHA256SUMS and Linux/Windows verification reports. It is distributed through GitHub Releases; the [release procedure](docs/RELEASING.md) explains the checks. A contributor checkout can still be installed with `python -m pip install -e '.[dev]'`.
 

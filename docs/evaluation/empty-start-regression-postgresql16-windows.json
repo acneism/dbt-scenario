@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "status": "PASS",
+  "platform": "win32",
+  "python_version": "3.12.10",
+  "synthetic_fixtures": true,
+  "before_source_commit": "dc4a791c0e6c65f01de264e929901783f7561891",
+  "after_source_commit": "1218ae71c7be3c0bd31d1dde3b11b1fae456b729",
+  "before_model_sha256": "4fb3bd33abf28d0ea18fede7b3cdab7a91154958c8b5b03c2a1b31c4f21b3497",
+  "after_model_sha256": "5af763be1a7e52e6fdc28a493c567007dbd0930dc2758c1c1e9b08596931072f",
+  "scenario_definitions_identical": true,
+  "model_sql_unchanged_during_runs": true,
+  "owned_schemas_unchanged": true,
+  "distinct_execution_invocations": 20,
+  "cases": [
+    {
+      "scenario": "empty_1800_delete_insert",
+      "year": 1800,
+      "strategy": "delete+insert",
+      "scenario_sha256": "a39dead5d8af61cdc0620bb1cfee36e1c51bf8704ff323ce1b1185d86454595f",
+      "before": {
+        "version": "0.1.0a9",
+        "status": "FAIL",
+        "actual_rows": [
+          0,
+          0,
+          null
+        ],
+        "cleanup_status": "CLEANED",
+        "missing_rows": 3
+      },
+      "after": {
+        "version": "0.1.0a10",
+        "status": "PASS",
+        "actual_rows": [
+          0,
+          3,
+          3
+        ],
+        "cleanup_status": "CLEANED"
+      }
+    },
+    {
+      "scenario": "empty_1800_merge",
+      "year": 1800,
+      "strategy": "merge",
+      "scenario_sha256": "4a694eb129066b0cdca038304e2560ed404784a127af3953f595b6af91478794",
+      "before": {
+        "version": "0.1.0a9",
+        "status": "FAIL",
+        "actual_rows": [
+          0,
+          0,
+          null
+        ],
+        "cleanup_status": "CLEANED",
+        "missing_rows": 3
+      },
+      "after": {
+        "version": "0.1.0a10",
+        "status": "PASS",
+        "actual_rows": [
+          0,
+          3,
+          3
+        ],
+        "cleanup_status": "CLEANED"
+      }
+    },
+    {
+      "scenario": "empty_2026_delete_insert",
+      "year": 2026,
+      "strategy": "delete+insert",
+      "scenario_sha256": "b26d0aeedc652c4f7707d657fff315e894dfcc08a266aae1af2215251d3d5f73",
+      "before": {
+        "version": "0.1.0a9",
+        "status": "FAIL",
+        "actual_rows": [
+          0,
+          0,
+          null
+        ],
+        "cleanup_status": "CLEANED",
+        "missing_rows": 3
+      },
+      "after": {
+        "version": "0.1.0a10",
+        "status": "PASS",
+        "actual_rows": [
+          0,
+          3,
+          3
+        ],
+        "cleanup_status": "CLEANED"
+      }
+    },
+    {
+      "scenario": "empty_2026_merge",
+      "year": 2026,
+      "strategy": "merge",
+      "scenario_sha256": "cb14466e33c89418c192ea74618f27a6806155df445e945e35f636918d9861e3",
+      "before": {
+        "version": "0.1.0a9",
+        "status": "FAIL",
+        "actual_rows": [
+          0,
+          0,
+          null
+        ],
+        "cleanup_status": "CLEANED",
+        "missing_rows": 3
+      },
+      "after": {
+        "version": "0.1.0a10",
+        "status": "PASS",
+        "actual_rows": [
+          0,
+          3,
+          3
+        ],
+        "cleanup_status": "CLEANED"
+      }
+    }
+  ]
+}

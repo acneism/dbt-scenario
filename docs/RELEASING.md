@@ -62,3 +62,15 @@ The exact [CI wheel and sdist](https://github.com/acneism/dbt-scenario/actions/r
 All seven published assets were downloaded anonymously and matched their verified copies; the tag resolved to the tested commit. `TEMPLATE_READY` establishes metadata preparation rather than SQL execution or external adoption.
 
 A separate [public-installation check](distribution/v0.1.0a9-install.json) installed directly from the public release URLs into a fresh Windows environment. The installed files matched the published wheel, pip found no dependency conflicts and no development-only packages were present. Outside the checkout, the installed CLI generated and validated the demo, diagnosed unfinished rows, and discovered a candidate from explicitly synthetic local metadata without password variables. The platform and real-catalog checks above cover discovery from actual dbt artifacts.
+
+## Empty initial table prerelease
+
+[`v0.1.0a10`](https://github.com/acneism/dbt-scenario/releases/tag/v0.1.0a10) points to commit `1218ae71c7be3c0bd31d1dde3b11b1fae456b729`. The [full CI](https://github.com/acneism/dbt-scenario/actions/runs/41698729094) passed 264 unit and 73 integration tests, the repository demo and offline acceptance. The permanent empty-start test now runs the supplied model unchanged for delete+insert and merge with modern and pre-1900 timestamps.
+
+A separate [before/after comparison](EMPTY-START.md) runs four identical YAML definitions through published 0.1.0a9 and the exact 0.1.0a10 CI wheel on Windows. Every old run fails with three missing rows; every corrected run completes 0 / 3 / 3. The [sanitized report](evaluation/empty-start-regression-postgresql16-windows.json) records matching scenario hashes, distinct model hashes, 20 separate executed dbt invocation IDs and successful cleanup in all eight runs.
+
+The exact [CI wheel and sdist](https://github.com/acneism/dbt-scenario/actions/runs/41698729029) passed installed-package verification on Linux and Windows. Both platform reports require the ordinary 2 / 3 / 3 sequence and the packaged empty-start 0 / 3 / 3 sequence, including SQL audits and cleanup. All 31 packaged files match the tagged source. The separate offline job runs both scenarios without external networking. The [external-model regressions](https://github.com/acneism/dbt-scenario/actions/runs/41698729066) passed again.
+
+All seven public assets were downloaded anonymously and matched their verified copies; the tag resolved to the tested commit. The change fixes the supplied example SQL. Source NULL timestamps, deletion semantics and events delivered behind a populated watermark still need explicit project-specific expectations.
+
+A separate [public-installation check](distribution/v0.1.0a10-install.json) installed directly from the release URLs into a fresh Windows environment. All installed package files matched the published wheel, pip found no dependency conflicts, and no development-only packages were present. The CLI generated the demo and validated the ordinary and empty-start definitions without passwords. Database execution is recorded in the two platform reports and the before/after comparison above.

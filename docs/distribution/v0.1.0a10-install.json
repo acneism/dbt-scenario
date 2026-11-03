@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "status": "PASS",
+  "package_version": "0.1.0a10",
+  "python_version": "3.12.10",
+  "platform": "win32",
+  "public_wheel_url": "https://github.com/acneism/dbt-scenario/releases/download/v0.1.0a10/dbt_scenario-0.1.0a10-py3-none-any.whl",
+  "wheel_sha256": "cf27d1a781b06a64dcab386b4c8ec4b5027fb382d5ddc69073ab8da2615880ed",
+  "fresh_virtualenv": true,
+  "installed_files_match_published_wheel": true,
+  "source_checkout_imported": false,
+  "development_packages_installed": false,
+  "generated_demo_scenario_steps": 3,
+  "empty_start_definition": {
+    "status": "PASS",
+    "first_input_rows": 0,
+    "first_expected_rows": 0,
+    "steps": 3
+  },
+  "metadata_options_available": [
+    "--model",
+    "--manifest",
+    "--catalog",
+    "--primary-key",
+    "--scenario-name"
+  ],
+  "model_discovery": {
+    "status": "PASS",
+    "without_password_env": true,
+    "execution_checked": false,
+    "source_metadata": "synthetic"
+  },
+  "static_validation": {
+    "status": "PASS",
+    "without_password_env": true,
+    "unfinished_rows_diagnostic": "PASS"
+  },
+  "pip_dependency_check": "PASS"
+}
