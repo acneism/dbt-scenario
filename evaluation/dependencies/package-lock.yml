@@ -1,0 +1,11 @@
+packages:
+  - git: https://github.com/infinitelambda/dbt-audit-helper-ext.git
+    name: audit_helper_ext
+    revision: d7c85bf54065c77bb4c7fc4923daced63796a43a
+  - name: audit_helper
+    package: dbt-labs/audit_helper
+    version: 0.14.0
+  - name: dbt_utils
+    package: dbt-labs/dbt_utils
+    version: 1.3.3
+sha1_hash: 81890df7ace6e379b3eaa397269b425c54fb43d8

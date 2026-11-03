@@ -187,6 +187,8 @@ The [recorded alpha 4 benchmark](docs/BENCHMARK.md) completed 20 valid samples a
 
 See [existing approaches and the comparison plan](docs/ALTERNATIVES.md) for the product hypothesis and alternatives that already support materialization checks.
 
+[Controlled evaluation](docs/EVALUATION.md) reproduces native-dbt checks, a manual gate and audit-helper-ext integration on synthetic cases, and measures the current runner under verified Linux resource limits. These checks do not establish a real-world bug discovery or adoption advantage.
+
 ## License
 
 [Apache License 2.0](LICENSE).

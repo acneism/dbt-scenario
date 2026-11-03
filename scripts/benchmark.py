@@ -16,6 +16,7 @@ from importlib.resources import files
 from pathlib import Path
 
 import yaml
+from resource_limits import resource_limits
 
 from dbt_scenario import __version__
 from dbt_scenario.config import load_config
@@ -166,11 +167,15 @@ def main():
     parser.add_argument("--samples", type=int, default=20)
     parser.add_argument("--rows", type=int, default=10000)
     parser.add_argument("--output", type=Path, default=Path("artifacts/benchmark/result.json"))
+    parser.add_argument("--require-limits", action="store_true")
     arguments = parser.parse_args()
     if arguments.samples < 1 or not 100 <= arguments.rows <= 20000:
         parser.error("samples must be positive; rows must be between 100 and 20000")
     if arguments.output.exists():
         parser.error("output already exists; choose a new path")
+    limits = resource_limits()
+    if arguments.require_limits and not limits["verified"]:
+        parser.error("requires cgroup v2 limits of 2 CPUs, 8 GiB memory and no extra swap")
     config = load_config(arguments.config, load_project_env=False)
     arguments.output.parent.mkdir(parents=True, exist_ok=True)
     benchmark_id = uuid.uuid4().hex
@@ -194,7 +199,8 @@ def main():
             "architecture": platform.machine(),
             "python": platform.python_version(),
             "logical_cpus": os.cpu_count(),
-            "resource_limits_enforced": False,
+            "resource_limits_enforced": limits["verified"],
+            "resource_limits": limits,
             "yaml_parser": YAML_BASE.__name__,
             "dependencies": {
                 name: version(name)
@@ -277,6 +283,12 @@ def main():
         "p95_ms": durations[math.ceil(0.95 * len(durations)) - 1],
         "min_ms": durations[0],
         "max_ms": durations[-1],
+    }
+    eligible = limits["verified"] and arguments.rows == 10000 and arguments.samples == 20
+    result["performance_target"] = {
+        "eligible": eligible,
+        "p95_limit_ms": 60000,
+        "met": result["summary"]["p95_ms"] <= 60000 if eligible else None,
     }
     save_result(arguments.output, result)
     print(json.dumps(result["summary"]), flush=True)

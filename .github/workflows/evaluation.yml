@@ -1,0 +1,45 @@
+name: Controlled evaluation
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/evaluation.yml
+      - evaluation/**
+      - scripts/benchmark.py
+      - scripts/compare_approaches.py
+      - scripts/evaluate.py
+      - scripts/local_postgres.py
+      - scripts/resource_limits.py
+permissions:
+  contents: read
+jobs:
+  evaluation:
+    name: evaluation (${{ matrix.mode }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [performance, comparison]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build installed package image
+        run: docker build -f tests/offline/Dockerfile -t dbt-scenario-evaluation-base .
+      - name: Prepare pinned comparison packages
+        run: docker build -f evaluation/Dockerfile -t dbt-scenario-evaluation .
+      - name: Run with fixed resource limits and no external network
+        env:
+          EVALUATION_COMMIT: ${{ github.sha }}
+        run: |
+          docker run --name controlled-evaluation --network none --cpus 2 --memory 8g --memory-swap 8g --cap-drop ALL --security-opt no-new-privileges --env EVALUATION_COMMIT dbt-scenario-evaluation ${{ matrix.mode }} --output /results/${{ matrix.mode }}.json
+      - name: Collect sanitized result
+        if: always()
+        run: |
+          mkdir -p artifacts/evaluation
+          docker cp controlled-evaluation:/results/${{ matrix.mode }}.json artifacts/evaluation/${{ matrix.mode }}.json || true
+          docker rm -f controlled-evaluation || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evaluation-${{ matrix.mode }}
+          path: artifacts/evaluation/${{ matrix.mode }}.json
