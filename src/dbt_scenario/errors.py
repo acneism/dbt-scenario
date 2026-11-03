@@ -30,6 +30,17 @@ FIELDS = {
 }
 
 HINTS = {
+    "INIT_OPTIONS_INVALID": "Use --demo alone, or --model with --manifest and optional --catalog.",
+    "INIT_METADATA_INVALID": "Use manifest v12 or catalog v1 JSON, at most 64 MiB each.",
+    "INIT_ADAPTER_UNSUPPORTED": "Use metadata from a PostgreSQL project.",
+    "INIT_PROJECT_MISMATCH": "Use a manifest from the selected dbt project.",
+    "INIT_MODEL_AMBIGUOUS": "Select one unversioned model using its full unique_id.",
+    "INIT_COLUMNS_MISSING": "Declare columns in model/source YAML or supply a matching --catalog.",
+    "INIT_COLUMN_TYPE_MISSING": "Declare each column's data_type or supply a matching --catalog.",
+    "INIT_CATALOG_MISMATCH": "Use manifest/catalog files from the same dbt docs invocation.",
+    "INIT_PRIMARY_KEY_REQUIRED": "Pass --primary-key for each output key column or set unique_key.",
+    "INIT_SCENARIO_NAME_INVALID": "Use a portable name starting with a letter (80 characters max).",
+    "INIT_TEMPLATE_UNSUPPORTED": "Selected metadata exceeds the supported scenario schema limits.",
     "MODEL_CONFIGURATION_CHANGED": (
         "Keep routing stable; use only supported materializations, strategies and model settings."
     ),

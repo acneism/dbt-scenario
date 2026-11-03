@@ -20,6 +20,8 @@ dbt-scenario init --project-dir ./your-dbt-project
 
 Edit the generated `scenario-runner.yml` and `scenarios/example.yml` to point at the disposable database, the selected model and its direct inputs. Replace every `replace_with_your_` placeholder. Use small synthetic rows that exercise the real rule; declare their types and expected keys explicitly. The initializer does not infer schema or copy production rows.
 
+With 0.1.0a7, the [metadata initialization mode](METADATA-INIT.md) can import the model/input identifiers and types from your existing manifest and optional paired catalog. It creates a model-specific scenario with deliberately unfinished row lists and preserves existing runner configuration. Record whether importing metadata helps; it does not supply the correct expected business results.
+
 Declare an initial input and expected target, a changed input and expected retained target, then an unchanged incremental retry using `same_as`. Input replacement describes the full input snapshot visible at that step. A retry reuses the previous input and must execute the model again.
 
 From the project directory, after exporting the database password variable named by the configuration:

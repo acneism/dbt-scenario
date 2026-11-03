@@ -14,7 +14,7 @@ from dbt_scenario.deadline import Deadline
 from dbt_scenario.environment import process_environment
 from dbt_scenario.errors import ScenarioError
 from dbt_scenario.process import run_process
-from dbt_scenario.requirements import check_dependencies, project_settings
+from dbt_scenario.requirements import check_dependencies, check_model_config, project_settings
 
 MACROS = """
 {% macro generate_schema_name(custom_schema_name, node) %}
@@ -191,15 +191,7 @@ class Project:
         node = manifest["nodes"].get(scenario["model"])
         if not node or node["package_name"] != self.settings["name"]:
             raise ScenarioError("MODEL_NOT_FOUND")
-        config = node["config"]
-        if config["materialized"] != "incremental" or config.get("full_refresh") is True:
-            raise ScenarioError("UNSUPPORTED_MATERIALIZATION")
-        if config.get("incremental_strategy") not in {None, "append", "merge", "delete+insert"}:
-            raise ScenarioError("UNSUPPORTED_INCREMENTAL_STRATEGY")
-        if any(config.get(name) for name in ["pre-hook", "post-hook", "grants", "persist_docs"]):
-            raise ScenarioError("MODEL_HOOKS_UNSUPPORTED")
-        if config.get("contract", {}).get("enforced") or config.get("language", "sql") != "sql":
-            raise ScenarioError("MODEL_CONFIG_UNSUPPORTED")
+        check_model_config(node["config"])
         reserved = {
             "ref",
             "source",

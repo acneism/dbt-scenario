@@ -5,6 +5,30 @@ from dbt_scenario.errors import ScenarioError
 from dbt_scenario.loader import read_yaml
 
 
+def check_model_config(config):
+    if not isinstance(config, dict):
+        raise ScenarioError("MODEL_CONFIG_UNSUPPORTED")
+    if config.get("materialized") != "incremental" or config.get("full_refresh") is True:
+        raise ScenarioError("UNSUPPORTED_MATERIALIZATION")
+    strategy = config.get("incremental_strategy")
+    if (strategy is not None and not isinstance(strategy, str)) or strategy not in {
+        None,
+        "append",
+        "merge",
+        "delete+insert",
+    }:
+        raise ScenarioError("UNSUPPORTED_INCREMENTAL_STRATEGY")
+    if any(config.get(name) for name in ["pre-hook", "post-hook", "grants", "persist_docs"]):
+        raise ScenarioError("MODEL_HOOKS_UNSUPPORTED")
+    contract = config.get("contract", {})
+    if (
+        not isinstance(contract, dict)
+        or contract.get("enforced")
+        or config.get("language", "sql") != "sql"
+    ):
+        raise ScenarioError("MODEL_CONFIG_UNSUPPORTED")
+
+
 def project_settings(project_dir: Path) -> dict:
     path = project_dir / "dbt_project.yml"
     if not path.is_file():

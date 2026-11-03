@@ -59,7 +59,15 @@ For an existing dbt project:
 dbt-scenario init --project-dir ./my-dbt-project
 ```
 
-This creates `scenario-runner.yml` and `scenarios/example.yml` with synthetic rows. Edit the model/source identifiers, columns, fixtures and expected results to match your project, then run `plan`. Identifiers beginning with `replace_with_your_` are placeholders; the command does not infer a real model's schema or sample production data. Your model SQL and existing configuration files are not changed.
+Version 0.1.0a7 also accepts existing [dbt metadata to fill identifiers and types](docs/METADATA-INIT.md):
+
+```sh
+dbt-scenario init --project-dir ./my-dbt-project --model fct_orders --manifest ./my-dbt-project/target/manifest.json --catalog ./my-dbt-project/target/catalog.json
+```
+
+The catalog is optional when every selected model/input has declared column types. This creates `scenarios/fct_orders.yml`, preserves existing configuration, and leaves explicit row placeholders for you to fill. Use `--scenario-name orders_late` for another case and repeated `--primary-key` arguments if the model does not declare plain-column keys. This mode does not connect to the database or infer expected business results.
+
+The manual mode creates `scenario-runner.yml` and `scenarios/example.yml` with synthetic rows. Edit the model/source identifiers, columns, fixtures and expected results to match your project, then run `plan`. Identifiers beginning with `replace_with_your_` are placeholders. Your model SQL and existing configuration files are not changed.
 
 Initialization checks destination collisions before writing and refuses to overwrite any file. If a write fails, it removes the files it created during that attempt.
 

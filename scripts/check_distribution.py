@@ -13,9 +13,13 @@ from importlib.metadata import version
 from pathlib import Path
 
 import psycopg
+import yaml
 
 import dbt_scenario
 from dbt_scenario.config import load_config
+from dbt_scenario.errors import ScenarioError
+from dbt_scenario.loader import load_scenario, read_yaml
+from dbt_scenario.project import Project
 
 
 def command(arguments, directory):
@@ -88,6 +92,58 @@ def owned_schemas(config):
         )
 
 
+def check_metadata_template(executable, project, root):
+    config = load_config(project / "scenario-runner.yml")
+    scenario_path = config.project_dir / "scenarios/orders.yml"
+    definition = read_yaml(scenario_path)
+    columns = definition["output"]["columns"]
+    declarations = [{"name": name, "data_type": kind} for name, kind in columns.items()]
+    source_path = config.project_dir / "models/sources.yml"
+    sources = read_yaml(source_path)
+    sources["sources"][0]["tables"][0]["columns"] = declarations
+    source_path.write_text(yaml.safe_dump(sources), encoding="utf-8")
+    (config.project_dir / "models/distribution_columns.yml").write_text(
+        yaml.safe_dump({"version": 2, "models": [{"name": "fct_orders", "columns": declarations}]}),
+        encoding="utf-8",
+    )
+    model = config.project_dir / "models/fct_orders.sql"
+    before = model.read_bytes()
+    parsed = Project(config, root / "metadata_parse", "dsc_distribution_metadata")
+    _, artifacts = parsed.invoke("parse", config.step_timeout)
+    command(
+        [
+            str(executable),
+            "init",
+            "--project-dir",
+            str(config.project_dir),
+            "--model",
+            "fct_orders",
+            "--manifest",
+            str(artifacts / "target/manifest.json"),
+            "--scenario-name",
+            "distribution_metadata",
+        ],
+        root,
+    )
+    path = config.project_dir / "scenarios/distribution_metadata.yml"
+    template = read_yaml(path)
+    if (
+        template["model"] != "model.shop.fct_orders"
+        or template["output"]["columns"] != columns
+        or template["inputs"]["input_1"]["node"] != "source.shop.raw.orders"
+        or model.read_bytes() != before
+    ):
+        raise RuntimeError("DISTRIBUTION_METADATA_TEMPLATE_MISMATCH")
+    try:
+        load_scenario(path, config.project_dir)
+    except ScenarioError as error:
+        if error.code != "INVALID_SCENARIO_SCHEMA":
+            raise RuntimeError("DISTRIBUTION_TEMPLATE_VALIDATION_FAILED") from None
+    else:
+        raise RuntimeError("DISTRIBUTION_TEMPLATE_MUST_REQUIRE_ROWS")
+    return {"status": "PASS", "explicit_rows_required": True, "model_sql_unchanged": True}
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--wheel", type=Path, required=True)
@@ -132,6 +188,7 @@ def main():
         result["dependency_check"] = "PASS"
         project = root / "demo"
         command([str(executable), "init", "--demo", "--project-dir", str(project)], root)
+        result["metadata_initialization"] = check_metadata_template(executable, project, root)
         generated = load_config(project / "scenario-runner.yml")
         if generated.database != config.database:
             raise RuntimeError("DEMO_DATABASE_CONFIG_MISMATCH")

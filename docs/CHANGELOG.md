@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0a7 — November 3, 2026
+
+- Initialize scenario identifiers, column types and keys from local dbt manifest/catalog metadata without database access.
+- Require explicit fixture and expected-row lists; unfinished templates cannot pass as empty scenarios.
+- Preserve existing runner configuration and support separately named cases for the same model.
+- Reject incompatible types, incomplete or mismatched metadata, unsafe output names and unsupported model configurations before writing.
+- Verify initialization against a real PostgreSQL dbt catalog, followed by explicit fixture edits and a successful materialized scenario.
+
 ## 0.1.0a6 — November 3, 2026
 
 - Publish the first GitHub prerelease with a wheel, source archive, dependency constraints, SHA-256 checksums and installed-package verification on Linux and Windows.

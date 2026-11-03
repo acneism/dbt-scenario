@@ -19,11 +19,13 @@ from dbt_scenario.cli import main
 from dbt_scenario.config import load_config
 from dbt_scenario.database import Database
 from dbt_scenario.deadline import Deadline
+from dbt_scenario.environment import process_environment
 from dbt_scenario.errors import ScenarioError
 from dbt_scenario.initialize import initialize
 from dbt_scenario.journal import Journal
 from dbt_scenario.lifecycle import cleanup_run, finish_run
 from dbt_scenario.loader import load_scenario
+from dbt_scenario.process import run_process
 from dbt_scenario.project import Project, fingerprint
 from dbt_scenario.runner import run_scenario
 
@@ -453,6 +455,103 @@ def test_initialized_demo_runs_on_real_postgresql(tmp_path):
     assert report["overall_status"] == "PASS", report
     assert report["cleanup_status"] == "CLEANED"
     assert [step["actual_rows"] for step in report["steps"]] == [2, 3, 3]
+
+
+def test_metadata_template_from_real_catalog_runs_after_explicit_fixture_edits(
+    project, tmp_path, monkeypatch
+):
+    config, original, reports = project
+    native = Database(config)
+    journal = Journal.create(config, uuid.uuid4().hex)
+    actual, inputs, _ = journal.data["schemas"]
+    try:
+        native.create_schemas(journal)
+        definition = original.data["inputs"]["orders"]
+        native.replace(
+            inputs,
+            "orders",
+            definition["columns"],
+            original.data["steps"][0]["inputs"]["orders"]["replace"]["rows"],
+        )
+        sources = config.project_dir / "models/sources.yml"
+        document = yaml.safe_load(sources.read_text())
+        document["sources"][0]["schema"] = inputs
+        sources.write_text(yaml.safe_dump(document))
+        profiles = tmp_path / "native_profiles"
+        profiles.mkdir()
+        profile = {
+            key: config.database[key] for key in ["host", "port", "dbname", "user", "sslmode"]
+        }
+        profile.update(type="postgres", schema=actual, threads=1)
+        profile["pass"] = "{{ env_var('DBT_ENV_SECRET_DSC_PASSWORD') }}"
+        (profiles / "profiles.yml").write_text(
+            yaml.safe_dump({"shop": {"target": "test", "outputs": {"test": profile}}})
+        )
+        executable = Path(sys.executable).parent / ("dbt.exe" if os.name == "nt" else "dbt")
+        artifacts = tmp_path / "docs_artifacts"
+        for command in [["run", "--select", "fct_orders"], ["docs", "generate"]]:
+            arguments = [
+                str(executable),
+                "--no-use-colors",
+                "--no-partial-parse",
+                "--log-path",
+                str(tmp_path / "native_logs"),
+                *command,
+                "--project-dir",
+                str(config.project_dir),
+                "--profiles-dir",
+                str(profiles),
+                "--target-path",
+                str(artifacts),
+            ]
+            assert (
+                run_process(
+                    arguments,
+                    process_environment({}, config.database["password"]),
+                    config.project_dir,
+                    Deadline(120, "DBT_TIMEOUT"),
+                )
+                == 0
+            )
+        model = config.project_dir / "models/fct_orders.sql"
+        before = model.read_bytes()
+        with monkeypatch.context() as patch:
+            patch.setattr("psycopg.connect", lambda *a, **kw: pytest.fail("init accessed database"))
+            result = CliRunner().invoke(
+                main,
+                [
+                    "init",
+                    "--project-dir",
+                    str(config.project_dir),
+                    "--model",
+                    "fct_orders",
+                    "--manifest",
+                    str(artifacts / "manifest.json"),
+                    "--catalog",
+                    str(artifacts / "catalog.json"),
+                ],
+            )
+        assert result.exit_code == 0, result.output
+        path = config.project_dir / "scenarios/fct_orders.yml"
+        data = yaml.safe_load(path.read_text())
+        assert data["inputs"]["input_1"]["node"] == "source.shop.raw.orders"
+        assert data["output"]["columns"] == original.data["output"]["columns"]
+        for index, fixture_name in enumerate(["initial", "updated"]):
+            rows = yaml.safe_load(
+                (config.project_dir / f"scenarios/fixtures/{fixture_name}.yml").read_text()
+            )["rows"]
+            data["steps"][index]["inputs"]["input_1"]["replace"]["rows"] = copy.deepcopy(rows)
+            data["steps"][index]["expect"]["rows"] = copy.deepcopy(rows)
+        path.write_text(yaml.safe_dump(data, sort_keys=False))
+        generated = load_config(config.project_dir / "scenario-runner.yml")
+        report = run_scenario(load_scenario(path, generated.project_dir), generated, reports)
+        assert report["overall_status"] == "PASS", report
+        assert report["cleanup_status"] == "CLEANED"
+        assert [step["actual_rows"] for step in report["steps"]] == [2, 3, 3]
+        assert model.read_bytes() == before
+    finally:
+        finish_run(native, journal)
+        native.close()
 
 
 def test_project_env_allowlist_reaches_dbt_without_forwarding_other_values(

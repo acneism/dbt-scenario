@@ -57,14 +57,38 @@ scenario_option = click.option(
 @click.option(
     "--demo", is_flag=True, help="Create a complete runnable example with synthetic data."
 )
+@click.option("--model", help="Incremental model name or unique_id from a manifest.")
+@click.option(
+    "--manifest", "manifest_path", type=click.Path(exists=True, dir_okay=False, path_type=Path)
+)
+@click.option(
+    "--catalog", "catalog_path", type=click.Path(exists=True, dir_okay=False, path_type=Path)
+)
+@click.option("--primary-key", multiple=True, help="Output key column; repeat for a compound key.")
+@click.option(
+    "--scenario-name", help="Name and filename for an additional metadata-based scenario."
+)
 @guarded
-def init(project_dir, demo):
-    created = initialize(project_dir, demo)
+def init(project_dir, demo, model, manifest_path, catalog_path, primary_key, scenario_name):
+    created = initialize(
+        project_dir,
+        demo,
+        model=model,
+        manifest_path=manifest_path,
+        catalog_path=catalog_path,
+        primary_key=primary_key,
+        scenario_name=scenario_name,
+    )
     for relative in created:
         click.echo(f"CREATED {relative}")
     if demo:
         click.echo("Demo ready. Set test passwords and start the disposable PostgreSQL database.")
         click.echo("Then run plan and test with examples/shop/scenarios/orders.yml.")
+    elif model:
+        click.echo(
+            "Template created from metadata; replace every rows placeholder with a row list."
+        )
+        click.echo("Review columns and keys, set the test database, then run plan and test.")
     else:
         click.echo(
             "Template created with synthetic data; edit model, inputs, columns and expectations."
