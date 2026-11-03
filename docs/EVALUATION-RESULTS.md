@@ -1,6 +1,6 @@
 # Recorded evaluation results
 
-No bug in an external production project has been confirmed. These are deliberately constructed, reproducible cases, not evidence that a user adopted the tool or that its assertions are uniquely possible.
+No new bug discovery in an external production project has been confirmed. The controlled comparison below uses deliberately constructed cases. A separate [historical regression replay](HISTORICAL-REGRESSION.md) exercises unchanged SQL from a previously fixed external premerge defect with synthetic PostgreSQL fixtures. Neither experiment establishes adoption or uniquely possible assertions.
 
 ## Native dbt tests
 

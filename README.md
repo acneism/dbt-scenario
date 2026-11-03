@@ -189,7 +189,9 @@ See [existing approaches and the comparison plan](docs/ALTERNATIVES.md) for the 
 
 [Controlled evaluation](docs/EVALUATION.md) reproduces native-dbt checks, a manual gate and audit-helper-ext integration on synthetic cases, and measures the current runner under verified Linux resource limits. These checks do not establish a real-world bug discovery or adoption advantage.
 
-The [recorded comparison](docs/EVALUATION-RESULTS.md) includes a built-in unit test that passes despite duplicate append materialization; a native unique test after the retry catches those duplicates too. No external-project bug discovery has been confirmed.
+The [recorded comparison](docs/EVALUATION-RESULTS.md) includes a built-in unit test that passes despite duplicate append materialization; a native unique test after the retry catches those duplicates too. No new external-project bug discovery has been confirmed.
+
+A separate [historical regression replay](docs/HISTORICAL-REGRESSION.md) uses unchanged model SQL from two public MIT Open Learning commits with synthetic PostgreSQL fixtures. It checks recovery after an empty first build and compares native key and unit tests. This is a previously identified premerge defect, not an external pilot or validation of the original warehouse.
 
 ## License
 

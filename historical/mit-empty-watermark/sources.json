@@ -1,0 +1,24 @@
+{
+  "repository": "mitodl/ol-data-platform",
+  "pull_request": 3187,
+  "before": "b1f9a72f290907c31d5a684065a4e6d8a9ddcb14",
+  "after": "bca689e4a6570579b506e276ef31935b7b6e3704",
+  "files": {
+    "before.sql": {
+      "url": "https://raw.githubusercontent.com/mitodl/ol-data-platform/b1f9a72f290907c31d5a684065a4e6d8a9ddcb14/src/ol_dbt/models/intermediate/edxorg/int__edxorg__mitx_user_activity.sql",
+      "sha256": "4418a288d8e43dbdc0280061d239eb1a3cf9fba46a296453d5ad9a5d18a11c8a"
+    },
+    "after.sql": {
+      "url": "https://raw.githubusercontent.com/mitodl/ol-data-platform/bca689e4a6570579b506e276ef31935b7b6e3704/src/ol_dbt/models/intermediate/edxorg/int__edxorg__mitx_user_activity.sql",
+      "sha256": "6b847d8fc3c373dcd6d8a3530bca674ff205108a1d2751f37b616a9057fc8dfb"
+    },
+    "macros.sql": {
+      "url": "https://raw.githubusercontent.com/mitodl/ol-data-platform/bca689e4a6570579b506e276ef31935b7b6e3704/src/ol_dbt/macros/extract_course_id.sql",
+      "sha256": "fe075d26b5cd1d993be155beed110d5b8d93fb423bb64a7eaf7b8ff555d0a875"
+    },
+    "LICENSE": {
+      "url": "https://raw.githubusercontent.com/mitodl/ol-data-platform/bca689e4a6570579b506e276ef31935b7b6e3704/LICENSE",
+      "sha256": "666627f000933664afa86b3796db7d702bb2e912cc9ebec99ab103b466e0fe4e"
+    }
+  }
+}

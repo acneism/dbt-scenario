@@ -1,0 +1,84 @@
+version: 1
+name: empty_target_recovery
+model: model.historical.int__edxorg__mitx_user_activity
+inputs:
+  activity:
+    node: model.historical.stg__edxorg__s3__tracking_logs__user_activity
+    columns:
+      user_username: text
+      user_id: bigint
+      useractivity_path: text
+      useractivity_context_object: text
+      useractivity_event_source: text
+      useractivity_event_type: text
+      useractivity_event_object: text
+      useractivity_event_name: text
+      useractivity_page_url: text
+      useractivity_timestamp: text
+      courserun_readable_id: text
+output:
+  columns:
+    user_username: text
+    user_id: bigint
+    useractivity_path: text
+    useractivity_context_object: text
+    useractivity_event_source: text
+    useractivity_event_type: text
+    useractivity_event_object: text
+    useractivity_event_name: text
+    useractivity_page_url: text
+    useractivity_timestamp: text
+    courserun_readable_id: text
+  primary_key:
+    - user_username
+    - useractivity_context_object
+    - useractivity_event_source
+    - useractivity_event_type
+    - useractivity_event_object
+    - useractivity_timestamp
+steps:
+  - name: empty_initial_build
+    inputs:
+      activity:
+        replace:
+          rows: []
+    run:
+      mode: initial
+    expect:
+      rows: []
+  - name: first_course_activity
+    inputs:
+      activity:
+        replace:
+          rows:
+            - user_username: synthetic_student
+              user_id: 1
+              useractivity_path: /courses/course-v1:Example+Demo+2026/course/
+              useractivity_context_object: '{}'
+              useractivity_event_source: browser
+              useractivity_event_type: play_video
+              useractivity_event_object: '{}'
+              useractivity_event_name: play_video
+              useractivity_page_url: https://example.invalid/course
+              useractivity_timestamp: '2026-01-02T12:00:00Z'
+              courserun_readable_id: course-v1:Example+Demo+2026
+    run:
+      mode: incremental
+    expect:
+      rows:
+        - user_username: synthetic_student
+          user_id: 1
+          useractivity_path: /courses/course-v1:Example+Demo+2026/course/
+          useractivity_context_object: '{}'
+          useractivity_event_source: browser
+          useractivity_event_type: play_video
+          useractivity_event_object: '{}'
+          useractivity_event_name: play_video
+          useractivity_page_url: https://example.invalid/course
+          useractivity_timestamp: '2026-01-02T12:00:00Z'
+          courserun_readable_id: Example/Demo/2026
+  - name: retry_without_changes
+    run:
+      mode: incremental
+    expect:
+      same_as: first_course_activity
