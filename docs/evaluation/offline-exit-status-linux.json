@@ -1,0 +1,201 @@
+{
+  "status": "PASS",
+  "date": "2026-11-04",
+  "baseline_commit": "ff116a681f380428eddf71a07c3f222892247134",
+  "fix_commit": "5b9eeadf7f0a692a419b31091adacb0845bb51ed",
+  "proof_commit": "0b53411aecc6527ad2417b9629241d764453a97a",
+  "proof_run": "https://github.com/acneism/dbt-scenario/actions/runs/41814355322",
+  "proof_job": "https://github.com/acneism/dbt-scenario/actions/runs/41814355322/job/126521230515",
+  "proof_artifact": {
+    "id": 13313088951,
+    "zip_sha256": "ce9ded68a1be9cc56a396c0d56a264794a5e48273b7509a7379b9e99cdb98bc6",
+    "zip_digest_verified_after_download": true
+  },
+  "shell_experiment": {
+    "status": "PASS",
+    "before": {
+      "status": "PASS",
+      "date": "2026-11-04",
+      "phase": "before",
+      "scope": "Exact offline workflow run body with synthetic docker and failing tee shell functions; no container or database executed",
+      "bash_version": "GNU bash, version 5.2.21(1)-release (x86_64-pc-linux-gnu)",
+      "workflow_shell": null,
+      "shell_flags": [
+        "-e"
+      ],
+      "run_body_sha256": "d37a88a1ab99de2c6a53b43cf719c02901a4cc6bd6766d8ac7ef7cc3edb59524",
+      "cases": [
+        {
+          "case": "success",
+          "producer_exit": 0,
+          "expected_exit": 0,
+          "observed_exit": 0,
+          "failure_masked": false,
+          "result_file_exists": true,
+          "result_file_bytes": 18
+        },
+        {
+          "case": "acceptance_failure",
+          "producer_exit": 2,
+          "expected_exit": 2,
+          "observed_exit": 0,
+          "failure_masked": true,
+          "result_file_exists": true,
+          "result_file_bytes": 0
+        },
+        {
+          "case": "docker_failure",
+          "producer_exit": 125,
+          "expected_exit": 125,
+          "observed_exit": 0,
+          "failure_masked": true,
+          "result_file_exists": true,
+          "result_file_bytes": 0
+        },
+        {
+          "case": "failure_after_pass_output",
+          "producer_exit": 17,
+          "expected_exit": 17,
+          "observed_exit": 0,
+          "failure_masked": true,
+          "result_file_exists": true,
+          "result_file_bytes": 18
+        },
+        {
+          "case": "terminated_producer",
+          "producer_exit": 137,
+          "expected_exit": 137,
+          "observed_exit": 0,
+          "failure_masked": true,
+          "result_file_exists": true,
+          "result_file_bytes": 0
+        },
+        {
+          "case": "artifact_write_failure",
+          "producer_exit": 0,
+          "expected_exit": 73,
+          "observed_exit": 73,
+          "failure_masked": false,
+          "result_file_exists": false,
+          "result_file_bytes": null
+        }
+      ],
+      "masked_failures": 4
+    },
+    "after": {
+      "status": "PASS",
+      "date": "2026-11-04",
+      "phase": "after",
+      "scope": "Exact offline workflow run body with synthetic docker and failing tee shell functions; no container or database executed",
+      "bash_version": "GNU bash, version 5.2.21(1)-release (x86_64-pc-linux-gnu)",
+      "workflow_shell": "bash",
+      "shell_flags": [
+        "--noprofile",
+        "--norc",
+        "-eo",
+        "pipefail"
+      ],
+      "run_body_sha256": "d37a88a1ab99de2c6a53b43cf719c02901a4cc6bd6766d8ac7ef7cc3edb59524",
+      "cases": [
+        {
+          "case": "success",
+          "producer_exit": 0,
+          "expected_exit": 0,
+          "observed_exit": 0,
+          "failure_masked": false,
+          "result_file_exists": true,
+          "result_file_bytes": 18
+        },
+        {
+          "case": "acceptance_failure",
+          "producer_exit": 2,
+          "expected_exit": 2,
+          "observed_exit": 2,
+          "failure_masked": false,
+          "result_file_exists": true,
+          "result_file_bytes": 0
+        },
+        {
+          "case": "docker_failure",
+          "producer_exit": 125,
+          "expected_exit": 125,
+          "observed_exit": 125,
+          "failure_masked": false,
+          "result_file_exists": true,
+          "result_file_bytes": 0
+        },
+        {
+          "case": "failure_after_pass_output",
+          "producer_exit": 17,
+          "expected_exit": 17,
+          "observed_exit": 17,
+          "failure_masked": false,
+          "result_file_exists": true,
+          "result_file_bytes": 18
+        },
+        {
+          "case": "terminated_producer",
+          "producer_exit": 137,
+          "expected_exit": 137,
+          "observed_exit": 137,
+          "failure_masked": false,
+          "result_file_exists": true,
+          "result_file_bytes": 0
+        },
+        {
+          "case": "artifact_write_failure",
+          "producer_exit": 0,
+          "expected_exit": 73,
+          "observed_exit": 73,
+          "failure_masked": false,
+          "result_file_exists": false,
+          "result_file_bytes": null
+        }
+      ],
+      "masked_failures": 0
+    }
+  },
+  "real_offline_job": {
+    "url": "https://github.com/acneism/dbt-scenario/actions/runs/41814169186/job/126520596838",
+    "observed_shell": "/usr/bin/bash --noprofile --norc -e -o pipefail {0}",
+    "result": {
+      "status": "PASS",
+      "package_version": "0.1.0a10",
+      "postgresql": 160015,
+      "network": {
+        "interfaces": [
+          "lo"
+        ],
+        "external_connections_blocked": {
+          "ipv4": true,
+          "ipv6": true
+        }
+      },
+      "static_validation": {
+        "status": "PASS",
+        "ran_before_postgres_start": true,
+        "without_password_env": true
+      },
+      "steps": [
+        "PASS",
+        "PASS",
+        "PASS"
+      ],
+      "actual_rows": [
+        2,
+        3,
+        3
+      ],
+      "cleanup_status": "CLEANED",
+      "empty_start_demo": {
+        "status": "PASS",
+        "actual_rows": [
+          0,
+          3,
+          3
+        ],
+        "cleanup_status": "CLEANED"
+      }
+    }
+  }
+}
