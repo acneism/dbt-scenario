@@ -1,0 +1,36 @@
+{
+  "status": "PASS",
+  "date": "2026-11-04",
+  "scope": "Synthetic demo with a real dbt-generated manifest and a custom generate_schema_name macro; no model execution",
+  "baseline": {
+    "package_version": "0.1.0a10",
+    "wheel_sha256": "cf27d1a781b06a64dcab386b4c8ec4b5027fb382d5ddc69073ab8da2615880ed",
+    "discovery_status": "TEMPLATE_READY",
+    "initialization": "CREATED",
+    "after_filling_rows_plan": "CUSTOM_MACRO_UNSUPPORTED"
+  },
+  "updated": {
+    "build": "unreleased working tree",
+    "discovery_exit": 0,
+    "discovery": {
+      "model": "model.shop.fct_orders",
+      "status": "BLOCKED",
+      "reason_code": "CUSTOM_MACRO_UNSUPPORTED",
+      "diagnostic": {
+        "code": "CUSTOM_MACRO_UNSUPPORTED",
+        "hint": "Choose a project without custom routing, incremental-strategy or materialization macros."
+      }
+    },
+    "initialization_exit": 2,
+    "initialization_reason": "CUSTOM_MACRO_UNSUPPORTED",
+    "database_calls": 0,
+    "subprocess_calls": 0,
+    "password_environment_present": false,
+    "project_files_unchanged": true
+  },
+  "manifest_sha256": "02244c582a8c4114538ece17d552d5eff8d0b3f67afb1f3d46b7261ecf3c346b",
+  "baseline_dbt_invocations": [
+    "7322e0ed-c0d2-4ba7-8417-dac6a7bcd3e6",
+    "7bdd66fc-d171-4abc-a5ce-4cacdfa184b5"
+  ]
+}

@@ -14,7 +14,12 @@ from dbt_scenario.deadline import Deadline
 from dbt_scenario.environment import process_environment
 from dbt_scenario.errors import ScenarioError
 from dbt_scenario.process import run_process
-from dbt_scenario.requirements import check_dependencies, check_model_config, project_settings
+from dbt_scenario.requirements import (
+    check_dependencies,
+    check_model_config,
+    check_project_macros,
+    project_settings,
+)
 
 MACROS = """
 {% macro generate_schema_name(custom_schema_name, node) %}
@@ -192,22 +197,7 @@ class Project:
         if not node or node["package_name"] != self.settings["name"]:
             raise ScenarioError("MODEL_NOT_FOUND")
         check_model_config(node["config"])
-        reserved = {
-            "ref",
-            "source",
-            "is_incremental",
-            "generate_schema_name",
-            "generate_database_name",
-            "generate_alias_name",
-            "dsc_input",
-        }
-        for macro in manifest["macros"].values():
-            if macro["package_name"] in {"dbt", "dbt_postgres"}:
-                continue
-            if macro["name"] in reserved or any(
-                text in macro["name"] for text in ["get_incremental_", "materialization_"]
-            ):
-                raise ScenarioError("CUSTOM_MACRO_UNSUPPORTED")
+        check_project_macros(manifest.get("macros"))
         inputs = {definition["node"] for definition in scenario["inputs"].values()}
         if set(node["depends_on"]["nodes"]) != inputs:
             raise ScenarioError("INPUT_DEPENDENCIES_MISMATCH")

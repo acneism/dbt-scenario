@@ -9,7 +9,7 @@ from jsonschema import Draft202012Validator
 
 from dbt_scenario.errors import ScenarioError
 from dbt_scenario.loader import sql_type
-from dbt_scenario.requirements import check_model_config
+from dbt_scenario.requirements import check_model_config, check_project_macros
 
 
 def unique_pairs(pairs):
@@ -158,6 +158,7 @@ def scaffold_from_metadata(settings, selector, manifest, catalog=None, primary_k
     ):
         raise ScenarioError("DIRECT_BUILTIN_OR_VERSIONED_REF_UNSUPPORTED")
     check_model_config(model.get("config"))
+    check_project_macros(manifest.get("macros", {}))
     depends_on = model.get("depends_on")
     dependencies = depends_on.get("nodes") if isinstance(depends_on, dict) else None
     if (

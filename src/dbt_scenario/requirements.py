@@ -5,6 +5,32 @@ from dbt_scenario.errors import ScenarioError
 from dbt_scenario.loader import read_yaml
 
 
+def check_project_macros(macros):
+    if not isinstance(macros, dict):
+        raise ScenarioError("DBT_ARTIFACT_INVALID")
+    reserved = {
+        "ref",
+        "source",
+        "is_incremental",
+        "generate_schema_name",
+        "generate_database_name",
+        "generate_alias_name",
+        "dsc_input",
+    }
+    for macro in macros.values():
+        if not isinstance(macro, dict) or any(
+            not isinstance(macro.get(field), str) or not macro[field]
+            for field in ["package_name", "name"]
+        ):
+            raise ScenarioError("DBT_ARTIFACT_INVALID")
+        if macro["package_name"] in {"dbt", "dbt_postgres"}:
+            continue
+        if macro["name"] in reserved or any(
+            text in macro["name"] for text in ["get_incremental_", "materialization_"]
+        ):
+            raise ScenarioError("CUSTOM_MACRO_UNSUPPORTED")
+
+
 def check_model_config(config):
     if not isinstance(config, dict):
         raise ScenarioError("MODEL_CONFIG_UNSUPPORTED")

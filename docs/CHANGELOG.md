@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Report known custom routing, incremental-strategy and materialization macro blockers during metadata discovery and initialization, before fixture authoring or file writes.
+- Share macro eligibility checks with execution preflight and provide an actionable `CUSTOM_MACRO_UNSUPPORTED` hint.
+- Cover project/package overrides, supported business and built-in macros, malformed entries and a real dbt-generated manifest with no database access during metadata checks.
 - Propagate offline Docker and acceptance failures through the CI artifact-capture pipeline by explicitly selecting Bash with `pipefail`.
 
 ## 0.1.0a10 — November 3, 2026

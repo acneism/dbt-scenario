@@ -30,6 +30,9 @@ FIELDS = {
 }
 
 HINTS = {
+    "CUSTOM_MACRO_UNSUPPORTED": (
+        "Choose a project without custom routing, incremental-strategy or materialization macros."
+    ),
     "UNSUPPORTED_MATERIALIZATION": "Choose an incremental model without forced full refresh.",
     "UNSUPPORTED_INCREMENTAL_STRATEGY": "Choose append, delete+insert or merge on PostgreSQL 16.",
     "MODEL_HOOKS_UNSUPPORTED": "Choose a model without hooks, grants or persisted documentation.",

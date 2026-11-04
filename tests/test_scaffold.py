@@ -10,6 +10,7 @@ from dbt_scenario.discovery import discover_models
 from dbt_scenario.errors import ScenarioError
 from dbt_scenario.initialize import initialize
 from dbt_scenario.loader import load_scenario, read_yaml
+from dbt_scenario.project import Project
 
 
 @pytest.fixture
@@ -179,6 +180,93 @@ def test_discovery_can_use_catalog_types_when_declarations_are_absent(artifacts,
     assert entry["status"] == ("TEMPLATE_READY" if with_catalog else "NEEDS_COLUMN_TYPES")
     if with_catalog:
         generate(artifacts, with_catalog=True)
+
+
+@pytest.mark.parametrize("package", ["analytics", "dependency_package"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "ref",
+        "source",
+        "is_incremental",
+        "generate_schema_name",
+        "generate_database_name",
+        "generate_alias_name",
+        "dsc_input",
+        "get_incremental_custom_sql",
+        "materialization_incremental_custom",
+    ],
+)
+def test_custom_macro_refusal_matches_execution_before_rows_or_writes(
+    artifacts, monkeypatch, name, package
+):
+    root, manifest, _ = artifacts
+    manifest["macros"] = {
+        "macro.synthetic.private@example.invalid": {
+            "name": name,
+            "package_name": package,
+            "macro_sql": "synthetic.private@example.invalid",
+        }
+    }
+    monkeypatch.delenv("DSC_TEST_PASSWORD", raising=False)
+    monkeypatch.setattr("psycopg.connect", lambda *a, **kw: pytest.fail("database accessed"))
+    monkeypatch.setattr("subprocess.Popen", lambda *a, **kw: pytest.fail("subprocess started"))
+    result = discover(artifacts)
+    assert result.exit_code == 0, result.output
+    entry = json.loads(result.output)["models"][0]
+    assert entry["status"] == "BLOCKED"
+    assert entry["reason_code"] == "CUSTOM_MACRO_UNSUPPORTED"
+    assert entry["diagnostic"]["hint"]
+    assert "synthetic.private@example.invalid" not in result.output
+    with pytest.raises(ScenarioError, match="CUSTOM_MACRO_UNSUPPORTED"):
+        generate(artifacts)
+    assert not (root / "scenario-runner.yml").exists()
+    assert not (root / "scenarios").exists()
+    project = Project.__new__(Project)
+    project.settings = {"name": "analytics"}
+    project.invoke = lambda *args: (manifest, None)
+    with pytest.raises(ScenarioError, match="CUSTOM_MACRO_UNSUPPORTED"):
+        project.inspect({"model": "model.analytics.fct_orders", "steps": [{"run": {}}]}, 120)
+
+
+@pytest.mark.parametrize(
+    "package,name",
+    [
+        ("analytics", "calculate_amount"),
+        ("dependency_package", "format_currency"),
+        ("dbt", "generate_schema_name"),
+        ("dbt_postgres", "get_incremental_merge_sql"),
+    ],
+)
+def test_ordinary_business_and_builtin_macros_remain_template_ready(artifacts, package, name):
+    _, manifest, _ = artifacts
+    manifest["macros"] = {"macro.example": {"name": name, "package_name": package}}
+    result = discover(artifacts, with_catalog=True)
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["models"][0]["status"] == "TEMPLATE_READY"
+    generate(artifacts, with_catalog=True)
+
+
+@pytest.mark.parametrize(
+    "macros",
+    [
+        None,
+        [],
+        {"macro.invalid": None},
+        {"macro.invalid": {}},
+        {"macro.invalid": {"package_name": "analytics", "name": []}},
+        {"macro.invalid": {"package_name": "", "name": "generate_schema_name"}},
+    ],
+)
+def test_unusable_macro_entries_fail_without_writing_templates(artifacts, macros):
+    root, manifest, _ = artifacts
+    manifest["macros"] = macros
+    result = discover(artifacts)
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["models"][0]["reason_code"] == "DBT_ARTIFACT_INVALID"
+    with pytest.raises(ScenarioError, match="DBT_ARTIFACT_INVALID"):
+        generate(artifacts)
+    assert not (root / "scenario-runner.yml").exists()
 
 
 @pytest.mark.parametrize(

@@ -16,7 +16,7 @@ from click.testing import CliRunner
 from psycopg import sql
 
 from dbt_scenario.cli import main
-from dbt_scenario.config import load_config
+from dbt_scenario.config import Config, load_config
 from dbt_scenario.database import Database
 from dbt_scenario.deadline import Deadline
 from dbt_scenario.environment import process_environment
@@ -455,6 +455,73 @@ def test_initialized_demo_runs_on_real_postgresql(tmp_path):
     assert report["overall_status"] == "PASS", report
     assert report["cleanup_status"] == "CLEANED"
     assert [step["actual_rows"] for step in report["steps"]] == [2, 3, 3]
+
+
+def test_real_manifest_refuses_custom_macros_before_template_writes(tmp_path, monkeypatch):
+    root = tmp_path / "analytics"
+    (root / "models").mkdir(parents=True)
+    (root / "macros").mkdir()
+    (root / "dbt_project.yml").write_text("name: analytics\nconfig-version: 2\n")
+    (root / "models/fct_orders.sql").write_text(
+        "{{ config(materialized='incremental', unique_key='order_id') }}\n"
+        "select order_id from {{ source('raw', 'orders') }}\n"
+    )
+    columns = [{"name": "order_id", "data_type": "bigint"}]
+    (root / "models/schema.yml").write_text(
+        yaml.safe_dump(
+            {
+                "version": 2,
+                "models": [{"name": "fct_orders", "columns": columns}],
+                "sources": [
+                    {
+                        "name": "raw",
+                        "tables": [{"name": "orders", "columns": copy.deepcopy(columns)}],
+                    }
+                ],
+            }
+        )
+    )
+    (root / "macros/schema.sql").write_text(
+        "{% macro generate_schema_name(custom_schema_name, node) %}"
+        "{{ target.schema }}{% endmacro %}"
+    )
+    config = Config(
+        root,
+        {
+            "host": "127.0.0.1",
+            "port": 1,
+            "dbname": "offline_metadata_test",
+            "user": "offline_metadata_test",
+            "password": "unused-synthetic-password",
+            "sslmode": "disable",
+        },
+    )
+    _, artifacts = Project(config, tmp_path / "parse", "dsc_metadata_probe").invoke("parse", 120)
+    before = {
+        path.relative_to(root): path.read_bytes() for path in root.rglob("*") if path.is_file()
+    }
+    with monkeypatch.context() as patch:
+        patch.delenv("DSC_TEST_PASSWORD", raising=False)
+        patch.delenv("DBT_ENV_SECRET_DSC_PASSWORD", raising=False)
+        patch.setattr("psycopg.connect", lambda *a, **kw: pytest.fail("database accessed"))
+        patch.setattr("subprocess.Popen", lambda *a, **kw: pytest.fail("subprocess started"))
+        arguments = [
+            "--project-dir",
+            str(root),
+            "--manifest",
+            str(artifacts / "target/manifest.json"),
+        ]
+        discovered = CliRunner().invoke(main, ["discover", *arguments])
+        assert discovered.exit_code == 0, discovered.output
+        entry = json.loads(discovered.output)["models"][0]
+        assert entry["status"] == "BLOCKED"
+        assert entry["reason_code"] == "CUSTOM_MACRO_UNSUPPORTED"
+        initialized = CliRunner().invoke(main, ["init", *arguments, "--model", "fct_orders"])
+        assert initialized.exit_code == 2, initialized.output
+        assert "CUSTOM_MACRO_UNSUPPORTED" in initialized.output
+    assert {
+        path.relative_to(root): path.read_bytes() for path in root.rglob("*") if path.is_file()
+    } == before
 
 
 def test_metadata_template_from_real_catalog_runs_after_explicit_fixture_edits(

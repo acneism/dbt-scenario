@@ -32,6 +32,8 @@ This selects the scenario's output key and does not edit the model's materializa
 
 The initializer writes `scenarios/fct_orders.yml`. If `scenario-runner.yml` is absent, it also writes a default disposable-test configuration with `project_dir: .`; edit its connection settings for your test database. An existing configuration is preserved byte for byte. Existing scenario files are never overwritten, and newly created files are rolled back if writing fails.
 
+Development `main` (unreleased) refuses known unsupported project/package routing and materialization macros from the manifest before writing a template. `CUSTOM_MACRO_UNSUPPORTED` uses the same rule and diagnostic as `plan`; see [the discovery checks and regression evidence](DISCOVERY.md). This avoids filling rows for a project already known to be incompatible from its metadata. The initializer still does not compile SQL or evaluate macro bodies.
+
 Every initial and incremental input, and both expected outputs, contain a `replace_with_..._rows` placeholder. Replace each with a YAML list of rows using the declared columns. The template intentionally fails scenario validation until these lists are supplied. It does not guess expected business results from the SQL or record actual query output as an oracle.
 
 Use complete input snapshots for each replacement and the complete retained target as each expectation. The retry reuses the incremental input and asserts the previous successful output through `same_as`. Required project vars and environment forwarding remain your responsibility. Review metadata-derived columns and keys, then run the usual `plan` and `test` commands.
