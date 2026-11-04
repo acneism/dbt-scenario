@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Propagate offline Docker and acceptance failures through the CI artifact-capture pipeline by explicitly selecting Bash with `pipefail`.
+
 ## 0.1.0a10 — November 3, 2026
 
 - Fix the example and packaged demo SQL dropping the first incoming batch after an empty initial table: use PostgreSQL timestamp `-infinity` for a NULL watermark.

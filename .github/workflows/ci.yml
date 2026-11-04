@@ -16,6 +16,7 @@ jobs:
       - name: Prepare installed package and local PostgreSQL
         run: docker build -f tests/offline/Dockerfile -t dbt-scenario-offline .
       - name: Run demo without external networking
+        shell: bash
         run: |
           mkdir -p artifacts/offline
           docker run --rm --network none --cap-drop ALL --security-opt no-new-privileges dbt-scenario-offline | tee artifacts/offline/result.json
