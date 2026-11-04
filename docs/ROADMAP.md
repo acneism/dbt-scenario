@@ -45,6 +45,8 @@ Implemented in alpha 7–9:
 - Read-only discovery of incremental model candidates and their first metadata/template blocker.
 - Installed-package checks and public installation reports for released artifacts.
 
+Alpha 10 fixes the packaged empty-start example. Alpha 11 adds finite double precision fixtures and [checks an unchanged public PostgreSQL demonstration model](AQW-COMPATIBILITY.md), including a composite key and three double columns. It also moves known macro refusals earlier and validates CLI selection paths. This is compatibility evidence for one selected model; setup effort and continued use by an external team are still unmeasured.
+
 The remaining work is:
 
 - Broader SQL compatibility guided by real projects, while keeping the trusted-code/disposable-database boundary explicit.

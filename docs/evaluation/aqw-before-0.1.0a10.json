@@ -1,0 +1,53 @@
+{
+  "status": "PASS",
+  "date": "2026-11-04",
+  "repository": "aosman101/london-air-quality-weather-lakehouse",
+  "upstream_commit": "487d5877a0a75737163129d831c3bbbd9ec922ed",
+  "license": "MIT",
+  "package_version": "0.1.0a10",
+  "discovery": {
+    "model": "model.aqw.fct_air_quality_hourly",
+    "status": "BLOCKED",
+    "reason_code": "UNSUPPORTED_COLUMN_TYPE",
+    "diagnostic": {
+      "code": "UNSUPPORTED_COLUMN_TYPE",
+      "hint": "Use a supported PostgreSQL scalar type or numeric(p,s).",
+      "location": "$.inputs[0].columns[*]"
+    }
+  },
+  "initialization_reason": "UNSUPPORTED_COLUMN_TYPE",
+  "database_endpoint_used_for_parse": "non-listening localhost port 1",
+  "model_executed": false,
+  "source_files": [
+    {
+      "path": "LICENSE",
+      "sha256": "d541000af81a9930218f7ef3e686ce302fd479e58cc89c5909ee8d654d4611e3",
+      "git_blob_sha": "955e159a28d700f1d33a10c20c33a0610d2c59e4"
+    },
+    {
+      "path": "dbt/aqw/dbt_project.yml",
+      "sha256": "f3f21ba10cceac563f3b02b0da1b821db810fafe9f65bc0efe47d48594669bfb",
+      "git_blob_sha": "2540d94a166187cff7475cc7f64c26932a53ef15"
+    },
+    {
+      "path": "dbt/aqw/models/marts/fct_air_quality_hourly.sql",
+      "sha256": "3402d05cb2ecb2c34f55a8f7eec2c606fb2b6bf98f6b9ceef4773f42abad412b",
+      "git_blob_sha": "48387f37d1ef807dc2c9fc634e1e60c97a41d29a"
+    },
+    {
+      "path": "dbt/aqw/models/staging/stg_air_quality_hourly.sql",
+      "sha256": "e692f422762262ef41b4ba3843818346219907345a0c76bd0e7ae47fe9e6cd66",
+      "git_blob_sha": "217fd5e14726b7db3e227ac3f89e60f45d25b828"
+    },
+    {
+      "path": "docker/initdb/01_warehouse.sql",
+      "sha256": "fd50669ee350b13ce76020a37ea70b47b6b7a0f077cd19c21ed638f24f16cfc0",
+      "git_blob_sha": "6919e385fcde252ad5bdf33702d19e900564c05a"
+    }
+  ],
+  "manifest_sha256": "20b99891c0731f93b6dc8fadaeffc194c95198a7966aae2ae86c97c6cc833e35",
+  "manifest_invocation_id": "8f0bade5-ea4d-4eac-9ff3-ce4fc68640a2",
+  "added_files": [
+    "models/scenario_columns.yml"
+  ]
+}

@@ -8,10 +8,10 @@ This is an early alpha. It supports PostgreSQL 16, Python 3.12, dbt Core 1.11 an
 
 ## Quickstart
 
-In a Python 3.12 virtual environment, install the [verified alpha release](https://github.com/acneism/dbt-scenario/releases/tag/v0.1.0a10) and generate its example project. PostgreSQL 16 runs through Docker Compose; no repository checkout is needed.
+In a Python 3.12 virtual environment, install the [verified alpha release](https://github.com/acneism/dbt-scenario/releases/tag/v0.1.0a11) and generate its example project. PostgreSQL 16 runs through Docker Compose; no repository checkout is needed.
 
 ```sh
-python -m pip install -c https://github.com/acneism/dbt-scenario/releases/download/v0.1.0a10/constraints.txt https://github.com/acneism/dbt-scenario/releases/download/v0.1.0a10/dbt_scenario-0.1.0a10-py3-none-any.whl
+python -m pip install -c https://github.com/acneism/dbt-scenario/releases/download/v0.1.0a11/constraints.txt https://github.com/acneism/dbt-scenario/releases/download/v0.1.0a11/dbt_scenario-0.1.0a11-py3-none-any.whl
 dbt-scenario init --demo --project-dir scenario-demo
 cd scenario-demo
 dbt-scenario validate --project-dir examples/shop --scenario examples/shop/scenarios/orders.yml
@@ -157,9 +157,11 @@ steps:
 
 All direct `source()` and `ref()` dependencies need explicit fixtures. A fixture file is a YAML object containing `rows`. Paths are relative to the scenario file and must stay inside the project. Decimals are strings, timestamps are explicit strings, and NULL is YAML `null`. The first step initializes every input. Later steps retain inputs they do not replace. Each step may supply its own `run.vars` object.
 
-Supported types are `integer`, `bigint`, `text`, `boolean`, `date`, `timestamp`, `timestamptz` and `numeric(p,s)`. Development `main` also supports `double precision`, with `float8` metadata normalized to that native type. Output keys must be unique and non-null; row ordering does not matter. Comparisons run in PostgreSQL.
+Supported types are `integer`, `bigint`, `text`, `boolean`, `date`, `timestamp`, `timestamptz` and `numeric(p,s)`. From 0.1.0a11, it also supports `double precision`, with `float8` metadata normalized to that native type. Output keys must be unique and non-null; row ordering does not matter. Comparisons run in PostgreSQL.
 
 For `double precision`, use quoted finite decimal strings such as `'0.1'`. They convert to binary64 values and use exact PostgreSQL equality without a tolerance; adjacent representable values are different. NaN, Infinity, overflow and nonzero values that round to zero are rejected. Use `numeric(p,s)` for exact decimal expectations. See [double precision fixtures](docs/DOUBLE-PRECISION.md).
+
+An [external PostgreSQL model check](docs/AQW-COMPATIBILITY.md) exercises unchanged MIT-licensed fact SQL with synthetic staging fixtures: newer-data and empty-start scenarios pass, while a same-timestamp late-sensor case reports the expected missing row. The check runs on PostgreSQL 16 and does not establish original-pipeline delivery guarantees or external-user adoption.
 
 Numeric precision is supported from 1 to 99, with scale between 0 and precision. Decimal fixtures are validated independently of Python's global Decimal context. Values that require rounding are rejected. Timestamp fractions are limited to six digits; finer values are rejected instead of silently truncated. Text comparisons distinguish case, accents and Unicode normalization forms, including when a model uses a nondeterministic collation.
 
@@ -173,7 +175,7 @@ Exit codes are `0` for PASS, `1` for assertion FAIL, `2` for configuration or ex
 
 Use repeated `--scenario` arguments or `--scenario-dir` to select multiple scenarios. Directory selection includes only immediate `.yml` and `.yaml` files. Store fixture files in a subdirectory.
 
-Development `main` checks that `--scenario-dir` names a directory and `--scenario`/`--config` name files. Incorrect path types exit 2 before configuration loading or scenario execution, including when other selected scenarios are valid. Repeated references to the same resolved scenario path run once.
+From 0.1.0a11, the CLI checks that `--scenario-dir` names a directory and `--scenario`/`--config` name files. Incorrect path types exit 2 before configuration loading or scenario execution, including when other selected scenarios are valid. Repeated references to the same resolved scenario path run once.
 
 A [real CLI regression check](docs/evaluation/scenario-selection-postgresql16-windows.json) confirmed that alpha 10 ignored a file passed as `--scenario-dir` while successfully running the other selected scenario on PostgreSQL. The corrected CLI rejects the same arguments before loading configuration, including with password variables removed.
 

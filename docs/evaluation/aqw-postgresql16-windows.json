@@ -1,0 +1,339 @@
+{
+  "schema_version": 1,
+  "status": "PASS",
+  "complete": true,
+  "source_commit": "b83616c1eebe37468cccf828f3c7f29bba04dc04",
+  "package_version": "0.1.0a11",
+  "python_version": "3.12.10",
+  "started_at": "2026-11-04T18:04:50.418287+00:00",
+  "check_script_sha256": "111513c444a6c01695561ead9428d32e111e05e863b7c7cbed8b5534c746fb6f",
+  "upstream": {
+    "repository": "aosman101/london-air-quality-weather-lakehouse",
+    "snapshot": "487d5877a0a75737163129d831c3bbbd9ec922ed",
+    "license": "MIT",
+    "source_project_kind": "public demonstration",
+    "files": {
+      "LICENSE": {
+        "url": "https://raw.githubusercontent.com/aosman101/london-air-quality-weather-lakehouse/487d5877a0a75737163129d831c3bbbd9ec922ed/LICENSE",
+        "sha256": "d541000af81a9930218f7ef3e686ce302fd479e58cc89c5909ee8d654d4611e3",
+        "git_blob_sha": "955e159a28d700f1d33a10c20c33a0610d2c59e4"
+      },
+      "dbt_project.yml": {
+        "url": "https://raw.githubusercontent.com/aosman101/london-air-quality-weather-lakehouse/487d5877a0a75737163129d831c3bbbd9ec922ed/dbt/aqw/dbt_project.yml",
+        "sha256": "f3f21ba10cceac563f3b02b0da1b821db810fafe9f65bc0efe47d48594669bfb",
+        "git_blob_sha": "2540d94a166187cff7475cc7f64c26932a53ef15"
+      },
+      "fact.sql": {
+        "url": "https://raw.githubusercontent.com/aosman101/london-air-quality-weather-lakehouse/487d5877a0a75737163129d831c3bbbd9ec922ed/dbt/aqw/models/marts/fct_air_quality_hourly.sql",
+        "sha256": "3402d05cb2ecb2c34f55a8f7eec2c606fb2b6bf98f6b9ceef4773f42abad412b",
+        "git_blob_sha": "48387f37d1ef807dc2c9fc634e1e60c97a41d29a"
+      },
+      "staging.sql": {
+        "url": "https://raw.githubusercontent.com/aosman101/london-air-quality-weather-lakehouse/487d5877a0a75737163129d831c3bbbd9ec922ed/dbt/aqw/models/staging/stg_air_quality_hourly.sql",
+        "sha256": "e692f422762262ef41b4ba3843818346219907345a0c76bd0e7ae47fe9e6cd66",
+        "git_blob_sha": "217fd5e14726b7db3e227ac3f89e60f45d25b828"
+      },
+      "warehouse.sql": {
+        "url": "https://raw.githubusercontent.com/aosman101/london-air-quality-weather-lakehouse/487d5877a0a75737163129d831c3bbbd9ec922ed/docker/initdb/01_warehouse.sql",
+        "sha256": "fd50669ee350b13ce76020a37ea70b47b6b7a0f077cd19c21ed638f24f16cfc0",
+        "git_blob_sha": "6919e385fcde252ad5bdf33702d19e900564c05a"
+      }
+    }
+  },
+  "fixture_specification_sha256": "207280fec867778639de4cd304d906529ec8126ad373a08bcb4e4ecf0711637c",
+  "protocol": {
+    "synthetic_fixtures": true,
+    "external_pilot": false,
+    "confirmed_production_incident": false,
+    "source_postgresql_major": 15,
+    "execution_postgresql_major": 16,
+    "original_postgresql15_tested": false,
+    "upstream_staging_executed": false,
+    "upstream_sql_and_project_config_unchanged": true,
+    "schema_declarations_added": true,
+    "metadata_and_definition_checks_without_password_database_or_subprocess": true,
+    "comparison_tolerance": 0,
+    "source_delivery_assumption_verified": false,
+    "native_upstream_tests_executed": false
+  },
+  "cases": {
+    "normal": {
+      "overall_status": "PASS",
+      "reason_code": null,
+      "cleanup_status": "CLEANED",
+      "scenario_hash": "01029b7dc67f27b138f0999ec1fe803749303039aa592b292bf3aa8fab172246",
+      "engine_versions": {
+        "dbt-core": "1.11.16",
+        "dbt-postgres": "1.10.2",
+        "postgresql": 160015
+      },
+      "steps": [
+        {
+          "name": "initial",
+          "requested_mode": "initial",
+          "observed_mode": "initial",
+          "observed_mode_evidence": {
+            "operation": "create_table",
+            "method": "dbt_invocation_main_sql_and_target_oid",
+            "invocation_id": "afedc1a8-a2b4-4469-ad9a-8f303eb8cccb",
+            "statement_sha256": "1368ec30b8df10dee483fa6b72569f5be79a03c5406fb199884ac98c598297dd"
+          },
+          "sql_audit": {
+            "status": "PASS",
+            "method": "sqlglot_postgres_scopes",
+            "checked_relations": 1,
+            "compiled_sha256": "147ce3df05eeece1ff8701cb7f2e719d74b82043c6b8ba4150ce4a755b6106ed",
+            "run_compiled_sha256": "147ce3df05eeece1ff8701cb7f2e719d74b82043c6b8ba4150ce4a755b6106ed"
+          },
+          "status": "PASS",
+          "reason_code": null,
+          "diff_counts": {
+            "missing": 0,
+            "unexpected": 0,
+            "changed": 0
+          },
+          "actual_rows": 2,
+          "expected_rows": 2,
+          "changed_columns": [],
+          "duration_ms": 27657
+        },
+        {
+          "name": "incremental",
+          "requested_mode": "incremental",
+          "observed_mode": "incremental",
+          "observed_mode_evidence": {
+            "operation": "delete+insert",
+            "method": "dbt_invocation_main_sql_and_target_oid",
+            "invocation_id": "ca9d4fb2-695e-43df-9649-3f2bb814c1bf",
+            "statement_sha256": "72a0d980ef6ab61e1f0c992b41e11a6f958d4ae4190f0b3e74f5f74ced7b4694"
+          },
+          "sql_audit": {
+            "status": "PASS",
+            "method": "sqlglot_postgres_scopes",
+            "checked_relations": 2,
+            "compiled_sha256": "eab094bf3c64a2178e65018b78fca678cc49eb3b1583026a00b6a7b76278cb8e",
+            "run_compiled_sha256": "eab094bf3c64a2178e65018b78fca678cc49eb3b1583026a00b6a7b76278cb8e"
+          },
+          "status": "PASS",
+          "reason_code": null,
+          "diff_counts": {
+            "missing": 0,
+            "unexpected": 0,
+            "changed": 0
+          },
+          "actual_rows": 3,
+          "expected_rows": 3,
+          "changed_columns": [],
+          "duration_ms": 27281
+        },
+        {
+          "name": "retry",
+          "requested_mode": "incremental",
+          "observed_mode": "incremental",
+          "observed_mode_evidence": {
+            "operation": "delete+insert",
+            "method": "dbt_invocation_main_sql_and_target_oid",
+            "invocation_id": "e1f42222-c8ac-49fd-bc1e-e2004edd7559",
+            "statement_sha256": "8734f0704c08e915001b3f157c0ca15a15c5213416c618f271b9bc5f48b562d3"
+          },
+          "sql_audit": {
+            "status": "PASS",
+            "method": "sqlglot_postgres_scopes",
+            "checked_relations": 2,
+            "compiled_sha256": "eab094bf3c64a2178e65018b78fca678cc49eb3b1583026a00b6a7b76278cb8e",
+            "run_compiled_sha256": "eab094bf3c64a2178e65018b78fca678cc49eb3b1583026a00b6a7b76278cb8e"
+          },
+          "status": "PASS",
+          "reason_code": null,
+          "diff_counts": {
+            "missing": 0,
+            "unexpected": 0,
+            "changed": 0
+          },
+          "actual_rows": 3,
+          "expected_rows": 3,
+          "changed_columns": [],
+          "duration_ms": 18344
+        }
+      ]
+    },
+    "empty_start": {
+      "overall_status": "PASS",
+      "reason_code": null,
+      "cleanup_status": "CLEANED",
+      "scenario_hash": "38cf7bf23818d1528b9255dbd0142543ad8e0684807b7ceed915d1ac4163d29e",
+      "engine_versions": {
+        "dbt-core": "1.11.16",
+        "dbt-postgres": "1.10.2",
+        "postgresql": 160015
+      },
+      "steps": [
+        {
+          "name": "initial",
+          "requested_mode": "initial",
+          "observed_mode": "initial",
+          "observed_mode_evidence": {
+            "operation": "create_table",
+            "method": "dbt_invocation_main_sql_and_target_oid",
+            "invocation_id": "42c0a082-0283-4173-aa62-d3c22e1244f4",
+            "statement_sha256": "c7a670e94c9e04294a16fd973092de3cf8ae9b8f030df4ef79e61af162d4ffc5"
+          },
+          "sql_audit": {
+            "status": "PASS",
+            "method": "sqlglot_postgres_scopes",
+            "checked_relations": 1,
+            "compiled_sha256": "b67ac4ef1bc8fbdf5aba320d1453c2628905a9554387eb820daee6b9e45c58a6",
+            "run_compiled_sha256": "b67ac4ef1bc8fbdf5aba320d1453c2628905a9554387eb820daee6b9e45c58a6"
+          },
+          "status": "PASS",
+          "reason_code": null,
+          "diff_counts": {
+            "missing": 0,
+            "unexpected": 0,
+            "changed": 0
+          },
+          "actual_rows": 0,
+          "expected_rows": 0,
+          "changed_columns": [],
+          "duration_ms": 16907
+        },
+        {
+          "name": "incremental",
+          "requested_mode": "incremental",
+          "observed_mode": "incremental",
+          "observed_mode_evidence": {
+            "operation": "delete+insert",
+            "method": "dbt_invocation_main_sql_and_target_oid",
+            "invocation_id": "0d67ba14-c31c-4df1-b418-a0133ed2bd5c",
+            "statement_sha256": "fe55af1c1ac55cb6962fcca570269101e88ab724370b74b701414a3454fcc249"
+          },
+          "sql_audit": {
+            "status": "PASS",
+            "method": "sqlglot_postgres_scopes",
+            "checked_relations": 2,
+            "compiled_sha256": "405cd348eba72242c35059a0a753d4b1644b01058028785e05e5161469f88fc9",
+            "run_compiled_sha256": "405cd348eba72242c35059a0a753d4b1644b01058028785e05e5161469f88fc9"
+          },
+          "status": "PASS",
+          "reason_code": null,
+          "diff_counts": {
+            "missing": 0,
+            "unexpected": 0,
+            "changed": 0
+          },
+          "actual_rows": 1,
+          "expected_rows": 1,
+          "changed_columns": [],
+          "duration_ms": 16781
+        },
+        {
+          "name": "retry",
+          "requested_mode": "incremental",
+          "observed_mode": "incremental",
+          "observed_mode_evidence": {
+            "operation": "delete+insert",
+            "method": "dbt_invocation_main_sql_and_target_oid",
+            "invocation_id": "4fd159ba-0f2b-41d3-aa36-c84a20930d4f",
+            "statement_sha256": "996f263e7e1c295c47bd828d33b9bc67fe5bdbe16017a72c397b8acaf641aeca"
+          },
+          "sql_audit": {
+            "status": "PASS",
+            "method": "sqlglot_postgres_scopes",
+            "checked_relations": 2,
+            "compiled_sha256": "405cd348eba72242c35059a0a753d4b1644b01058028785e05e5161469f88fc9",
+            "run_compiled_sha256": "405cd348eba72242c35059a0a753d4b1644b01058028785e05e5161469f88fc9"
+          },
+          "status": "PASS",
+          "reason_code": null,
+          "diff_counts": {
+            "missing": 0,
+            "unexpected": 0,
+            "changed": 0
+          },
+          "actual_rows": 1,
+          "expected_rows": 1,
+          "changed_columns": [],
+          "duration_ms": 16875
+        }
+      ]
+    },
+    "late_sensor": {
+      "overall_status": "FAIL",
+      "reason_code": null,
+      "cleanup_status": "CLEANED",
+      "scenario_hash": "e7fd720d14054cec03d1f0391f0338144f99d3fdab8382f6fc8656dbf268d5e0",
+      "engine_versions": {
+        "dbt-core": "1.11.16",
+        "dbt-postgres": "1.10.2",
+        "postgresql": 160015
+      },
+      "steps": [
+        {
+          "name": "initial",
+          "requested_mode": "initial",
+          "observed_mode": "initial",
+          "observed_mode_evidence": {
+            "operation": "create_table",
+            "method": "dbt_invocation_main_sql_and_target_oid",
+            "invocation_id": "6ca9fd93-bae7-4bef-a128-dc0f8782f241",
+            "statement_sha256": "ae0761b601d92e3fbddb5d5450cb0f863c490d88c159632e020f2d7cba00f446"
+          },
+          "sql_audit": {
+            "status": "PASS",
+            "method": "sqlglot_postgres_scopes",
+            "checked_relations": 1,
+            "compiled_sha256": "d8802af5e34c12f8cab7f03a8dde11118e74450615befb42a644eea4a7d5fa24",
+            "run_compiled_sha256": "d8802af5e34c12f8cab7f03a8dde11118e74450615befb42a644eea4a7d5fa24"
+          },
+          "status": "PASS",
+          "reason_code": null,
+          "diff_counts": {
+            "missing": 0,
+            "unexpected": 0,
+            "changed": 0
+          },
+          "actual_rows": 2,
+          "expected_rows": 2,
+          "changed_columns": [],
+          "duration_ms": 16890
+        },
+        {
+          "name": "incremental",
+          "requested_mode": "incremental",
+          "observed_mode": "incremental",
+          "observed_mode_evidence": {
+            "operation": "delete+insert",
+            "method": "dbt_invocation_main_sql_and_target_oid",
+            "invocation_id": "66e49eb0-bbe5-4c6f-86d1-e20bb047c551",
+            "statement_sha256": "2cb5817b21ac8c2bbf12efe4b70939f47d5589764546350ca48c2aada8f1edf5"
+          },
+          "sql_audit": {
+            "status": "PASS",
+            "method": "sqlglot_postgres_scopes",
+            "checked_relations": 2,
+            "compiled_sha256": "d82b374524a61badcb7fd09939e55cf0d74e480fcf997bd97b96a2d315846b14",
+            "run_compiled_sha256": "d82b374524a61badcb7fd09939e55cf0d74e480fcf997bd97b96a2d315846b14"
+          },
+          "status": "FAIL",
+          "reason_code": "ROWS_MISMATCH",
+          "diff_counts": {
+            "missing": 1,
+            "unexpected": 0,
+            "changed": 0
+          },
+          "actual_rows": 2,
+          "expected_rows": 3,
+          "changed_columns": [],
+          "duration_ms": 16813
+        },
+        {
+          "name": "retry",
+          "status": "NOT_RUN",
+          "reason_code": "PREVIOUS_STEP_UNSUCCESSFUL",
+          "duration_ms": 0
+        }
+      ]
+    }
+  },
+  "owned_schemas_unchanged": true
+}
