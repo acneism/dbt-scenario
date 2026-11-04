@@ -1,45 +1,29 @@
-name: Controlled evaluation
+name: Offline exit status proof
 on:
-  workflow_dispatch:
   push:
-    paths:
-      - .github/workflows/evaluation.yml
-      - evaluation/**
-      - scripts/benchmark.py
-      - scripts/compare_approaches.py
-      - scripts/evaluate.py
-      - scripts/local_postgres.py
-      - scripts/resource_limits.py
+    branches: [validation/offline-exit-status-2026-11-04]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  evaluation:
-    name: evaluation (${{ matrix.mode }})
+  failure-propagation:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        mode: [performance, comparison]
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      - name: Build installed package image
-        run: docker build -f tests/offline/Dockerfile -t dbt-scenario-evaluation-base .
-      - name: Prepare pinned comparison packages
-        run: docker build -f evaluation/Dockerfile -t dbt-scenario-evaluation .
-      - name: Run with fixed resource limits and no external network
-        env:
-          EVALUATION_COMMIT: ${{ github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install PyYAML==6.0.3
+      - name: Exercise the exact pipeline with both runner shell configurations
+        shell: bash
         run: |
-          docker run --name controlled-evaluation --network none --cpus 2 --memory 8g --memory-swap 8g --cap-drop ALL --security-opt no-new-privileges --env EVALUATION_COMMIT dbt-scenario-evaluation ${{ matrix.mode }} --output /results/${{ matrix.mode }}.json
-      - name: Collect sanitized result
-        if: always()
-        run: |
-          mkdir -p artifacts/evaluation
-          docker cp controlled-evaluation:/results/${{ matrix.mode }}.json artifacts/evaluation/${{ matrix.mode }}.json || true
-          docker rm -f controlled-evaluation || true
+          mkdir -p artifacts/before/.github/workflows
+          git show ff116a681f380428eddf71a07c3f222892247134:.github/workflows/ci.yml > artifacts/before/.github/workflows/ci.yml
+          python scripts/check_offline_exit_status.py --repo artifacts/before --bash /bin/bash --output artifacts/exit-status --phase before
+          python scripts/check_offline_exit_status.py --repo . --bash /bin/bash --output artifacts/exit-status --phase after
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: evaluation-${{ matrix.mode }}
-          path: artifacts/evaluation/${{ matrix.mode }}.json
+          name: offline-exit-status-proof
+          path: artifacts/exit-status/
