@@ -41,10 +41,16 @@ def guarded(function):
 
 
 config_option = click.option(
-    "--config", "config_path", required=True, type=click.Path(exists=True, path_type=Path)
+    "--config",
+    "config_path",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
 )
 scenario_option = click.option(
-    "--scenario", "scenario_path", required=True, type=click.Path(exists=True, path_type=Path)
+    "--scenario",
+    "scenario_path",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
 )
 
 
@@ -173,9 +179,12 @@ def plan(config_path, scenario_path):
 @main.command("test", help="Run scenarios against the dedicated test database.")
 @config_option
 @click.option(
-    "--scenario", "scenario_paths", multiple=True, type=click.Path(exists=True, path_type=Path)
+    "--scenario",
+    "scenario_paths",
+    multiple=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
 )
-@click.option("--scenario-dir", type=click.Path(exists=True, path_type=Path))
+@click.option("--scenario-dir", type=click.Path(exists=True, file_okay=False, path_type=Path))
 @click.option("--report-dir", default="artifacts/scenarios", type=click.Path(path_type=Path))
 @click.option(
     "--keep-on-failure",

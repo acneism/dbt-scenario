@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Reject files passed as `--scenario-dir` and directories passed as `--scenario`/`--config` before configuration loading; prevent a mistaken directory argument from silently reducing a mixed selection.
+- Cover mixed file/directory selections, resolved-path deduplication and exclusion of nested fixture files.
 - Report known custom routing, incremental-strategy and materialization macro blockers during metadata discovery and initialization, before fixture authoring or file writes.
 - Share macro eligibility checks with execution preflight and provide an actionable `CUSTOM_MACRO_UNSUPPORTED` hint.
 - Cover project/package overrides, supported business and built-in macros, malformed entries and a real dbt-generated manifest with no database access during metadata checks.
