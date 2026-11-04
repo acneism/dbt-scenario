@@ -1,0 +1,43 @@
+{
+  "status": "PASS",
+  "date": "2026-11-04",
+  "scope": "Actual CLI processes; a scenario file is incorrectly supplied as --scenario-dir alongside a valid --scenario",
+  "runner_mocked": false,
+  "baseline": {
+    "package_version": "0.1.0a10",
+    "exit_code": 0,
+    "report_count": 1,
+    "executed_scenarios": [
+      "orders_update_late_arrival_retry"
+    ],
+    "actual_rows": [
+      2,
+      3,
+      3
+    ],
+    "cleanup_status": "CLEANED",
+    "sql_audits": [
+      "PASS",
+      "PASS",
+      "PASS"
+    ],
+    "invocation_ids": [
+      "98443561-a377-4337-a271-d6a1b580aedf",
+      "c9f11ac9-258e-423f-92a0-b68734fc00c0",
+      "23283b1b-d6e2-4c05-8c6e-1412161ca3ea"
+    ],
+    "invalid_directory_argument_ignored": true
+  },
+  "updated": {
+    "build": "development main; unreleased",
+    "source_commit": "d7a756bef645a13d5be1717137752ccea990aac7",
+    "exit_code": 2,
+    "rejected_option": "--scenario-dir",
+    "password_environment_present": false,
+    "report_directory_created": false,
+    "journal_inventory_unchanged": true
+  },
+  "model_sql_sha256": "5af763be1a7e52e6fdc28a493c567007dbd0930dc2758c1c1e9b08596931072f",
+  "model_sql_unchanged": true,
+  "owned_schemas_unchanged": true
+}

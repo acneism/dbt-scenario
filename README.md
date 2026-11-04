@@ -173,6 +173,8 @@ Use repeated `--scenario` arguments or `--scenario-dir` to select multiple scena
 
 Development `main` checks that `--scenario-dir` names a directory and `--scenario`/`--config` name files. Incorrect path types exit 2 before configuration loading or scenario execution, including when other selected scenarios are valid. Repeated references to the same resolved scenario path run once.
 
+A [real CLI regression check](docs/evaluation/scenario-selection-postgresql16-windows.json) confirmed that alpha 10 ignored a file passed as `--scenario-dir` while successfully running the other selected scenario on PostgreSQL. The corrected CLI rejects the same arguments before loading configuration, including with password variables removed.
+
 Each run writes `summary.json`, `summary.md` and `junit.xml` beneath `artifacts/scenarios/<run_id>/`. Reports contain counts and column names, without row values or raw dbt errors. dbt logs and temporary profiles are deleted with the temporary workspace. GitHub branch rules must make your test job required if you want it to block merges.
 
 Execution evidence binds manifest and run-results to the current dbt invocation, requires one successful selected model, rejects forced full refresh and checks the target OID and emitted materialization SQL. Missing, stale or inconsistent evidence returns ERROR. Reports retain the invocation ID and SQL hash. See [execution verification](docs/EXECUTION.md).
