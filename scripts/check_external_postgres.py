@@ -128,16 +128,17 @@ def prepare_project(root, sources, config, fixtures):
     return scenario_config, paths, destinations
 
 
-def checked_report(report, case):
+def validate_report(report, case):
     status, counts = CASES[case]
     if (
         report["overall_status"] != status
+        or report["reason_code"] is not None
         or report["cleanup_status"] != "CLEANED"
         or [step.get("actual_rows") for step in report["steps"]] != counts
     ):
         raise RuntimeError("EXTERNAL_SCENARIO_OUTCOME_MISMATCH")
     if case == "late_sensor" and (
-        report["reason_code"] != "ROWS_MISMATCH"
+        report["steps"][1]["reason_code"] != "ROWS_MISMATCH"
         or report["steps"][1]["diff_counts"] != {"missing": 1, "unexpected": 0, "changed": 0}
         or report["steps"][2]["status"] != "NOT_RUN"
     ):
@@ -153,17 +154,6 @@ def checked_report(report, case):
         ):
             raise RuntimeError("EXTERNAL_EXECUTION_EVIDENCE_MISSING")
         UUID(evidence["invocation_id"])
-    return {
-        key: report[key]
-        for key in [
-            "overall_status",
-            "reason_code",
-            "cleanup_status",
-            "scenario_hash",
-            "engine_versions",
-            "steps",
-        ]
-    }
 
 
 def main():
@@ -224,8 +214,19 @@ def main():
             report = run_scenario(
                 load_scenario(path, prepared.project_dir), prepared, root / "reports"
             )
-            result["cases"][case] = checked_report(report, case)
+            result["cases"][case] = {
+                key: report[key]
+                for key in [
+                    "overall_status",
+                    "reason_code",
+                    "cleanup_status",
+                    "scenario_hash",
+                    "engine_versions",
+                    "steps",
+                ]
+            }
             arguments.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+            validate_report(result["cases"][case], case)
             print(case + ": " + report["overall_status"], flush=True)
         for name, relative in destinations.items():
             if (prepared.project_dir / relative).read_bytes() != (
