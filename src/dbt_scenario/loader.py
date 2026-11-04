@@ -1,6 +1,7 @@
 import copy
 import hashlib
 import json
+import math
 import re
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -14,7 +15,8 @@ from jsonschema import Draft202012Validator
 from dbt_scenario.errors import ScenarioError
 
 TYPE_PATTERN = re.compile(
-    r"^(bigint|integer|text|boolean|date|timestamp|timestamptz|numeric\(([1-9]\d?),([0-9]\d?)\))$"
+    r"^(bigint|integer|text|boolean|date|timestamp|timestamptz|double precision|"
+    r"numeric\(([1-9]\d?),([0-9]\d?)\))$"
 )
 YAML_BASE = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
 
@@ -108,6 +110,12 @@ def converted(value, kind: str):
         elif kind == "text":
             if isinstance(value, str) and "\x00" not in value:
                 return value
+        elif kind == "double precision" and isinstance(value, str):
+            if re.fullmatch(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?", value):
+                number = Decimal(value)
+                floating = float(value)
+                if math.isfinite(floating) and (floating != 0.0 or number.is_zero()):
+                    return floating
         elif kind.startswith("numeric") and isinstance(value, str):
             number = Decimal(value)
             precision, scale = map(int, re.findall(r"\d+", kind))

@@ -8,6 +8,8 @@ on:
       - scripts/reproduce_history.py
       - scripts/compare_approaches.py
       - scripts/check_watermarks.py
+      - scripts/check_external_postgres.py
+      - compatibility/aqw/**
       - investigations/watermark-boundary/**
       - src/**
       - requirements-dev.lock.txt
@@ -28,6 +30,9 @@ jobs:
           - case: watermark-boundary
             script: check_watermarks.py
             artifact: watermark-boundary
+          - case: aqw-postgresql
+            script: check_external_postgres.py
+            artifact: aqw-postgresql
     services:
       postgres:
         image: postgres:16

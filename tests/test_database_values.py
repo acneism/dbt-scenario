@@ -1,3 +1,4 @@
+import json
 import os
 import uuid
 from pathlib import Path
@@ -10,6 +11,7 @@ from dbt_scenario.database import Database
 from dbt_scenario.errors import ScenarioError
 from dbt_scenario.journal import Journal
 from dbt_scenario.lifecycle import finish_run
+from dbt_scenario.loader import converted
 
 ROOT = Path(__file__).resolve().parents[1]
 pytestmark = pytest.mark.integration
@@ -79,6 +81,85 @@ def test_false_is_a_valid_key(tables):
         [{"id": False, "value": ""}],
     )
     assert result["status"] == "PASS"
+
+
+def test_double_precision_extremes_roundtrip_as_the_expected_binary64_values(tables):
+    values = ["0.1", "0.10000000000000002", "5e-324", "1.7976931348623157e308", "-0.0", None]
+    rows = [{"id": index, "value": value} for index, value in enumerate(values)]
+    result = compare(tables, {"id": "integer", "value": "double precision"}, ["id"], rows, rows)
+    assert result["status"] == "PASS"
+    database, actual, _ = tables
+    stored = database.execute(
+        sql.SQL("SELECT value FROM {}.result ORDER BY id").format(sql.Identifier(actual))
+    ).fetchall()
+    assert [value.hex() if value is not None else None for (value,) in stored] == [
+        converted(value, "double precision").hex() if value is not None else None
+        for value in values
+    ]
+
+
+def test_adjacent_double_precision_values_have_no_comparison_tolerance(tables):
+    result = compare(
+        tables,
+        {"id": "integer", "value": "double precision"},
+        ["id"],
+        [{"id": 1, "value": "0.1"}],
+        [{"id": 1, "value": "0.10000000000000002"}],
+    )
+    assert result["status"] == "FAIL"
+    assert result["diff_counts"] == {"missing": 0, "unexpected": 0, "changed": 1}
+
+
+def test_double_precision_cannot_silently_match_a_real_column(tables):
+    def narrow(database, actual):
+        database.execute(
+            sql.SQL("ALTER TABLE {}.result ALTER COLUMN value TYPE real").format(
+                sql.Identifier(actual)
+            )
+        )
+
+    result = compare(
+        tables,
+        {"id": "integer", "value": "double precision"},
+        ["id"],
+        [{"id": 1, "value": "1.5"}],
+        [{"id": 1, "value": "1.5"}],
+        narrow,
+    )
+    assert result["status"] == "FAIL" and result["reason_code"] == "SCHEMA_MISMATCH"
+
+
+@pytest.mark.parametrize("value", ["NaN", "Infinity", "-Infinity"])
+def test_nonfinite_actual_values_fail_and_leave_reports_json_serializable(tables, value):
+    def change(database, actual):
+        database.execute(
+            sql.SQL("UPDATE {}.result SET value = %s::double precision").format(
+                sql.Identifier(actual)
+            ),
+            [value],
+        )
+
+    result = compare(
+        tables,
+        {"id": "integer", "value": "double precision"},
+        ["id"],
+        [{"id": 1, "value": "1.5"}],
+        [{"id": 1, "value": "1.5"}],
+        change,
+    )
+    assert result["status"] == "FAIL" and result["diff_counts"]["changed"] == 1
+    json.dumps(result, allow_nan=False)
+
+
+def test_double_precision_duplicate_keys_use_postgresql_values(tables):
+    result = compare(
+        tables,
+        {"key": "double precision"},
+        ["key"],
+        [{"key": "0.1"}, {"key": "0.10000000000000001"}],
+        [{"key": "0.1"}],
+    )
+    assert result["status"] == "FAIL" and result["reason_code"] == "DUPLICATE_KEY"
 
 
 def test_compound_key_matches_every_component(tables):

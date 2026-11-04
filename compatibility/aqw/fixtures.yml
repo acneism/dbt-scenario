@@ -1,0 +1,49 @@
+columns:
+  sensor_id: bigint
+  location_id: bigint
+  location_name: text
+  parameter: text
+  units: text
+  latitude: double precision
+  longitude: double precision
+  ts_utc: timestamptz
+  value: double precision
+initial:
+  - sensor_id: 101
+    location_id: 10
+    location_name: Synthetic London North
+    parameter: pm25
+    units: ug/m3
+    latitude: '51.5'
+    longitude: '-0.1'
+    ts_utc: '2026-01-01T00:00:00Z'
+    value: '0.1'
+  - sensor_id: 102
+    location_id: 10
+    location_name: null
+    parameter: pm25
+    units: ug/m3
+    latitude: null
+    longitude: null
+    ts_utc: '2026-01-01T00:00:00Z'
+    value: '0.10000000000000002'
+newer:
+  sensor_id: 101
+  location_id: 10
+  location_name: Synthetic London North
+  parameter: pm25
+  units: ug/m3
+  latitude: '51.5'
+  longitude: '-0.1234567890123456'
+  ts_utc: '2026-01-01T01:00:00Z'
+  value: '12.25'
+late_sensor:
+  sensor_id: 103
+  location_id: 11
+  location_name: Synthetic London South
+  parameter: pm25
+  units: ug/m3
+  latitude: '51.45'
+  longitude: '-0.15'
+  ts_utc: '2026-01-01T00:00:00Z'
+  value: '4.5'

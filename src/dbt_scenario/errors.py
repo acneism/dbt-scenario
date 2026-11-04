@@ -75,7 +75,9 @@ HINTS = {
     "DUPLICATE_YAML_KEY": "Remove the duplicate YAML key.",
     "YAML_ALIAS_UNSUPPORTED": "Expand YAML aliases into explicit values.",
     "YAML_NESTING_LIMIT": "Reduce YAML nesting to at most 128 mapping/sequence levels.",
-    "INVALID_TYPED_VALUE": "Match the declared column type; quote decimals and timestamps.",
+    "INVALID_TYPED_VALUE": (
+        "Match the column type; quote decimals, double precision values and timestamps."
+    ),
     "INVALID_COLUMN_NAME": "Quote column names as strings and use at most 63 UTF-8 bytes per name.",
     "FIXTURE_COLUMNS_MISMATCH": "Each row must contain exactly the declared columns.",
     "INVALID_EXPECTED_KEY": "Expected primary keys must be unique and non-null.",

@@ -440,6 +440,26 @@ def test_catalog_supplies_schema_when_manifest_has_no_declared_columns(artifacts
     assert list(data["output"]["columns"]) == ["order_id", "amount"]
 
 
+@pytest.mark.parametrize("kind", ["double precision", "FLOAT8"])
+@pytest.mark.parametrize("with_catalog", [False, True])
+def test_double_precision_metadata_preserves_the_native_type(artifacts, kind, with_catalog):
+    root, manifest, catalog = artifacts
+    for collection in ["nodes", "sources"]:
+        for node in manifest[collection].values():
+            node["columns"]["amount"]["data_type"] = kind
+        for node in catalog[collection].values():
+            node["columns"]["amount"]["type"] = kind
+    result = discover(artifacts, with_catalog=with_catalog)
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["models"][0]["status"] == "TEMPLATE_READY"
+    generate(artifacts, with_catalog=with_catalog)
+    scenario = read_yaml(root / "scenarios/fct_orders.yml")
+    assert scenario["output"]["columns"]["amount"] == "double precision"
+    assert all(
+        node["columns"]["amount"] == "double precision" for node in scenario["inputs"].values()
+    )
+
+
 def test_additional_template_preserves_existing_configuration_and_refuses_overwrite(artifacts):
     root, _, _ = artifacts
     config = root / "scenario-runner.yml"
@@ -494,7 +514,9 @@ def test_missing_or_expression_key_requires_explicit_valid_output_columns(artifa
     "kind",
     [
         "jsonb",
-        "double precision",
+        "real",
+        "float4",
+        "doubleprecision",
         "varchar(80)",
         "numeric",
         "smallint",

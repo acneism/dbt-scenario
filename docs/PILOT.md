@@ -14,7 +14,7 @@ The catalog is optional when column types are declared in the manifest. The inve
 
 Use an incremental SQL model in an existing PostgreSQL 16 project, with Python 3.12, dbt Core 1.11 and dbt-postgres 1.10. Use a dedicated disposable database and a restricted role as described in the [README](../README.md). Install the original project's dependencies before running the scenario.
 
-Start with a model that uses supported scalar types and ordinary append, delete+insert or merge. The current runner does not cover JSON/arrays/floating-point fixtures, custom materializations, hooks, versioned refs or another warehouse. Record a compatibility refusal as a trial result; rewriting the project's model just to fit the runner would measure a different workflow.
+Start with a model that uses supported scalar types and ordinary append, delete+insert or merge. Development `main` supports [finite double precision fixtures](DOUBLE-PRECISION.md) with exact native comparisons. JSON/arrays, `real`/`float4`, custom materializations, hooks, versioned refs and another warehouse remain unsupported. Record a compatibility refusal as a trial result; rewriting the project's model just to fit the runner would measure a different workflow.
 
 Choose an actual concern from the project's history or review: an update to an existing key, a delayed event, an empty initial build or repeating a batch. Record the expected whole-table state before writing the test. A deliberately injected defect can test detection, but should be labeled as an injected defect rather than a newly discovered bug.
 

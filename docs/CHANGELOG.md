@@ -1,7 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.1.0a11 — November 4, 2026
 
+- Support native PostgreSQL `double precision` and metadata alias `float8` with quoted finite decimal fixtures and exact database comparisons.
+- Reject nonfinite values, overflow and nonzero values rounded to zero; keep `real`/`float4` distinct and unsupported.
+- Add a pinned, MIT-licensed external PostgreSQL model check using unchanged upstream SQL, composite keys and three floating point columns.
 - Reject files passed as `--scenario-dir` and directories passed as `--scenario`/`--config` before configuration loading; prevent a mistaken directory argument from silently reducing a mixed selection.
 - Cover mixed file/directory selections, resolved-path deduplication and exclusion of nested fixture files.
 - Report known custom routing, incremental-strategy and materialization macro blockers during metadata discovery and initialization, before fixture authoring or file writes.
