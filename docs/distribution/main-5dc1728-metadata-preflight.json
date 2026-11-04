@@ -1,0 +1,31 @@
+{
+  "status": "PASS",
+  "date": "2026-11-04",
+  "build": "unreleased CI wheel; published v0.1.0a10 assets were not replaced",
+  "source_commit": "5dc1728eddd9ae391afac34bf4935c5a49e5a9ad",
+  "distribution_run": "https://github.com/acneism/dbt-scenario/actions/runs/41869799488",
+  "platform": "win32",
+  "python_version": "3.12.10",
+  "package_version": "0.1.0a10",
+  "wheel_sha256": "64daf352c39b838683e3087b2808e4aad14dadb4d32c8241093529df970b2293",
+  "installed_wheel_source_files_equal": 31,
+  "isolated_python_outside_checkout": true,
+  "development_dependencies_present": false,
+  "cli_version": "dbt-scenario, version 0.1.0a10",
+  "manifest_sha256": "02244c582a8c4114538ece17d552d5eff8d0b3f67afb1f3d46b7261ecf3c346b",
+  "discovery": {
+    "model": "model.shop.fct_orders",
+    "status": "BLOCKED",
+    "reason_code": "CUSTOM_MACRO_UNSUPPORTED",
+    "diagnostic": {
+      "code": "CUSTOM_MACRO_UNSUPPORTED",
+      "hint": "Choose a project without custom routing, incremental-strategy or materialization macros."
+    }
+  },
+  "initialization_exit": 2,
+  "initialization_reason": "CUSTOM_MACRO_UNSUPPORTED",
+  "database_calls": 0,
+  "subprocess_calls_during_metadata_checks": 0,
+  "without_password_environment": true,
+  "project_files_unchanged": true
+}

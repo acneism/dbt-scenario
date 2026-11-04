@@ -10,7 +10,7 @@
     "after_filling_rows_plan": "CUSTOM_MACRO_UNSUPPORTED"
   },
   "updated": {
-    "build": "unreleased working tree",
+    "build": "development main; unreleased",
     "discovery_exit": 0,
     "discovery": {
       "model": "model.shop.fct_orders",
@@ -26,11 +26,13 @@
     "database_calls": 0,
     "subprocess_calls": 0,
     "password_environment_present": false,
-    "project_files_unchanged": true
+    "project_files_unchanged": true,
+    "source_commit": "5dc1728eddd9ae391afac34bf4935c5a49e5a9ad"
   },
   "manifest_sha256": "02244c582a8c4114538ece17d552d5eff8d0b3f67afb1f3d46b7261ecf3c346b",
   "baseline_dbt_invocations": [
     "7322e0ed-c0d2-4ba7-8417-dac6a7bcd3e6",
     "7bdd66fc-d171-4abc-a5ce-4cacdfa184b5"
-  ]
+  ],
+  "installed_wheel_check": "../distribution/main-5dc1728-metadata-preflight.json"
 }

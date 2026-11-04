@@ -46,6 +46,8 @@ On development `main` (unreleased), discovery also checks macro entries present 
 
 The [November 4 before/after check](evaluation/metadata-macro-preflight-windows.json) used a real dbt-generated manifest from a synthetic project with `generate_schema_name`. Installed 0.1.0a10 reported `TEMPLATE_READY` and created a template, then `plan` refused it after row authoring. The development code reports the same blocker immediately and leaves the project files unchanged. A regression test generates its manifest with real `dbt parse`, then blocks database and subprocess calls while checking discovery and initialization.
 
+The [Linux distribution check](https://github.com/acneism/dbt-scenario/actions/runs/41869799488) built and installed the development wheel, then passed the ordinary and empty-start demos. A [fresh Windows installation of the same CI wheel](distribution/main-5dc1728-metadata-preflight.json), outside the checkout under isolated Python mode, confirmed the early macro refusal with password variables removed, zero database/subprocess calls during the metadata commands and unchanged project files. All 31 packaged files matched both the wheel and source commit `5dc1728eddd9ae391afac34bf4935c5a49e5a9ad`. This is an unreleased development build; the public alpha 10 release remains the baseline above.
+
 The report includes project/model identifiers, status counts and safe diagnostics. It does not include model SQL, descriptions, catalog statistics, connection settings or fixture rows. Model identifiers are intentionally visible; review the JSON before sharing it. Control characters in identifiers are JSON-escaped.
 
 ## Continue with the selected model
