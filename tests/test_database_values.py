@@ -1,6 +1,7 @@
 import json
 import os
 import uuid
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -206,6 +207,93 @@ def test_numeric_38_roundtrips_without_losing_a_cent(tables, expected, status):
         [{"id": 1, "value": expected}],
     )
     assert result["status"] == status
+
+
+@pytest.mark.parametrize(
+    "value", ["9" * 150 + "." + "1" * 150, "1e131071", "1e-16383", "0e1000000000", None]
+)
+def test_unconstrained_numeric_roundtrips_native_extremes_without_rounding(tables, value):
+    database, schema, _ = tables
+    result = compare(
+        tables,
+        {"id": "integer", "value": "numeric"},
+        ["id"],
+        [{"id": 1, "value": value}],
+        [{"id": 1, "value": value}],
+    )
+    assert result["status"] == "PASS"
+    observed = database.execute(
+        sql.SQL("SELECT value FROM {}").format(sql.Identifier(schema, "result"))
+    ).fetchone()[0]
+    assert observed == (Decimal(value) if value is not None else None)
+
+
+def test_unconstrained_numeric_detects_a_difference_beyond_default_decimal_precision(tables):
+    result = compare(
+        tables,
+        {"id": "integer", "value": "numeric"},
+        ["id"],
+        [{"id": 1, "value": "0." + "0" * 120 + "1"}],
+        [{"id": 1, "value": "0." + "0" * 120 + "2"}],
+    )
+    assert result["status"] == "FAIL"
+    assert result["diff_counts"] == {"missing": 0, "unexpected": 0, "changed": 1}
+
+
+@pytest.mark.parametrize(
+    "expected,actual", [("numeric", "numeric(12,2)"), ("numeric(12,2)", "numeric")]
+)
+def test_unconstrained_and_fixed_numeric_schemas_are_distinct(tables, expected, actual):
+    def mutate(database, schema):
+        database.execute(
+            sql.SQL("ALTER TABLE {} ALTER COLUMN value TYPE {}").format(
+                sql.Identifier(schema, "result"), sql.SQL(actual)
+            )
+        )
+
+    result = compare(
+        tables,
+        {"id": "integer", "value": expected},
+        ["id"],
+        [{"id": 1, "value": "1.25"}],
+        [{"id": 1, "value": "1.25"}],
+        mutate,
+    )
+    assert result["status"] == "FAIL"
+    assert result["reason_code"] == "SCHEMA_MISMATCH"
+
+
+@pytest.mark.parametrize("value", ["NaN", "Infinity", "-Infinity"])
+def test_nonfinite_native_numeric_output_is_a_json_safe_failure(tables, value):
+    def mutate(database, schema):
+        database.execute(
+            sql.SQL("UPDATE {} SET value=%s::numeric").format(sql.Identifier(schema, "result")),
+            [value],
+        )
+
+    result = compare(
+        tables,
+        {"id": "integer", "value": "numeric"},
+        ["id"],
+        [{"id": 1, "value": "1.25"}],
+        [{"id": 1, "value": "1.25"}],
+        mutate,
+    )
+    assert result["status"] == "FAIL"
+    assert result["diff_counts"]["changed"] == 1
+    json.dumps(result, allow_nan=False)
+
+
+def test_native_numeric_duplicate_keys_use_database_value_equality(tables):
+    result = compare(
+        tables,
+        {"key": "numeric"},
+        ["key"],
+        [{"key": "1e-100"}, {"key": "10e-101"}],
+        [{"key": "1e-100"}],
+    )
+    assert result["status"] == "FAIL"
+    assert result["reason_code"] == "DUPLICATE_KEY"
 
 
 @pytest.mark.parametrize(

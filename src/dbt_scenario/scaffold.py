@@ -83,6 +83,7 @@ def column_types(node, location, catalog=False):
             "int8": "bigint",
             "bool": "boolean",
             "float8": "double precision",
+            "decimal": "numeric",
             "timestamp without time zone": "timestamp",
             "timestamp with time zone": "timestamptz",
         }

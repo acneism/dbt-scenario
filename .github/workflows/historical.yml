@@ -10,8 +10,10 @@ on:
       - scripts/check_watermarks.py
       - scripts/check_external_postgres.py
       - scripts/check_external_antijoin.py
+      - scripts/check_external_power.py
       - compatibility/aqw/**
       - compatibility/clinical/**
+      - compatibility/power/**
       - investigations/watermark-boundary/**
       - src/**
       - requirements-dev.lock.txt
@@ -38,6 +40,9 @@ jobs:
           - case: clinical-antijoin-postgresql
             script: check_external_antijoin.py
             artifact: clinical-antijoin-postgresql
+          - case: power-postgresql
+            script: check_external_power.py
+            artifact: power-postgresql
     services:
       postgres:
         image: postgres:16

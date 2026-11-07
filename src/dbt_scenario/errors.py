@@ -86,7 +86,7 @@ HINTS = {
     "UNINITIALIZED_INPUT": "Initialize every declared input in the first step.",
     "INVALID_SAME_AS_REFERENCE": "Reference an earlier step from this scenario.",
     "INVALID_RUN_VARS": "Use JSON-compatible vars without NaN, infinity or binary values.",
-    "UNSUPPORTED_COLUMN_TYPE": "Use a supported PostgreSQL scalar type or numeric(p,s).",
+    "UNSUPPORTED_COLUMN_TYPE": "Use a supported PostgreSQL scalar type, numeric or numeric(p,s).",
     "MISSING_PASSWORD_ENV": "Export the variable named in database.password_env before running.",
     "MISSING_PROJECT_ENV": "Export every variable named in env_allowlist before running.",
     "INVALID_ENV_ALLOWLIST": "Use unique environment names; runner controls cannot be forwarded.",

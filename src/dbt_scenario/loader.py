@@ -16,8 +16,9 @@ from dbt_scenario.errors import ScenarioError
 
 TYPE_PATTERN = re.compile(
     r"^(bigint|integer|text|boolean|date|timestamp|timestamptz|double precision|"
-    r"numeric\(([1-9]\d?),([0-9]\d?)\))$"
+    r"numeric(?:\(([1-9]\d?),([0-9]\d?)\))?)$"
 )
+DECIMAL_PATTERN = re.compile(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
 YAML_BASE = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
 
 
@@ -91,7 +92,7 @@ def read_yaml(path: Path):
 
 def sql_type(value: str) -> str:
     match = TYPE_PATTERN.fullmatch(value)
-    if not match or (value.startswith("numeric") and int(match[3]) > int(match[2])):
+    if not match or (match[2] is not None and int(match[3]) > int(match[2])):
         raise ScenarioError("UNSUPPORTED_COLUMN_TYPE")
     return value
 
@@ -111,11 +112,20 @@ def converted(value, kind: str):
             if isinstance(value, str) and "\x00" not in value:
                 return value
         elif kind == "double precision" and isinstance(value, str):
-            if re.fullmatch(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?", value):
+            if DECIMAL_PATTERN.fullmatch(value):
                 number = Decimal(value)
                 floating = float(value)
                 if math.isfinite(floating) and (floating != 0.0 or number.is_zero()):
                     return floating
+        elif kind == "numeric" and isinstance(value, str):
+            if DECIMAL_PATTERN.fullmatch(value):
+                number = Decimal(value)
+                if (
+                    number.is_finite()
+                    and number.as_tuple().exponent >= -16383
+                    and (number.is_zero() or number.adjusted() < 131072)
+                ):
+                    return Decimal(0) if number.is_zero() else number
         elif kind.startswith("numeric") and isinstance(value, str):
             number = Decimal(value)
             precision, scale = map(int, re.findall(r"\d+", kind))

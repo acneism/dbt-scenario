@@ -1,0 +1,96 @@
+input_columns:
+  country: text
+  ts_utc: timestamptz
+  production_type: text
+  category: text
+  unit: text
+  renewable_share: numeric
+  value: numeric
+  loaded_at: timestamptz
+output_columns:
+  country: text
+  ts_utc: timestamptz
+  ts_local: timestamp
+  production_type: text
+  category: text
+  unit: text
+  renewable_share: numeric
+  value: numeric
+  loaded_at: timestamptz
+initial:
+  - country: de
+    ts_utc: '2026-10-18T01:30:00Z'
+    production_type: Solar
+    category: generation
+    unit: MW
+    renewable_share: '1'
+    value: '0.1000000000000000000000000000000000000001'
+    loaded_at: '2026-10-25T04:00:00Z'
+  - country: de
+    ts_utc: '2026-10-25T01:30:00Z'
+    production_type: Waste
+    category: generation
+    unit: MW
+    renewable_share: '0.5'
+    value: null
+    loaded_at: '2026-10-25T04:00:00Z'
+newer:
+  country: fr
+  ts_utc: '2026-10-25T02:30:00Z'
+  production_type: Solar
+  category: generation
+  unit: MW
+  renewable_share: '1'
+  value: '1234567890123456789012345678901234567890.01234567890123456789'
+  loaded_at: '2026-10-25T05:00:00Z'
+outside:
+  country: de
+  ts_utc: '2026-10-17T01:30:00Z'
+  production_type: Solar
+  category: generation
+  unit: MW
+  renewable_share: '1'
+  value: '1.25'
+  loaded_at: '2026-10-25T04:00:00Z'
+revision:
+  value: '0.1000000000000000000000000000000000000002'
+  loaded_at: '2026-10-25T05:00:00Z'
+fold:
+  - country: de
+    ts_utc: '2026-10-25T00:30:00Z'
+    production_type: Solar
+    category: generation
+    unit: MW
+    renewable_share: '1'
+    value: '10.125'
+    loaded_at: '2026-10-25T04:00:00Z'
+  - country: fr
+    ts_utc: '2026-10-25T00:30:00Z'
+    production_type: Solar
+    category: generation
+    unit: MW
+    renewable_share: '1'
+    value: '20.25'
+    loaded_at: '2026-10-25T04:00:00Z'
+  - country: de
+    ts_utc: '2026-10-25T01:30:00Z'
+    production_type: Solar
+    category: generation
+    unit: MW
+    renewable_share: '1'
+    value: '30.375'
+    loaded_at: '2026-10-25T04:00:00Z'
+  - country: fr
+    ts_utc: '2026-10-25T01:30:00Z'
+    production_type: Solar
+    category: generation
+    unit: MW
+    renewable_share: '1'
+    value: '40.5'
+    loaded_at: '2026-10-25T04:00:00Z'
+local_times:
+  '2026-10-17T01:30:00Z': '2026-10-17T03:30:00'
+  '2026-10-18T01:30:00Z': '2026-10-18T03:30:00'
+  '2026-10-25T00:30:00Z': '2026-10-25T02:30:00'
+  '2026-10-25T01:30:00Z': '2026-10-25T02:30:00'
+  '2026-10-25T02:30:00Z': '2026-10-25T03:30:00'
