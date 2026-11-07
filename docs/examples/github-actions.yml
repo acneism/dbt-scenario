@@ -1,0 +1,13 @@
+name: dbt-scenario
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  scenarios:
+    uses: acneism/dbt-scenario/.github/workflows/scenarios.yml@8f4b36cdf41c66b152127f1e0cb1c83f577578e7
+    with:
+      project-dir: .
+      scenario-dir: scenarios
+      config-file: scenario-runner.yml

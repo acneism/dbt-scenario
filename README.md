@@ -10,6 +10,8 @@ This is an early alpha. It supports PostgreSQL 16, Python 3.12, dbt Core 1.11 an
 
 In a Python 3.12 virtual environment, install the [verified alpha release](https://github.com/acneism/dbt-scenario/releases/tag/v0.1.0a12) and generate its example project. PostgreSQL 16 runs through Docker Compose; no repository checkout is needed.
 
+To try the supplied example without a local database or your own dbt project, run the [GitHub Actions example](docs/GITHUB-ACTIONS.md#try-it-without-your-own-project) in a fork. It installs the public package and starts its own test database.
+
 ```sh
 python -m pip install -c https://github.com/acneism/dbt-scenario/releases/download/v0.1.0a12/constraints.txt https://github.com/acneism/dbt-scenario/releases/download/v0.1.0a12/dbt_scenario-0.1.0a12-py3-none-any.whl
 dbt-scenario init --demo --project-dir scenario-demo
@@ -186,6 +188,8 @@ From 0.1.0a11, the CLI checks that `--scenario-dir` names a directory and `--sce
 A [real CLI regression check](docs/evaluation/scenario-selection-postgresql16-windows.json) confirmed that alpha 10 ignored a file passed as `--scenario-dir` while successfully running the other selected scenario on PostgreSQL. The corrected CLI rejects the same arguments before loading configuration, including with password variables removed.
 
 Each run writes `summary.json`, `summary.md` and `junit.xml` beneath `artifacts/scenarios/<run_id>/`. Reports contain counts and column names, without row values or raw dbt errors. dbt logs and temporary profiles are deleted with the temporary workspace. GitHub branch rules must make your test job required if you want it to block merges.
+
+For GitHub Actions, use the [ready workflow](docs/GITHUB-ACTIONS.md). It installs the verified public package, creates a disposable PostgreSQL service and restricted role, preserves failures and uploads summaries/JUnit even after a failed scenario. Configure the project/scenario paths and enable public dependency installation when needed; no production credentials or tool source checkout are required. Controlled runs verify success, an assertion failure followed by a passing scenario, and an empty selection.
 
 Execution evidence binds manifest and run-results to the current dbt invocation, requires one successful selected model, rejects forced full refresh and checks the target OID and emitted materialization SQL. Missing, stale or inconsistent evidence returns ERROR. Reports retain the invocation ID and SQL hash. See [execution verification](docs/EXECUTION.md).
 

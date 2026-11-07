@@ -51,6 +51,8 @@ A subsequent [selected portfolio-model check](CLINICAL-COMPATIBILITY.md) exercis
 
 Alpha 12 adds exact unconstrained numeric fixtures, guided by an original PostgreSQL cast and seed declaration in the [power-model check](POWER-COMPATIBILITY.md). That check exercises merge, a three-column key, a seven-day revision boundary and repeated local clock times. Original transformations/packages and an upstream catalog remain outside the focused fact-model execution. This narrows a concrete compatibility gap without completing the broader compatibility or pilot items.
 
+The [reusable GitHub Actions workflow](GITHUB-ACTIONS.md) now supplies a public-package installation and disposable test database without copying contributor scripts. A separate controlled consumer verifies exit codes 0/1/2, failure propagation, public dependency installation, reports and cleanup. These are machine-executed controls; human setup/maintenance comparison and external retention remain unmeasured.
+
 The remaining work is:
 
 - Broader SQL compatibility guided by real projects, while keeping the trusted-code/disposable-database boundary explicit.

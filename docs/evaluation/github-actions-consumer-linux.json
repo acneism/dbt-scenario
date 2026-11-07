@@ -1,0 +1,496 @@
+{
+  "schema_version": 1,
+  "status": "PASS",
+  "complete": true,
+  "checked_on": "2026-11-08",
+  "protocol": {
+    "synthetic_consumer": true,
+    "external_pilot": false,
+    "human_setup_time_measured": false,
+    "retention_measured": false,
+    "tool_runtime_or_scripts_in_checkout": false,
+    "public_package": "0.1.0a12",
+    "public_dependency": "dbt-labs/dbt_utils@1.3.3",
+    "source_database_config_deliberately_unusable": true,
+    "ci_database_replaced_source_settings": true,
+    "artifact_and_log_fixture_marker_checks": true,
+    "branch_protection_changed": false
+  },
+  "consumer_commit": "00e245353af634c38e8af4873a4f91116f81318a",
+  "workflow_commit": "8f4b36cdf41c66b152127f1e0cb1c83f577578e7",
+  "cases": {
+    "pass": {
+      "workflow_run_id": 42407930683,
+      "workflow_url": "https://github.com/acneism/dbt-scenario/actions/runs/42407930683",
+      "workflow_conclusion": "success",
+      "job_id": 128509569993,
+      "job_name": "scenarios / PostgreSQL scenarios",
+      "artifact_id": 13588710489,
+      "artifact_sha256": "443fbc5095e8e3c2f0d24963440895b236256a7414680ade16413a385e83bc1e",
+      "artifact_files": 7,
+      "log_evidence": {
+        "role_check_passed": true,
+        "public_dependency_installed": true,
+        "fixture_marker_absent": true
+      },
+      "aggregate": {
+        "schema_version": 1,
+        "package_version": "0.1.0a12",
+        "wheel_sha256": "483850af67e4ce0af275447f2b1ec33b9716aa4b9fb5b7d48e82208b175938b5",
+        "test_outcome": "success",
+        "test_exit_code": 0,
+        "reported_scenarios": 2,
+        "statuses": {
+          "PASS": 2
+        },
+        "cleanup_statuses": {
+          "CLEANED": 2
+        },
+        "summaries_valid": true,
+        "all_passed_and_cleaned": true
+      },
+      "scenarios": {
+        "consumer_empty_start": {
+          "overall_status": "PASS",
+          "cleanup_status": "CLEANED",
+          "scenario_hash": "ca2b9f9609fc82a3bad78add9a518971557d8a6e183cb4ffabef137eba5b526f",
+          "engine_versions": {
+            "dbt-core": "1.11.16",
+            "dbt-postgres": "1.10.2",
+            "postgresql": 160015
+          },
+          "steps": [
+            {
+              "name": "initial",
+              "requested_mode": "initial",
+              "observed_mode": "initial",
+              "observed_mode_evidence": {
+                "operation": "create_table",
+                "method": "dbt_invocation_main_sql_and_target_oid",
+                "invocation_id": "88d36f87-0c64-44bf-9ca5-3f3616379702",
+                "statement_sha256": "f266b9c65b3e7ab062ae856120808690579f2448131d84678e03dd15f97ded89"
+              },
+              "sql_audit": {
+                "status": "PASS",
+                "method": "sqlglot_postgres_scopes",
+                "checked_relations": 1,
+                "compiled_sha256": "5e5c8eedd1fb36e5a0ba9d87a16539af1ed44ff18f5bc23190c6b470a4e0beb8",
+                "run_compiled_sha256": "5e5c8eedd1fb36e5a0ba9d87a16539af1ed44ff18f5bc23190c6b470a4e0beb8"
+              },
+              "status": "PASS",
+              "reason_code": null,
+              "diff_counts": {
+                "missing": 0,
+                "unexpected": 0,
+                "changed": 0
+              },
+              "actual_rows": 0,
+              "expected_rows": 0,
+              "changed_columns": [],
+              "duration_ms": 8004
+            },
+            {
+              "name": "arrival",
+              "requested_mode": "incremental",
+              "observed_mode": "incremental",
+              "observed_mode_evidence": {
+                "operation": "delete+insert",
+                "method": "dbt_invocation_main_sql_and_target_oid",
+                "invocation_id": "a2f89a11-48da-46ae-ab59-ddb5c33a44f7",
+                "statement_sha256": "df864fb9980d44a541f8144c2c291e5f89fec5ea00b4e000d3f2bb78bc8f9303"
+              },
+              "sql_audit": {
+                "status": "PASS",
+                "method": "sqlglot_postgres_scopes",
+                "checked_relations": 2,
+                "compiled_sha256": "92025248667022645c4159fadd5751b8d5a8f8e77300439083ec60307fd2664a",
+                "run_compiled_sha256": "92025248667022645c4159fadd5751b8d5a8f8e77300439083ec60307fd2664a"
+              },
+              "status": "PASS",
+              "reason_code": null,
+              "diff_counts": {
+                "missing": 0,
+                "unexpected": 0,
+                "changed": 0
+              },
+              "actual_rows": 2,
+              "expected_rows": 2,
+              "changed_columns": [],
+              "duration_ms": 8018
+            },
+            {
+              "name": "retry",
+              "requested_mode": "incremental",
+              "observed_mode": "incremental",
+              "observed_mode_evidence": {
+                "operation": "delete+insert",
+                "method": "dbt_invocation_main_sql_and_target_oid",
+                "invocation_id": "10611f22-456e-44ac-9d07-02f8019aa258",
+                "statement_sha256": "903600c09505d22a0f7cd2f0944c5c2bccf57548c289af914eed2bb7e8c1adfd"
+              },
+              "sql_audit": {
+                "status": "PASS",
+                "method": "sqlglot_postgres_scopes",
+                "checked_relations": 2,
+                "compiled_sha256": "92025248667022645c4159fadd5751b8d5a8f8e77300439083ec60307fd2664a",
+                "run_compiled_sha256": "92025248667022645c4159fadd5751b8d5a8f8e77300439083ec60307fd2664a"
+              },
+              "status": "PASS",
+              "reason_code": null,
+              "diff_counts": {
+                "missing": 0,
+                "unexpected": 0,
+                "changed": 0
+              },
+              "actual_rows": 2,
+              "expected_rows": 2,
+              "changed_columns": [],
+              "duration_ms": 8041
+            }
+          ]
+        },
+        "consumer_update_retry": {
+          "overall_status": "PASS",
+          "cleanup_status": "CLEANED",
+          "scenario_hash": "4f399fe7ddd5361ecc5524f60e344f66691ca11d975eff81fe7aa4cb82dce8a9",
+          "engine_versions": {
+            "dbt-core": "1.11.16",
+            "dbt-postgres": "1.10.2",
+            "postgresql": 160015
+          },
+          "steps": [
+            {
+              "name": "initial",
+              "requested_mode": "initial",
+              "observed_mode": "initial",
+              "observed_mode_evidence": {
+                "operation": "create_table",
+                "method": "dbt_invocation_main_sql_and_target_oid",
+                "invocation_id": "ce8d359a-eb75-4d37-add6-3d8140c4e073",
+                "statement_sha256": "cd7d75c3f268eafeb46340676e2d00eff803281059be36b9e24b402512388519"
+              },
+              "sql_audit": {
+                "status": "PASS",
+                "method": "sqlglot_postgres_scopes",
+                "checked_relations": 1,
+                "compiled_sha256": "c64cf40a248222b388ab1f5ab1e1e3f60d643c10787ac159882d0a40e8dddc74",
+                "run_compiled_sha256": "c64cf40a248222b388ab1f5ab1e1e3f60d643c10787ac159882d0a40e8dddc74"
+              },
+              "status": "PASS",
+              "reason_code": null,
+              "diff_counts": {
+                "missing": 0,
+                "unexpected": 0,
+                "changed": 0
+              },
+              "actual_rows": 1,
+              "expected_rows": 1,
+              "changed_columns": [],
+              "duration_ms": 8087
+            },
+            {
+              "name": "arrival",
+              "requested_mode": "incremental",
+              "observed_mode": "incremental",
+              "observed_mode_evidence": {
+                "operation": "delete+insert",
+                "method": "dbt_invocation_main_sql_and_target_oid",
+                "invocation_id": "6549c6d0-1c17-42f1-b395-c6ddf105794e",
+                "statement_sha256": "e0c87518356bbcf501025cd0b653fbd9553852fdefb8499cb24ade31163c36f3"
+              },
+              "sql_audit": {
+                "status": "PASS",
+                "method": "sqlglot_postgres_scopes",
+                "checked_relations": 2,
+                "compiled_sha256": "870e2112665e061ae87644995f8cee8d85a82345a0dfc1d29248010592ff037d",
+                "run_compiled_sha256": "870e2112665e061ae87644995f8cee8d85a82345a0dfc1d29248010592ff037d"
+              },
+              "status": "PASS",
+              "reason_code": null,
+              "diff_counts": {
+                "missing": 0,
+                "unexpected": 0,
+                "changed": 0
+              },
+              "actual_rows": 2,
+              "expected_rows": 2,
+              "changed_columns": [],
+              "duration_ms": 8068
+            },
+            {
+              "name": "retry",
+              "requested_mode": "incremental",
+              "observed_mode": "incremental",
+              "observed_mode_evidence": {
+                "operation": "delete+insert",
+                "method": "dbt_invocation_main_sql_and_target_oid",
+                "invocation_id": "2fe9d79f-18da-49e3-9a27-0580ff380be2",
+                "statement_sha256": "a47d59b3e099132978fac8ea36dfc18be0679ac605c3a01815b5b6376fbb721c"
+              },
+              "sql_audit": {
+                "status": "PASS",
+                "method": "sqlglot_postgres_scopes",
+                "checked_relations": 2,
+                "compiled_sha256": "870e2112665e061ae87644995f8cee8d85a82345a0dfc1d29248010592ff037d",
+                "run_compiled_sha256": "870e2112665e061ae87644995f8cee8d85a82345a0dfc1d29248010592ff037d"
+              },
+              "status": "PASS",
+              "reason_code": null,
+              "diff_counts": {
+                "missing": 0,
+                "unexpected": 0,
+                "changed": 0
+              },
+              "actual_rows": 2,
+              "expected_rows": 2,
+              "changed_columns": [],
+              "duration_ms": 8058
+            }
+          ]
+        }
+      }
+    },
+    "assertion_failure": {
+      "workflow_run_id": 42407937624,
+      "workflow_url": "https://github.com/acneism/dbt-scenario/actions/runs/42407937624",
+      "workflow_conclusion": "failure",
+      "job_id": 128509592767,
+      "job_name": "scenarios / PostgreSQL scenarios",
+      "artifact_id": 13588326725,
+      "artifact_sha256": "9c5565637c75179af93a42d62ee9a9fb8032ff032c2578378b7fa52ff2651de3",
+      "artifact_files": 7,
+      "log_evidence": {
+        "role_check_passed": true,
+        "public_dependency_installed": true,
+        "fixture_marker_absent": true,
+        "failed_scenario_followed_by_successful_scenario": true
+      },
+      "aggregate": {
+        "schema_version": 1,
+        "package_version": "0.1.0a12",
+        "wheel_sha256": "483850af67e4ce0af275447f2b1ec33b9716aa4b9fb5b7d48e82208b175938b5",
+        "test_outcome": "failure",
+        "test_exit_code": 1,
+        "reported_scenarios": 2,
+        "statuses": {
+          "FAIL": 1,
+          "PASS": 1
+        },
+        "cleanup_statuses": {
+          "CLEANED": 2
+        },
+        "summaries_valid": true,
+        "all_passed_and_cleaned": false
+      },
+      "scenarios": {
+        "consumer_wrong_expectation": {
+          "overall_status": "FAIL",
+          "cleanup_status": "CLEANED",
+          "scenario_hash": "9dc1029680b91036930e9678e309550c290937fab34039b7a65625fd95013c02",
+          "engine_versions": {
+            "dbt-core": "1.11.16",
+            "dbt-postgres": "1.10.2",
+            "postgresql": 160015
+          },
+          "steps": [
+            {
+              "name": "initial",
+              "requested_mode": "initial",
+              "observed_mode": "initial",
+              "observed_mode_evidence": {
+                "operation": "create_table",
+                "method": "dbt_invocation_main_sql_and_target_oid",
+                "invocation_id": "dcb140ed-72da-485f-b5b0-c4735eaea54d",
+                "statement_sha256": "218a4d8d66ffd3c043e7ecb38db390db70859ce059d14c6f22e4e968e749b312"
+              },
+              "sql_audit": {
+                "status": "PASS",
+                "method": "sqlglot_postgres_scopes",
+                "checked_relations": 1,
+                "compiled_sha256": "66e6874c5dac2d0ef40d9fe76eadb3ada6a50a83e12b60dd0f3c2a54d66d9678",
+                "run_compiled_sha256": "66e6874c5dac2d0ef40d9fe76eadb3ada6a50a83e12b60dd0f3c2a54d66d9678"
+              },
+              "status": "FAIL",
+              "reason_code": "ROWS_MISMATCH",
+              "diff_counts": {
+                "missing": 0,
+                "unexpected": 0,
+                "changed": 1
+              },
+              "actual_rows": 1,
+              "expected_rows": 1,
+              "changed_columns": [
+                "amount"
+              ],
+              "duration_ms": 7472
+            },
+            {
+              "name": "arrival",
+              "status": "NOT_RUN",
+              "reason_code": "PREVIOUS_STEP_UNSUCCESSFUL",
+              "duration_ms": 0
+            },
+            {
+              "name": "retry",
+              "status": "NOT_RUN",
+              "reason_code": "PREVIOUS_STEP_UNSUCCESSFUL",
+              "duration_ms": 0
+            }
+          ]
+        },
+        "consumer_valid_after_failure": {
+          "overall_status": "PASS",
+          "cleanup_status": "CLEANED",
+          "scenario_hash": "39de33a57aec4815b2ea883d0bb28958413575826cae203d05a04ca67191116d",
+          "engine_versions": {
+            "dbt-core": "1.11.16",
+            "dbt-postgres": "1.10.2",
+            "postgresql": 160015
+          },
+          "steps": [
+            {
+              "name": "initial",
+              "requested_mode": "initial",
+              "observed_mode": "initial",
+              "observed_mode_evidence": {
+                "operation": "create_table",
+                "method": "dbt_invocation_main_sql_and_target_oid",
+                "invocation_id": "a3c613dd-2c35-4c90-9262-e20a8fcdd287",
+                "statement_sha256": "3c24c6cc7dfbdb947424130d2fd747b6d5c53ed4b2f2733e27f4934655532c68"
+              },
+              "sql_audit": {
+                "status": "PASS",
+                "method": "sqlglot_postgres_scopes",
+                "checked_relations": 1,
+                "compiled_sha256": "4eb6a3ab22d30fb57d34dedfc8a544641bb0f1ba5561e32defa1f6ff3fbb04db",
+                "run_compiled_sha256": "4eb6a3ab22d30fb57d34dedfc8a544641bb0f1ba5561e32defa1f6ff3fbb04db"
+              },
+              "status": "PASS",
+              "reason_code": null,
+              "diff_counts": {
+                "missing": 0,
+                "unexpected": 0,
+                "changed": 0
+              },
+              "actual_rows": 1,
+              "expected_rows": 1,
+              "changed_columns": [],
+              "duration_ms": 7526
+            },
+            {
+              "name": "arrival",
+              "requested_mode": "incremental",
+              "observed_mode": "incremental",
+              "observed_mode_evidence": {
+                "operation": "delete+insert",
+                "method": "dbt_invocation_main_sql_and_target_oid",
+                "invocation_id": "2afa891d-a055-46b3-9927-368bb5fbba8c",
+                "statement_sha256": "4264692604da47089fa369aee416c3e37c41cbd2700c719fed4321916f5d7b01"
+              },
+              "sql_audit": {
+                "status": "PASS",
+                "method": "sqlglot_postgres_scopes",
+                "checked_relations": 2,
+                "compiled_sha256": "99dd0cb4984668ea8ad45447a73c790df1a4dbf383b878654aa61717f59cfb95",
+                "run_compiled_sha256": "99dd0cb4984668ea8ad45447a73c790df1a4dbf383b878654aa61717f59cfb95"
+              },
+              "status": "PASS",
+              "reason_code": null,
+              "diff_counts": {
+                "missing": 0,
+                "unexpected": 0,
+                "changed": 0
+              },
+              "actual_rows": 2,
+              "expected_rows": 2,
+              "changed_columns": [],
+              "duration_ms": 7632
+            },
+            {
+              "name": "retry",
+              "requested_mode": "incremental",
+              "observed_mode": "incremental",
+              "observed_mode_evidence": {
+                "operation": "delete+insert",
+                "method": "dbt_invocation_main_sql_and_target_oid",
+                "invocation_id": "67174072-4fa4-4212-acda-61cf0ca9e1a1",
+                "statement_sha256": "eb8c0a82697ac45f70bc08abb9eac307bf89848cea00958f20027fa48b4f9799"
+              },
+              "sql_audit": {
+                "status": "PASS",
+                "method": "sqlglot_postgres_scopes",
+                "checked_relations": 2,
+                "compiled_sha256": "99dd0cb4984668ea8ad45447a73c790df1a4dbf383b878654aa61717f59cfb95",
+                "run_compiled_sha256": "99dd0cb4984668ea8ad45447a73c790df1a4dbf383b878654aa61717f59cfb95"
+              },
+              "status": "PASS",
+              "reason_code": null,
+              "diff_counts": {
+                "missing": 0,
+                "unexpected": 0,
+                "changed": 0
+              },
+              "actual_rows": 2,
+              "expected_rows": 2,
+              "changed_columns": [],
+              "duration_ms": 7621
+            }
+          ]
+        }
+      }
+    },
+    "empty_selection": {
+      "workflow_run_id": 42407940329,
+      "workflow_url": "https://github.com/acneism/dbt-scenario/actions/runs/42407940329",
+      "workflow_conclusion": "failure",
+      "job_id": 128509601097,
+      "job_name": "scenarios / PostgreSQL scenarios",
+      "artifact_id": 13587774707,
+      "artifact_sha256": "4f1b5314923c75b5d9af28e6f43d7677b1a60620c069aebd739ce8838c87b04b",
+      "artifact_files": 1,
+      "log_evidence": {
+        "role_check_passed": true,
+        "public_dependency_installed": true,
+        "fixture_marker_absent": true,
+        "empty_selection_diagnostic": true
+      },
+      "aggregate": {
+        "schema_version": 1,
+        "package_version": "0.1.0a12",
+        "wheel_sha256": "483850af67e4ce0af275447f2b1ec33b9716aa4b9fb5b7d48e82208b175938b5",
+        "test_outcome": "failure",
+        "test_exit_code": 2,
+        "reported_scenarios": 0,
+        "statuses": {},
+        "cleanup_statuses": {},
+        "summaries_valid": true,
+        "all_passed_and_cleaned": false
+      },
+      "scenarios": {}
+    }
+  },
+  "verified_materializations": 10,
+  "consumer_files": 18,
+  "main_ci": {
+    "run_id": 42407744919,
+    "url": "https://github.com/acneism/dbt-scenario/actions/runs/42407744919",
+    "source_commit": "8f4b36cdf41c66b152127f1e0cb1c83f577578e7",
+    "status": "success",
+    "unit_tests_passed": 388,
+    "integration_tests_passed": 93,
+    "offline_job_passed": true
+  },
+  "main_example": {
+    "run_id": 42407744999,
+    "url": "https://github.com/acneism/dbt-scenario/actions/runs/42407744999",
+    "status": "success",
+    "job_name": "scenarios / PostgreSQL scenarios"
+  },
+  "workflow_validation": {
+    "status": "PASS",
+    "actionlint_version": "1.7.12",
+    "actionlint_download_sha256": "6e7241b51e6817ea6a047693d8e6fed13b31819c9a0dd6c5a726e1592d22f6e9",
+    "embedded_python_programs_compiled": 4,
+    "code_comments_or_docstrings": false
+  }
+}
