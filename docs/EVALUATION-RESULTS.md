@@ -25,6 +25,10 @@ The [historical regression replay](HISTORICAL-REGRESSION.md#recorded-result) com
 
 The separate [watermark boundary investigation](WATERMARK-BOUNDARY.md#recorded-result) adds nine runs against a newer pinned upstream snapshot: three event-time cases, the unchanged model, a local `>=` candidate, and a complete initial-snapshot control. Equal-time arrivals fail only the unchanged predicate; older arrivals fail both incremental variants. The original source's delivery guarantees remain unverified, and no production defect or newly missed native test is claimed.
 
+## Selected external anti-join SQL
+
+The [clinical portfolio-model check](CLINICAL-COMPATIBILITY.md) adds unchanged PostgreSQL `NOT EXISTS` SQL and a 28-column fixture contract. Empty start, a later lower-valued key and retries exercise the supported path. A pair of scenarios uses identical changed inputs with two different expectations: retaining the existing key is the upstream design's positive control; deliberately requiring an update must fail with exactly one changed row. This assertion control is not a discovered defect or evidence that native dbt tests missed a bug. The upstream staging/enrichment SQL and native tests are not executed, and an upstream catalog is not validated.
+
 ## Three approach integrations
 
 All three approaches used byte-identical model SQL and shared fixtures within each case. FAIL means the gate detected an intentionally invalid result; PASS is expected only for the correct case.

@@ -163,6 +163,8 @@ For `double precision`, use quoted finite decimal strings such as `'0.1'`. They 
 
 An [external PostgreSQL model check](docs/AQW-COMPATIBILITY.md) exercises unchanged MIT-licensed fact SQL with synthetic staging fixtures: newer-data and empty-start scenarios pass, while a same-timestamp late-sensor case reports the expected missing row. The check runs on PostgreSQL 16 and does not establish original-pipeline delivery guarantees or external-user adoption.
 
+A second [external model check](docs/CLINICAL-COMPATIBILITY.md) covers a correlated `NOT EXISTS` predicate and 28 output columns. It distinguishes the model's deliberate new-keys-only behavior from an intentionally incompatible update expectation, using the same input changes for both.
+
 Numeric precision is supported from 1 to 99, with scale between 0 and precision. Decimal fixtures are validated independently of Python's global Decimal context. Values that require rounding are rejected. Timestamp fractions are limited to six digits; finer values are rejected instead of silently truncated. Text comparisons distinguish case, accents and Unicode normalization forms, including when a model uses a nondeterministic collation.
 
 A referenced fixture file is read and hashed once per scenario load. Reusing it for an input and an expectation still creates independent row snapshots; changing one in programmatic code does not change the other.

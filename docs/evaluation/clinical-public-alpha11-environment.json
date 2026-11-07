@@ -1,0 +1,9 @@
+{
+  "status": "PASS",
+  "isolated_python": true,
+  "module_inside_consumer_environment": true,
+  "version": "0.1.0a11",
+  "direct_url": "https://github.com/acneism/dbt-scenario/releases/download/v0.1.0a11/dbt_scenario-0.1.0a11-py3-none-any.whl",
+  "wheel_sha256": "8c5f21ed61d386da6b14854059a16a5d8264a7e78ada21357c356d6bdfee4d52",
+  "verified_package_files": 31
+}

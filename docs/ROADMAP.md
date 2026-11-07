@@ -47,6 +47,8 @@ Implemented in alpha 7–9:
 
 Alpha 10 fixes the packaged empty-start example. Alpha 11 adds finite double precision fixtures and [checks an unchanged public PostgreSQL demonstration model](AQW-COMPATIBILITY.md), including a composite key and three double columns. It also moves known macro refusals earlier and validates CLI selection paths. This is compatibility evidence for one selected model; setup effort and continued use by an external team are still unmeasured.
 
+A subsequent [selected portfolio-model check](CLINICAL-COMPATIBILITY.md) exercises unchanged correlated anti-join SQL, 28 output columns and the distinction between new-key-only and update expectations. Its typed fixture contract does not validate the complete original pipeline or upstream catalog. Broader compatibility and all three remaining items stay open.
+
 The remaining work is:
 
 - Broader SQL compatibility guided by real projects, while keeping the trusted-code/disposable-database boundary explicit.
