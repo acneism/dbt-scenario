@@ -33,6 +33,8 @@ The [Windows report](evaluation/clinical-antijoin-postgresql16-windows.json) use
 
 The [Linux report](evaluation/clinical-antijoin-postgresql16-linux.json) comes from the [external-model CI run](https://github.com/acneism/dbt-scenario/actions/runs/42320536805), job `clinical-antijoin-postgresql`. Its artifact ZIP SHA-256 was checked against GitHub's digest: `7d2e24be5adcb31562fa77da3c70755457ac5b721df3c2c3b7a47a55d617fe87`. Both reports use verification-script commit `6b56b854a3718845af7e543836d800af486583c9`. That commit's runtime source and package configuration are byte-identical in Git to the published alpha11 source; the added compatibility harness is contributor tooling.
 
+The [full CI for that commit](https://github.com/acneism/dbt-scenario/actions/runs/42320536779) also passed: 345 unit tests, 81 PostgreSQL integration tests, the repository demo and the installed demo without external networking. Integration tests took 946.49 seconds; this is CI-suite duration, not a model benchmark or human setup measurement.
+
 ## Reproduction
 
 From a contributor checkout with Python 3.12 and its locked dependencies installed, start the dedicated PostgreSQL 16 database and export its configured test password:
