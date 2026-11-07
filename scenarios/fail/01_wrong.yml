@@ -1,0 +1,48 @@
+version: 1
+name: consumer_wrong_expectation
+model: model.consumer.fct_orders
+inputs:
+  orders:
+    node: model.consumer.stg_orders
+    columns:
+      order_id: bigint
+      amount: numeric(12,2)
+      adjustment: numeric(12,2)
+      customer: text
+      updated_at: timestamp
+output:
+  columns:
+    order_id: bigint
+    amount: numeric(12,2)
+    customer: text
+    updated_at: timestamp
+  primary_key:
+  - order_id
+steps:
+- name: initial
+  inputs:
+    orders:
+      replace:
+        fixture: ../fixtures/initial.yml
+  run:
+    mode: initial
+  expect:
+    rows:
+    - order_id: 1
+      amount: '999.00'
+      customer: pilot.fixture.private@example.invalid
+      updated_at: '2026-11-08T00:00:00'
+- name: arrival
+  inputs:
+    orders:
+      replace:
+        fixture: ../fixtures/arrival.yml
+  run:
+    mode: incremental
+  expect:
+    fixture: ../fixtures/expected_arrival.yml
+- name: retry
+  run:
+    mode: incremental
+  expect:
+    same_as: arrival

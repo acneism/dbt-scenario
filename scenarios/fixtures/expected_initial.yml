@@ -1,0 +1,5 @@
+rows:
+- order_id: 1
+  amount: '11.00'
+  customer: pilot.fixture.private@example.invalid
+  updated_at: '2026-11-08T00:00:00'

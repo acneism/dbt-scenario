@@ -1,0 +1,19 @@
+name: Consumer scenario gate
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      scenario-dir:
+        type: string
+        default: scenarios/pass
+        description: Controlled pass, fail or empty scenario directory
+permissions:
+  contents: read
+jobs:
+  scenarios:
+    uses: acneism/dbt-scenario/.github/workflows/scenarios.yml@8f4b36cdf41c66b152127f1e0cb1c83f577578e7
+    with:
+      project-dir: .
+      scenario-dir: ${{ inputs.scenario-dir || 'scenarios/pass' }}
+      config-file: scenario-runner.yml
+      install-deps: true

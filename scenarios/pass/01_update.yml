@@ -1,0 +1,44 @@
+version: 1
+name: consumer_update_retry
+model: model.consumer.fct_orders
+inputs:
+  orders:
+    node: model.consumer.stg_orders
+    columns:
+      order_id: bigint
+      amount: numeric(12,2)
+      adjustment: numeric(12,2)
+      customer: text
+      updated_at: timestamp
+output:
+  columns:
+    order_id: bigint
+    amount: numeric(12,2)
+    customer: text
+    updated_at: timestamp
+  primary_key:
+  - order_id
+steps:
+- name: initial
+  inputs:
+    orders:
+      replace:
+        fixture: ../fixtures/initial.yml
+  run:
+    mode: initial
+  expect:
+    fixture: ../fixtures/expected_initial.yml
+- name: arrival
+  inputs:
+    orders:
+      replace:
+        fixture: ../fixtures/arrival.yml
+  run:
+    mode: incremental
+  expect:
+    fixture: ../fixtures/expected_arrival.yml
+- name: retry
+  run:
+    mode: incremental
+  expect:
+    same_as: arrival

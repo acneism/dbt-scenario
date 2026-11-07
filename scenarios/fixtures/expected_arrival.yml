@@ -1,0 +1,9 @@
+rows:
+- order_id: 1
+  amount: '14.00'
+  customer: pilot.fixture.private@example.invalid
+  updated_at: '2026-11-08T01:00:00'
+- order_id: 2
+  amount: '20.50'
+  customer: pilot.fixture.private@example.invalid
+  updated_at: '2026-11-08T01:00:00'
