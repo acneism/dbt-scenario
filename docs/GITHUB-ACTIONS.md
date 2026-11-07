@@ -22,7 +22,7 @@ GitHub calls reusable workflows at the job level. Access to public workflows dep
 
 ## Try it without your own project
 
-Fork dbt-scenario, enable Actions in the fork and manually run the [published-package example](../.github/workflows/scenarios-smoke.yml) on `main` with its default `scenario-dir: scenarios`. It uses the supplied shop project and starts its own PostgreSQL service. No local Docker installation, warehouse or production credentials are needed. The example covers an update/retry and an empty initial target; trying it is separate from the existing-project pilot.
+Fork dbt-scenario and enable Actions in the fork, or use Actions directly if you already own this repository. Manually run the [published-package example](../.github/workflows/scenarios-smoke.yml) on `main` with its default `scenario-dir: scenarios`. It uses the supplied shop project and starts its own PostgreSQL service. No local Docker installation, warehouse or production credentials are needed. The example covers an update/retry and an empty initial target; trying it is separate from the existing-project pilot.
 
 ## Choose paths and dependencies
 
