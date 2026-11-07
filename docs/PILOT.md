@@ -54,6 +54,8 @@ Record elapsed human setup time, edits to the project, compatibility failures an
 
 For GitHub Actions, the [ready CI workflow](GITHUB-ACTIONS.md) supplies its own PostgreSQL 16 service, restricted role and verified public package. Copy the caller file, set the project/scenario paths and make the resulting check required in your repository's branch rule. Set `install-deps: true` for public dbt dependencies. The workflow replaces database settings with its disposable service; private package credentials and custom project environment values need a separate setup. Record the human work needed to connect it, and have the second scenario added through the same selected directory.
 
+The [first-to-second scenario walkthrough](FIRST-AND-SECOND-SCENARIO.md) shows which four row lists to complete, how to add an empty-start case and how to confirm that the unchanged CI caller selects both files. Its recorded author-run rehearsal checks the technical path; it does not supply a human setup measurement.
+
 ## Compare with existing tests
 
 Run the project's existing checks against the same concern. If practical, implement equivalent assertions with native dbt tests and a sequence-driving script, or audit-helper-ext. Use identical inputs, expected state and model SQL. Record what each approach actually executed and how much human work it required. Passing unique/not_null alone does not establish that all expected rows arrived; a correctly supplied native unit test can catch many SQL errors.

@@ -1,0 +1,598 @@
+{
+  "schema_version": 1,
+  "status": "PASS",
+  "complete": true,
+  "checked_on": "2026-11-08",
+  "protocol": {
+    "author_run": true,
+    "synthetic_rows": true,
+    "real_dbt_manifest": true,
+    "column_declarations_manually_supplied": true,
+    "template_generation_database_required": false,
+    "tool_runtime_or_contributor_scripts_in_consumer": false,
+    "human_setup_time_measured": false,
+    "independently_authored_second_scenario": false,
+    "external_pilot": false,
+    "external_retention_observed": false
+  },
+  "public_package": {
+    "version": "0.1.0a12",
+    "wheel_sha256": "483850af67e4ce0af275447f2b1ec33b9716aa4b9fb5b7d48e82208b175938b5",
+    "installed_runtime_resource_files_matched": 31
+  },
+  "workflow_commit": "8f4b36cdf41c66b152127f1e0cb1c83f577578e7",
+  "consumer_branch": "validation/onboarding-2026-11-08",
+  "manifest_sha256": "f33b23f9e0ba1de81a6f6142b257510194fe1282231ad09e7de159502c6bb28e",
+  "manifest_generated_by": "dbt parse 1.11.16",
+  "cli_checks": {
+    "first": {
+      "commit": "5a7742df1fbd884582b68f6b5aafe74cdf1c840f",
+      "file": "scenarios/fct_orders.yml",
+      "row_lists_completed": 4,
+      "config_preserved": true,
+      "collision_refused_without_changes": true,
+      "file_sha256": "a7fbe002b65b8d527866794f43526f48beb8b0e17d432f2cadfda614671e2c4e",
+      "events": [
+        {
+          "command": [
+            "dbt.exe",
+            "deps",
+            "--project-dir",
+            "<rehearsal>\\project",
+            "--profiles-dir",
+            "<rehearsal>\\profiles"
+          ],
+          "exit_code": 0
+        },
+        {
+          "command": [
+            "dbt.exe",
+            "parse",
+            "--project-dir",
+            "<rehearsal>\\project",
+            "--profiles-dir",
+            "<rehearsal>\\profiles",
+            "--no-partial-parse"
+          ],
+          "exit_code": 0
+        },
+        {
+          "command": [
+            "dbt-scenario.exe",
+            "discover",
+            "--project-dir",
+            "<rehearsal>\\project",
+            "--manifest",
+            "<rehearsal>\\project\\target\\manifest.json"
+          ],
+          "exit_code": 0,
+          "output": "{\n  \"schema_version\": 1,\n  \"project\": \"consumer\",\n  \"scope\": \"template_initialization\",\n  \"execution_checked\": false,\n  \"catalog_used\": false,\n  \"summary\": {\n    \"TEMPLATE_READY\": 1,\n    \"NEEDS_PRIMARY_KEY\": 0,\n    \"NEEDS_COLUMN_TYPES\": 0,\n    \"NEEDS_SCENARIO_NAME\": 0,\n    \"BLOCKED\": 0\n  },\n  \"models\": [\n    {\n      \"model\": \"model.consumer.fct_orders\",\n      \"status\": \"TEMPLATE_READY\",\n      \"reason_code\": null,\n      \"input_count\": 1\n    }\n  ]\n}\n"
+        },
+        {
+          "command": [
+            "dbt-scenario.exe",
+            "init",
+            "--project-dir",
+            "<rehearsal>\\project",
+            "--model",
+            "fct_orders",
+            "--manifest",
+            "<rehearsal>\\project\\target\\manifest.json"
+          ],
+          "exit_code": 0,
+          "output": "CREATED scenarios/fct_orders.yml\nTemplate created from metadata; replace every rows placeholder with a row list.\nRun validate to check the edited fixtures, then configure the database and test.\n"
+        },
+        {
+          "command": [
+            "dbt-scenario.exe",
+            "validate",
+            "--project-dir",
+            "<rehearsal>\\project",
+            "--scenario",
+            "<rehearsal>\\project\\scenarios\\fct_orders.yml"
+          ],
+          "exit_code": 2,
+          "output": "ERROR UNFILLED_TEMPLATE_ROWS at $.steps[0].inputs[*].replace.rows\n  Replace this rows placeholder with an explicit YAML row list; use [] for empty data.\n"
+        },
+        {
+          "command": [
+            "dbt-scenario.exe",
+            "validate",
+            "--project-dir",
+            "<rehearsal>\\project",
+            "--scenario",
+            "<rehearsal>\\project\\scenarios\\fct_orders.yml"
+          ],
+          "exit_code": 0,
+          "output": "VALID definition: 1 inputs, 3 steps.\nNext: plan and test the model against the disposable database.\n"
+        },
+        {
+          "command": [
+            "dbt-scenario.exe",
+            "init",
+            "--project-dir",
+            "<rehearsal>\\project",
+            "--model",
+            "fct_orders",
+            "--manifest",
+            "<rehearsal>\\project\\target\\manifest.json"
+          ],
+          "exit_code": 2,
+          "output": "ERROR INIT_WOULD_OVERWRITE\n  Choose a new destination or preserve the existing files before initializing.\n"
+        }
+      ]
+    },
+    "second": {
+      "commit": "cd203901ddf9c5b1427259bfc4059d8461417146",
+      "file": "scenarios/orders_empty_start.yml",
+      "row_lists_completed": 4,
+      "first_scenario_preserved": true,
+      "config_preserved": true,
+      "workflow_preserved": true,
+      "model_preserved": true,
+      "only_added_scenario_changed": true,
+      "file_sha256": "8aa2b13a0ccce2a49e9f67e8c69ddcd2fb9ad7daf88d05b4e19b95c6801775c5",
+      "events": [
+        {
+          "command": [
+            "dbt-scenario.exe",
+            "init",
+            "--project-dir",
+            "<rehearsal>\\project",
+            "--model",
+            "fct_orders",
+            "--manifest",
+            "<rehearsal>\\project\\target\\manifest.json",
+            "--scenario-name",
+            "orders_empty_start"
+          ],
+          "exit_code": 0,
+          "output": "CREATED scenarios/orders_empty_start.yml\nTemplate created from metadata; replace every rows placeholder with a row list.\nRun validate to check the edited fixtures, then configure the database and test.\n"
+        },
+        {
+          "command": [
+            "dbt-scenario.exe",
+            "validate",
+            "--project-dir",
+            "<rehearsal>\\project",
+            "--scenario",
+            "<rehearsal>\\project\\scenarios\\orders_empty_start.yml"
+          ],
+          "exit_code": 2,
+          "output": "ERROR UNFILLED_TEMPLATE_ROWS at $.steps[0].inputs[*].replace.rows\n  Replace this rows placeholder with an explicit YAML row list; use [] for empty data.\n"
+        },
+        {
+          "command": [
+            "dbt-scenario.exe",
+            "validate",
+            "--project-dir",
+            "<rehearsal>\\project",
+            "--scenario",
+            "<rehearsal>\\project\\scenarios\\orders_empty_start.yml"
+          ],
+          "exit_code": 0,
+          "output": "VALID definition: 1 inputs, 3 steps.\nNext: plan and test the model against the disposable database.\n"
+        }
+      ]
+    }
+  },
+  "only_second_scenario_added": true,
+  "diff_name_status": "A\tscenarios/orders_empty_start.yml",
+  "verified_materializations": 9,
+  "stages": {
+    "first": {
+      "status": "PASS",
+      "complete": true,
+      "stage": "first",
+      "consumer_commit": "5a7742df1fbd884582b68f6b5aafe74cdf1c840f",
+      "workflow_run_id": 42410315897,
+      "workflow_url": "https://github.com/acneism/dbt-scenario/actions/runs/42410315897",
+      "workflow_conclusion": "success",
+      "job_id": 128516826916,
+      "artifact_id": 13589206079,
+      "artifact_sha256": "dcc1d6f5d6a3a5a37e7d9d4e7324bf4e99bd3dd395a48d8c55e45567bff93809",
+      "artifact_files": 4,
+      "consumer_files": [
+        ".github/workflows/scenarios-smoke.yml",
+        "LICENSE",
+        "README.md",
+        "dbt_project.yml",
+        "models/fct_orders.sql",
+        "models/schema.yml",
+        "models/sources.yml",
+        "models/stg_orders.sql",
+        "package-lock.yml",
+        "packages.yml",
+        "scenario-runner.yml",
+        "scenarios/fct_orders.yml"
+      ],
+      "log_evidence": {
+        "postgresql16_restricted_role_ready": true,
+        "dbt_utils_1_3_3_installed": true,
+        "first_scenario_pass": true,
+        "fixture_marker_absent": true
+      },
+      "aggregate": {
+        "schema_version": 1,
+        "package_version": "0.1.0a12",
+        "wheel_sha256": "483850af67e4ce0af275447f2b1ec33b9716aa4b9fb5b7d48e82208b175938b5",
+        "test_outcome": "success",
+        "test_exit_code": 0,
+        "reported_scenarios": 1,
+        "statuses": {
+          "PASS": 1
+        },
+        "cleanup_statuses": {
+          "CLEANED": 1
+        },
+        "summaries_valid": true,
+        "all_passed_and_cleaned": true
+      },
+      "scenarios": {
+        "test_fct_orders": {
+          "overall_status": "PASS",
+          "cleanup_status": "CLEANED",
+          "scenario_hash": "5f47983445bbf11457d6b30d1968c2c7a241e536bb8399a3b9427ef0dbd54fc8",
+          "engine_versions": {
+            "dbt-core": "1.11.16",
+            "dbt-postgres": "1.10.2",
+            "postgresql": 160015
+          },
+          "steps": [
+            {
+              "name": "initial",
+              "requested_mode": "initial",
+              "observed_mode": "initial",
+              "observed_mode_evidence": {
+                "operation": "create_table",
+                "method": "dbt_invocation_main_sql_and_target_oid",
+                "invocation_id": "ef24d2b8-2e41-405f-be1c-c58d3f117b7e",
+                "statement_sha256": "2a0c30901da4f65411d5530db02f08f0fa305c72e87dd5ab7683203271bd3c7b"
+              },
+              "sql_audit": {
+                "status": "PASS",
+                "method": "sqlglot_postgres_scopes",
+                "checked_relations": 1,
+                "compiled_sha256": "af490314630f2175bd19c2d7b2ef670c04074e0736eaf49e3bab50a83ccd07b8",
+                "run_compiled_sha256": "af490314630f2175bd19c2d7b2ef670c04074e0736eaf49e3bab50a83ccd07b8"
+              },
+              "status": "PASS",
+              "reason_code": null,
+              "diff_counts": {
+                "missing": 0,
+                "unexpected": 0,
+                "changed": 0
+              },
+              "actual_rows": 1,
+              "expected_rows": 1,
+              "changed_columns": [],
+              "duration_ms": 9207
+            },
+            {
+              "name": "incremental",
+              "requested_mode": "incremental",
+              "observed_mode": "incremental",
+              "observed_mode_evidence": {
+                "operation": "delete+insert",
+                "method": "dbt_invocation_main_sql_and_target_oid",
+                "invocation_id": "ede4970a-bb6c-4fd3-a937-efadf78a4cf6",
+                "statement_sha256": "08a36aa5b3d280eaa1af78dcb6fc258d7baa51ae8eda8901498700eb41cc5e81"
+              },
+              "sql_audit": {
+                "status": "PASS",
+                "method": "sqlglot_postgres_scopes",
+                "checked_relations": 2,
+                "compiled_sha256": "5f1bd1766c763ec6ace26cfd0456455f0efe34f893046d96b0697755b9a81326",
+                "run_compiled_sha256": "5f1bd1766c763ec6ace26cfd0456455f0efe34f893046d96b0697755b9a81326"
+              },
+              "status": "PASS",
+              "reason_code": null,
+              "diff_counts": {
+                "missing": 0,
+                "unexpected": 0,
+                "changed": 0
+              },
+              "actual_rows": 2,
+              "expected_rows": 2,
+              "changed_columns": [],
+              "duration_ms": 9225
+            },
+            {
+              "name": "retry",
+              "requested_mode": "incremental",
+              "observed_mode": "incremental",
+              "observed_mode_evidence": {
+                "operation": "delete+insert",
+                "method": "dbt_invocation_main_sql_and_target_oid",
+                "invocation_id": "23f89e6e-08dd-4e9e-8bf1-d2af1477357e",
+                "statement_sha256": "0721ae339494c35512da46a042019d50aa4b12ecb827c89b1571921da9b2ebb6"
+              },
+              "sql_audit": {
+                "status": "PASS",
+                "method": "sqlglot_postgres_scopes",
+                "checked_relations": 2,
+                "compiled_sha256": "5f1bd1766c763ec6ace26cfd0456455f0efe34f893046d96b0697755b9a81326",
+                "run_compiled_sha256": "5f1bd1766c763ec6ace26cfd0456455f0efe34f893046d96b0697755b9a81326"
+              },
+              "status": "PASS",
+              "reason_code": null,
+              "diff_counts": {
+                "missing": 0,
+                "unexpected": 0,
+                "changed": 0
+              },
+              "actual_rows": 2,
+              "expected_rows": 2,
+              "changed_columns": [],
+              "duration_ms": 9174
+            }
+          ]
+        }
+      },
+      "materialization_ids": [
+        "ef24d2b8-2e41-405f-be1c-c58d3f117b7e",
+        "ede4970a-bb6c-4fd3-a937-efadf78a4cf6",
+        "23f89e6e-08dd-4e9e-8bf1-d2af1477357e"
+      ]
+    },
+    "second": {
+      "status": "PASS",
+      "complete": true,
+      "stage": "second",
+      "consumer_commit": "cd203901ddf9c5b1427259bfc4059d8461417146",
+      "workflow_run_id": 42410528993,
+      "workflow_url": "https://github.com/acneism/dbt-scenario/actions/runs/42410528993",
+      "workflow_conclusion": "success",
+      "job_id": 128517475777,
+      "artifact_id": 13589053180,
+      "artifact_sha256": "fa0c31b9fd2c1f0d68bc6a3e5f887efa49df7c457197d3dee693e0fb19eb8398",
+      "artifact_files": 7,
+      "consumer_files": [
+        ".github/workflows/scenarios-smoke.yml",
+        "LICENSE",
+        "README.md",
+        "dbt_project.yml",
+        "models/fct_orders.sql",
+        "models/schema.yml",
+        "models/sources.yml",
+        "models/stg_orders.sql",
+        "package-lock.yml",
+        "packages.yml",
+        "scenario-runner.yml",
+        "scenarios/fct_orders.yml",
+        "scenarios/orders_empty_start.yml"
+      ],
+      "log_evidence": {
+        "postgresql16_restricted_role_ready": true,
+        "dbt_utils_1_3_3_installed": true,
+        "first_scenario_pass": true,
+        "second_scenario_pass": true,
+        "fixture_marker_absent": true
+      },
+      "aggregate": {
+        "schema_version": 1,
+        "package_version": "0.1.0a12",
+        "wheel_sha256": "483850af67e4ce0af275447f2b1ec33b9716aa4b9fb5b7d48e82208b175938b5",
+        "test_outcome": "success",
+        "test_exit_code": 0,
+        "reported_scenarios": 2,
+        "statuses": {
+          "PASS": 2
+        },
+        "cleanup_statuses": {
+          "CLEANED": 2
+        },
+        "summaries_valid": true,
+        "all_passed_and_cleaned": true
+      },
+      "scenarios": {
+        "orders_empty_start": {
+          "overall_status": "PASS",
+          "cleanup_status": "CLEANED",
+          "scenario_hash": "9f5304451255aba4fd836ecd1d4c26b1cf5c348b9955ce5f8f61c9d46aece363",
+          "engine_versions": {
+            "dbt-core": "1.11.16",
+            "dbt-postgres": "1.10.2",
+            "postgresql": 160015
+          },
+          "steps": [
+            {
+              "name": "initial",
+              "requested_mode": "initial",
+              "observed_mode": "initial",
+              "observed_mode_evidence": {
+                "operation": "create_table",
+                "method": "dbt_invocation_main_sql_and_target_oid",
+                "invocation_id": "f1a5e103-bdd4-4a83-b9a2-adf0cde7a0da",
+                "statement_sha256": "bf8c870bafa9e846235a78fa9a4d2a1f6ac7a4c39227ece173da34201357aad3"
+              },
+              "sql_audit": {
+                "status": "PASS",
+                "method": "sqlglot_postgres_scopes",
+                "checked_relations": 1,
+                "compiled_sha256": "086f2cc66a0869d2496297a1d3c8d5eaa73561f858066589db595785308625bc",
+                "run_compiled_sha256": "086f2cc66a0869d2496297a1d3c8d5eaa73561f858066589db595785308625bc"
+              },
+              "status": "PASS",
+              "reason_code": null,
+              "diff_counts": {
+                "missing": 0,
+                "unexpected": 0,
+                "changed": 0
+              },
+              "actual_rows": 0,
+              "expected_rows": 0,
+              "changed_columns": [],
+              "duration_ms": 6853
+            },
+            {
+              "name": "incremental",
+              "requested_mode": "incremental",
+              "observed_mode": "incremental",
+              "observed_mode_evidence": {
+                "operation": "delete+insert",
+                "method": "dbt_invocation_main_sql_and_target_oid",
+                "invocation_id": "f2d5758d-ff5c-434f-b254-279e9d336d1c",
+                "statement_sha256": "fd66ce48e6a0f1934510c2e47b1e242bf8349eb64447342ee4153b8d307c77d7"
+              },
+              "sql_audit": {
+                "status": "PASS",
+                "method": "sqlglot_postgres_scopes",
+                "checked_relations": 2,
+                "compiled_sha256": "75a47411f167d508b0fb45e1b0c6265fd4075432d9e74f2e4207eccb3351454c",
+                "run_compiled_sha256": "75a47411f167d508b0fb45e1b0c6265fd4075432d9e74f2e4207eccb3351454c"
+              },
+              "status": "PASS",
+              "reason_code": null,
+              "diff_counts": {
+                "missing": 0,
+                "unexpected": 0,
+                "changed": 0
+              },
+              "actual_rows": 2,
+              "expected_rows": 2,
+              "changed_columns": [],
+              "duration_ms": 6633
+            },
+            {
+              "name": "retry",
+              "requested_mode": "incremental",
+              "observed_mode": "incremental",
+              "observed_mode_evidence": {
+                "operation": "delete+insert",
+                "method": "dbt_invocation_main_sql_and_target_oid",
+                "invocation_id": "014f4123-6190-46d0-a88b-7c0d485756cb",
+                "statement_sha256": "e4e81bc64847b39ec6396a6534bd5c8026298f45f955968d912f8fd9ac1e85e7"
+              },
+              "sql_audit": {
+                "status": "PASS",
+                "method": "sqlglot_postgres_scopes",
+                "checked_relations": 2,
+                "compiled_sha256": "75a47411f167d508b0fb45e1b0c6265fd4075432d9e74f2e4207eccb3351454c",
+                "run_compiled_sha256": "75a47411f167d508b0fb45e1b0c6265fd4075432d9e74f2e4207eccb3351454c"
+              },
+              "status": "PASS",
+              "reason_code": null,
+              "diff_counts": {
+                "missing": 0,
+                "unexpected": 0,
+                "changed": 0
+              },
+              "actual_rows": 2,
+              "expected_rows": 2,
+              "changed_columns": [],
+              "duration_ms": 6886
+            }
+          ]
+        },
+        "test_fct_orders": {
+          "overall_status": "PASS",
+          "cleanup_status": "CLEANED",
+          "scenario_hash": "5f47983445bbf11457d6b30d1968c2c7a241e536bb8399a3b9427ef0dbd54fc8",
+          "engine_versions": {
+            "dbt-core": "1.11.16",
+            "dbt-postgres": "1.10.2",
+            "postgresql": 160015
+          },
+          "steps": [
+            {
+              "name": "initial",
+              "requested_mode": "initial",
+              "observed_mode": "initial",
+              "observed_mode_evidence": {
+                "operation": "create_table",
+                "method": "dbt_invocation_main_sql_and_target_oid",
+                "invocation_id": "ebb72f18-be56-4af3-a433-15aebfa17a37",
+                "statement_sha256": "fa7e4003049d37af836906f9971e77d43a5f281691a20bf526056e2f008623da"
+              },
+              "sql_audit": {
+                "status": "PASS",
+                "method": "sqlglot_postgres_scopes",
+                "checked_relations": 1,
+                "compiled_sha256": "05a7493359aa08d23bec34e520b91c91488ec4378cb66b4ff36be3c96ac0c5e3",
+                "run_compiled_sha256": "05a7493359aa08d23bec34e520b91c91488ec4378cb66b4ff36be3c96ac0c5e3"
+              },
+              "status": "PASS",
+              "reason_code": null,
+              "diff_counts": {
+                "missing": 0,
+                "unexpected": 0,
+                "changed": 0
+              },
+              "actual_rows": 1,
+              "expected_rows": 1,
+              "changed_columns": [],
+              "duration_ms": 6841
+            },
+            {
+              "name": "incremental",
+              "requested_mode": "incremental",
+              "observed_mode": "incremental",
+              "observed_mode_evidence": {
+                "operation": "delete+insert",
+                "method": "dbt_invocation_main_sql_and_target_oid",
+                "invocation_id": "3d0bb581-5cc8-48ac-b0dd-41b73bd66d80",
+                "statement_sha256": "a14fddc2bd3aeff8035d3b2a53862770823900a2494b6fe75113f0b188792366"
+              },
+              "sql_audit": {
+                "status": "PASS",
+                "method": "sqlglot_postgres_scopes",
+                "checked_relations": 2,
+                "compiled_sha256": "3097afe79541f9fce448ef3258887eac63b497b537a5fd4ed0825833ec0447e0",
+                "run_compiled_sha256": "3097afe79541f9fce448ef3258887eac63b497b537a5fd4ed0825833ec0447e0"
+              },
+              "status": "PASS",
+              "reason_code": null,
+              "diff_counts": {
+                "missing": 0,
+                "unexpected": 0,
+                "changed": 0
+              },
+              "actual_rows": 2,
+              "expected_rows": 2,
+              "changed_columns": [],
+              "duration_ms": 6969
+            },
+            {
+              "name": "retry",
+              "requested_mode": "incremental",
+              "observed_mode": "incremental",
+              "observed_mode_evidence": {
+                "operation": "delete+insert",
+                "method": "dbt_invocation_main_sql_and_target_oid",
+                "invocation_id": "8288cc60-782e-43dd-b3b6-e551695ed6dd",
+                "statement_sha256": "d81c036c45a6dc9b02ce99152574036f566a49520c0f92895b024f3d5b901005"
+              },
+              "sql_audit": {
+                "status": "PASS",
+                "method": "sqlglot_postgres_scopes",
+                "checked_relations": 2,
+                "compiled_sha256": "3097afe79541f9fce448ef3258887eac63b497b537a5fd4ed0825833ec0447e0",
+                "run_compiled_sha256": "3097afe79541f9fce448ef3258887eac63b497b537a5fd4ed0825833ec0447e0"
+              },
+              "status": "PASS",
+              "reason_code": null,
+              "diff_counts": {
+                "missing": 0,
+                "unexpected": 0,
+                "changed": 0
+              },
+              "actual_rows": 2,
+              "expected_rows": 2,
+              "changed_columns": [],
+              "duration_ms": 6966
+            }
+          ]
+        }
+      },
+      "materialization_ids": [
+        "f1a5e103-bdd4-4a83-b9a2-adf0cde7a0da",
+        "f2d5758d-ff5c-434f-b254-279e9d336d1c",
+        "014f4123-6190-46d0-a88b-7c0d485756cb",
+        "ebb72f18-be56-4af3-a433-15aebfa17a37",
+        "3d0bb581-5cc8-48ac-b0dd-41b73bd66d80",
+        "8288cc60-782e-43dd-b3b6-e551695ed6dd"
+      ]
+    }
+  }
+}

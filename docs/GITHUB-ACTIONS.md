@@ -58,6 +58,8 @@ The Actions job summary shows counts. The `dbt-scenario-results` artifact is ret
 
 Add another completed scenario file to the same directory to select it on the next run. Metadata-based `init --scenario-name ...` can prepare a separate template; its row placeholders still need business assertions. The [pilot protocol](PILOT.md) records whether another person can do this without assistance and keeps technical CI execution separate from human setup effort.
 
+For the exact initialization, fixture edits and selection checks, follow the [first and second scenario walkthrough](FIRST-AND-SECOND-SCENARIO.md). It records a first passing run followed by a commit that adds only the second scenario, using the same public package and CI caller.
+
 ## Recorded controls
 
 Checked November 8, 2026. The [controlled consumer](https://github.com/acneism/dbt-scenario/tree/00e245353af634c38e8af4873a4f91116f81318a) contains 18 files and no dbt-scenario runtime or contributor scripts. It installs public `dbt_utils` 1.3.3 and uses its `safe_add` macro in a real incremental model. Its original runner configuration deliberately names an unusable database and an unset password variable; the positive run succeeds through the forced CI database instead.

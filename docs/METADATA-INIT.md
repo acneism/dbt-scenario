@@ -56,4 +56,6 @@ dbt-scenario init --project-dir ./analytics --model fct_orders --manifest ./anal
 
 This creates only `scenarios/orders_late_arrival.yml` when a runner configuration already exists. It preserves the first scenario. Names start with a letter and contain up to 80 letters, digits, underscores or hyphens; paths and Windows device names are refused. `--demo` and the original manual `init` mode retain their existing behavior.
 
+The [first and second scenario walkthrough](FIRST-AND-SECOND-SCENARIO.md) connects this command to completed row lists and the unchanged CI directory selection, with a recorded public-package rehearsal.
+
 Metadata initialization reduces repeated schema/identifier entry. It does not replace execution preflight, define the correct expected rows, validate another warehouse, or establish that an external team finds onboarding easier. The integration test generates a real PostgreSQL catalog, initializes without database access, fills explicit fixtures and runs initial/update/retry successfully.

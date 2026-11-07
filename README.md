@@ -86,6 +86,8 @@ dbt-scenario init --project-dir ./my-dbt-project --model fct_orders --manifest .
 
 The catalog is optional when every selected model/input has declared column types. This creates `scenarios/fct_orders.yml`, preserves existing configuration, and leaves explicit row placeholders for you to fill. Use `--scenario-name orders_late` for another case and repeated `--primary-key` arguments if the model does not declare plain-column keys. This mode does not connect to the database or infer expected business results.
 
+Follow the [first and second scenario walkthrough](docs/FIRST-AND-SECOND-SCENARIO.md) to complete the row lists, run the first case in CI and add an empty-start case through the same workflow. Its recorded rehearsal uses the public package and a real parsed manifest.
+
 The manual mode creates `scenario-runner.yml` and `scenarios/example.yml` with synthetic rows. Edit the model/source identifiers, columns, fixtures and expected results to match your project, then run `plan`. Identifiers beginning with `replace_with_your_` are placeholders. Your model SQL and existing configuration files are not changed.
 
 Initialization checks destination collisions before writing and refuses to overwrite any file. If a write fails, it removes the files it created during that attempt.

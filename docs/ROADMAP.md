@@ -53,6 +53,8 @@ Alpha 12 adds exact unconstrained numeric fixtures, guided by an original Postgr
 
 The [reusable GitHub Actions workflow](GITHUB-ACTIONS.md) now supplies a public-package installation and disposable test database without copying contributor scripts. A separate controlled consumer verifies exit codes 0/1/2, failure propagation, public dependency installation, reports and cleanup. These are machine-executed controls; human setup/maintenance comparison and external retention remain unmeasured.
 
+A [first-to-second scenario rehearsal](FIRST-AND-SECOND-SCENARIO.md) now connects the installed public CLI and a real parsed manifest to two successive passing CI runs. The second commit adds only its scenario file; the first scenario, SQL, runner configuration and workflow remain unchanged. This verifies the technical addition path without completing the human comparison or external pilot items.
+
 The remaining work is:
 
 - Broader SQL compatibility guided by real projects, while keeping the trusted-code/disposable-database boundary explicit.
