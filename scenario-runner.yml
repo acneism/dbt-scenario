@@ -1,0 +1,12 @@
+version: 1
+project_dir: /must-not-be-used
+database:
+  host: must-not-connect.invalid
+  port: 1
+  dbname: must_not_use
+  user: must_not_use
+  password_env: UNSUPPLIED_DATABASE_PASSWORD
+  sslmode: verify-full
+step_timeout: 120
+scenario_timeout: 600
+env_allowlist: []
