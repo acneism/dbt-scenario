@@ -1,0 +1,38 @@
+{
+  "repository": "ksdisch/clinical-data-etl",
+  "snapshot": "ca7e4b370ff4a0cebc45c20f3cfe9cca607278a2",
+  "license": "MIT",
+  "source_project_kind": "public portfolio demonstration",
+  "files": {
+    "LICENSE": {
+      "url": "https://raw.githubusercontent.com/ksdisch/clinical-data-etl/ca7e4b370ff4a0cebc45c20f3cfe9cca607278a2/LICENSE",
+      "git_blob_sha": "f36773d192d552cc8de903802aad7ca0de347596",
+      "sha256": "18c5f666c00e1b8da119e11af640b54cf0db9739a74817162b97c8fd5f43e6f4"
+    },
+    "dbt_project.yml": {
+      "url": "https://raw.githubusercontent.com/ksdisch/clinical-data-etl/ca7e4b370ff4a0cebc45c20f3cfe9cca607278a2/dbt/dbt_project.yml",
+      "git_blob_sha": "a2b582612eeda8b4b51c601c88cff3fe64e14ddf",
+      "sha256": "d3d78aad5ae5b6f9771519a56206b89b2d8641e487b25e7d5542b7570c8f7e21"
+    },
+    "fact.sql": {
+      "url": "https://raw.githubusercontent.com/ksdisch/clinical-data-etl/ca7e4b370ff4a0cebc45c20f3cfe9cca607278a2/dbt/models/marts/fct_encounters.sql",
+      "git_blob_sha": "8d32c232be5f2280e465d08c57d50f50b704dc57",
+      "sha256": "dc83a487edd07bbf9d7c55137fb235c8928cabe4cc15bca8f01c1ede53a47b20"
+    },
+    "enriched.sql": {
+      "url": "https://raw.githubusercontent.com/ksdisch/clinical-data-etl/ca7e4b370ff4a0cebc45c20f3cfe9cca607278a2/dbt/models/intermediate/int_encounters_enriched.sql",
+      "git_blob_sha": "d322487ceeb897e74b8bb356d432944b8842b6ea",
+      "sha256": "72fd1f63db0875bef97fc51efa64df9caa510b5d027028440fb117ec06dfacfc"
+    },
+    "staging.sql": {
+      "url": "https://raw.githubusercontent.com/ksdisch/clinical-data-etl/ca7e4b370ff4a0cebc45c20f3cfe9cca607278a2/dbt/models/staging/stg_diabetes_encounters.sql",
+      "git_blob_sha": "7de3a025658e00ed3dfa0492339172bb459c6551",
+      "sha256": "95dd59d46bd921e2cee87ca4b7bb4bf47bfc1ebd567c0d02128dd6145546b2ff"
+    },
+    "sources.yml": {
+      "url": "https://raw.githubusercontent.com/ksdisch/clinical-data-etl/ca7e4b370ff4a0cebc45c20f3cfe9cca607278a2/dbt/models/staging/src_raw.yml",
+      "git_blob_sha": "6bbd9de8dd95489030b94959f1e7e70ad5844586",
+      "sha256": "3eb5e069869a45d984dde0255fc902c92ac839bd72bd8ff31711d69653000ba4"
+    }
+  }
+}

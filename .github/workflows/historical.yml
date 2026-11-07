@@ -9,7 +9,9 @@ on:
       - scripts/compare_approaches.py
       - scripts/check_watermarks.py
       - scripts/check_external_postgres.py
+      - scripts/check_external_antijoin.py
       - compatibility/aqw/**
+      - compatibility/clinical/**
       - investigations/watermark-boundary/**
       - src/**
       - requirements-dev.lock.txt
@@ -33,6 +35,9 @@ jobs:
           - case: aqw-postgresql
             script: check_external_postgres.py
             artifact: aqw-postgresql
+          - case: clinical-antijoin-postgresql
+            script: check_external_antijoin.py
+            artifact: clinical-antijoin-postgresql
     services:
       postgres:
         image: postgres:16
