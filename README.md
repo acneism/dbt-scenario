@@ -8,7 +8,7 @@ This is an early alpha. It supports PostgreSQL 16, Python 3.12, dbt Core 1.11 an
 
 ## Quickstart
 
-In a Python 3.12 virtual environment, install the [alpha release](https://github.com/acneism/dbt-scenario/releases/tag/v0.1.0a12) and generate its example project. PostgreSQL 16 runs through Docker Compose; no repository checkout is needed.
+In a Python 3.12 virtual environment, install the [verified alpha release](https://github.com/acneism/dbt-scenario/releases/tag/v0.1.0a12) and generate its example project. PostgreSQL 16 runs through Docker Compose; no repository checkout is needed.
 
 ```sh
 python -m pip install -c https://github.com/acneism/dbt-scenario/releases/download/v0.1.0a12/constraints.txt https://github.com/acneism/dbt-scenario/releases/download/v0.1.0a12/dbt_scenario-0.1.0a12-py3-none-any.whl
@@ -161,11 +161,13 @@ Supported types are `integer`, `bigint`, `text`, `boolean`, `date`, `timestamp`,
 
 From 0.1.0a12, [unconstrained `numeric`](docs/UNCONSTRAINED-NUMERIC.md) is supported with quoted finite decimal fixtures. It preserves exact values without choosing a precision or scale; `decimal` metadata is normalized to `numeric`. Native `numeric` and `numeric(p,s)` remain distinct schema contracts.
 
-For `double precision`, use quoted finite decimal strings such as `'0.1'`. They convert to binary64 values and use exact PostgreSQL equality without a tolerance; adjacent representable values are different. NaN, Infinity, overflow and nonzero values that round to zero are rejected. Use `numeric(p,s)` for exact decimal expectations. See [double precision fixtures](docs/DOUBLE-PRECISION.md).
+For `double precision`, use quoted finite decimal strings such as `'0.1'`. They convert to binary64 values and use exact PostgreSQL equality without a tolerance; adjacent representable values are different. NaN, Infinity, overflow and nonzero values that round to zero are rejected. Use `numeric` or `numeric(p,s)` for exact decimal expectations. See [double precision fixtures](docs/DOUBLE-PRECISION.md).
 
 An [external PostgreSQL model check](docs/AQW-COMPATIBILITY.md) exercises unchanged MIT-licensed fact SQL with synthetic staging fixtures: newer-data and empty-start scenarios pass, while a same-timestamp late-sensor case reports the expected missing row. The check runs on PostgreSQL 16 and does not establish original-pipeline delivery guarantees or external-user adoption.
 
 A second [external model check](docs/CLINICAL-COMPATIBILITY.md) covers a correlated `NOT EXISTS` predicate and 28 output columns. It distinguishes the model's deliberate new-keys-only behavior from an intentionally incompatible update expectation, using the same input changes for both.
+
+The [power-model check](docs/POWER-COMPATIBILITY.md) covers native numeric columns, a three-column merge key, a lookback-boundary revision and repeated local clock times. Its original SQL runs unchanged; a conditional empty-start case reports the expected missing row. These checks use synthetic direct-input fixtures.
 
 For `numeric(p,s)`, precision is supported from 1 to 99, with scale between 0 and precision. Decimal fixtures are validated independently of Python's global Decimal context. Values that require rounding are rejected. Timestamp fractions are limited to six digits; finer values are rejected instead of silently truncated. Text comparisons distinguish case, accents and Unicode normalization forms, including when a model uses a nondeterministic collation.
 

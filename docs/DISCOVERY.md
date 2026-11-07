@@ -14,6 +14,8 @@ dbt-scenario discover --project-dir ./analytics --manifest ./analytics/target/ma
 
 Artifact versions, PostgreSQL adapter requirements, file limits and manifest/catalog pairing are the same as [metadata initialization](METADATA-INIT.md). Each file is read once. A supplied catalog provides column types exclusively. The command does not generate or refresh artifacts; a historical snapshot may differ from current project code or database state.
 
+From 0.1.0a12, native `numeric` and equivalent unconstrained `decimal` metadata are eligible without inventing precision/scale. The [power-model before/after check](POWER-COMPATIBILITY.md) records an installed alpha11 type refusal and alpha12 template readiness for the same original SQL and explicit schema contract.
+
 ## Read the inventory
 
 Models are sorted by unique ID. Views, tables, seeds and models belonging to dependency packages are excluded from this inventory. Root-project incremental models are included even when their configuration is unsupported.

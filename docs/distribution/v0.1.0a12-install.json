@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "status": "PASS",
+  "package_version": "0.1.0a12",
+  "python_version": "3.12.10",
+  "platform": "win32",
+  "public_wheel_url": "https://github.com/acneism/dbt-scenario/releases/download/v0.1.0a12/dbt_scenario-0.1.0a12-py3-none-any.whl",
+  "wheel_sha256": "483850af67e4ce0af275447f2b1ec33b9716aa4b9fb5b7d48e82208b175938b5",
+  "fresh_virtualenv": true,
+  "installed_files_match_published_wheel": true,
+  "source_checkout_imported": false,
+  "development_packages_installed": false,
+  "generated_demo_scenario_steps": 3,
+  "empty_start_definition": {
+    "status": "PASS",
+    "first_input_rows": 0,
+    "first_expected_rows": 0,
+    "steps": 3
+  },
+  "metadata_options_available": [
+    "--model",
+    "--manifest",
+    "--catalog",
+    "--primary-key",
+    "--scenario-name"
+  ],
+  "model_discovery": {
+    "status": "PASS",
+    "without_password_env": true,
+    "execution_checked": false,
+    "source_metadata": "synthetic"
+  },
+  "static_validation": {
+    "status": "PASS",
+    "without_password_env": true,
+    "unfinished_rows_diagnostic": "PASS"
+  },
+  "pip_dependency_check": "PASS",
+  "finite_double_precision_and_float8_metadata": "PASS",
+  "exact_unconstrained_numeric_and_decimal_metadata": "PASS",
+  "native_numeric_cli_discovery_and_template": "PASS",
+  "invalid_scenario_directory_rejected_before_configuration": "PASS",
+  "synthetic_macro_blocker_before_template_write": "PASS"
+}

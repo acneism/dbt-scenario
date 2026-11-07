@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "status": "PASS",
+  "complete": true,
+  "verification_source_commit": null,
+  "package_version": "0.1.0a11",
+  "python_version": "3.12.10",
+  "started_at": "2026-11-07T18:08:16.630382+00:00",
+  "check_script_sha256": "30e44c70311ed4f161c6e255862da323f94a6ec0884b7fa8dbf5500746c8e9f2",
+  "upstream": {
+    "repository": "OlgaAvshister/eu-power-pipeline",
+    "snapshot": "20583ec2d073d27190418be9777592fdeb4125e4",
+    "license": "MIT",
+    "source_project_kind": "public demonstration",
+    "files": {
+      "LICENSE": {
+        "url": "https://raw.githubusercontent.com/OlgaAvshister/eu-power-pipeline/20583ec2d073d27190418be9777592fdeb4125e4/LICENSE",
+        "git_blob_sha": "413c5cee386bf8f374f131746ce76931704c5a51",
+        "sha256": "2e56572cdfed71279ab5c6f39b65bebf374d93ad2cd764a0bd22c138f69804e0"
+      },
+      "dbt_project.yml": {
+        "url": "https://raw.githubusercontent.com/OlgaAvshister/eu-power-pipeline/20583ec2d073d27190418be9777592fdeb4125e4/dbt_power/dbt_project.yml",
+        "git_blob_sha": "7c683d733f77358b67879d8a38a7e5fc8462725c",
+        "sha256": "8f426aabcb7ca7681391e32f225db4e468e219861879dc6236fb490558c9eb33"
+      },
+      "fact.sql": {
+        "url": "https://raw.githubusercontent.com/OlgaAvshister/eu-power-pipeline/20583ec2d073d27190418be9777592fdeb4125e4/dbt_power/models/marts/fct_power_generation.sql",
+        "git_blob_sha": "6975825bfb29a88e14c08cc3cd2daf71d28746dd",
+        "sha256": "a33e55bdde2fe69064384b387257700778746321108a05b8ce642524e5dd0b93"
+      },
+      "enriched.sql": {
+        "url": "https://raw.githubusercontent.com/OlgaAvshister/eu-power-pipeline/20583ec2d073d27190418be9777592fdeb4125e4/dbt_power/models/staging/stg_public_power_enriched.sql",
+        "git_blob_sha": "4fd7f94b7a9e7910338da72df8066772a898c75c",
+        "sha256": "ada4f5149d9cb999362a19514df5e560ff0832e250578e812cccee86e6e201c5"
+      },
+      "deduped.sql": {
+        "url": "https://raw.githubusercontent.com/OlgaAvshister/eu-power-pipeline/20583ec2d073d27190418be9777592fdeb4125e4/dbt_power/models/staging/stg_public_power_deduped.sql",
+        "git_blob_sha": "fe6d0001d95f2797c05b5a9d0c64f1b9e12c519a",
+        "sha256": "98f3aeb4a52c6fd362117998ad29b83acdf5ed1b464048ca0f188dee2ee05116"
+      },
+      "staging.sql": {
+        "url": "https://raw.githubusercontent.com/OlgaAvshister/eu-power-pipeline/20583ec2d073d27190418be9777592fdeb4125e4/dbt_power/models/staging/stg_public_power.sql",
+        "git_blob_sha": "e59911beba71ae6d64aa7f68cf4496b5bea3d3b7",
+        "sha256": "bcfc263e46351a0185aaec0bbc5a873b3a46af9ba2e6068b284bd17a7a457b35"
+      },
+      "sources.yml": {
+        "url": "https://raw.githubusercontent.com/OlgaAvshister/eu-power-pipeline/20583ec2d073d27190418be9777592fdeb4125e4/dbt_power/models/staging/_sources.yml",
+        "git_blob_sha": "b26a8f3623d128d7caa6f5ffe50c5215abf7b9a8",
+        "sha256": "e1786d6f529f9e7d6c933b76de6c1484c6adfa6053e4edfac4f2e471a6299add"
+      },
+      "production_types.csv": {
+        "url": "https://raw.githubusercontent.com/OlgaAvshister/eu-power-pipeline/20583ec2d073d27190418be9777592fdeb4125e4/dbt_power/seeds/production_types.csv",
+        "git_blob_sha": "bf1eee5c96d3bd10c33f7b36be12cb6f32720468",
+        "sha256": "bfa1b3e4b817da44abdb6aba625cebb446ddc27ab247307efa1134a7078fa44f"
+      },
+      "packages.yml": {
+        "url": "https://raw.githubusercontent.com/OlgaAvshister/eu-power-pipeline/20583ec2d073d27190418be9777592fdeb4125e4/dbt_power/packages.yml",
+        "git_blob_sha": "71fdb1a7868cfc95cf183272c17557ed23bbb7c8",
+        "sha256": "b8f2f7736267d87f1fae390a1ec4cb82d28f52fa970d1a852c988fcc05cbe57b"
+      },
+      "package-lock.yml": {
+        "url": "https://raw.githubusercontent.com/OlgaAvshister/eu-power-pipeline/20583ec2d073d27190418be9777592fdeb4125e4/dbt_power/package-lock.yml",
+        "git_blob_sha": "f683b3280228b40279990ed279940bf9e17a235d",
+        "sha256": "3b69fa4efd7fbb7479f377cdbd7f658ad8d5e9b83df8d95f8c7674c331e5c295"
+      },
+      "model-tests.yml": {
+        "url": "https://raw.githubusercontent.com/OlgaAvshister/eu-power-pipeline/20583ec2d073d27190418be9777592fdeb4125e4/dbt_power/models/marts/_marts.yml",
+        "git_blob_sha": "ca2edf33804c18b41895b39a2f846f069425c38b",
+        "sha256": "d7d58653b382f91f97bcaeec383cf1f824008f22b5778af7d6f2e56af32e453c"
+      },
+      "seed-types.yml": {
+        "url": "https://raw.githubusercontent.com/OlgaAvshister/eu-power-pipeline/20583ec2d073d27190418be9777592fdeb4125e4/dbt_power/seeds/_seeds.yml",
+        "sha256": "0f406af15b638971a30e83a86b99322d0162e100f3a9c9bf20292a85be709e6b",
+        "git_blob_sha": "ce0cee010e4fc3e0b4a4c88c87e28846cde12462"
+      }
+    }
+  },
+  "fixture_specification_sha256": "835585e68e70a44fd24d4a40b9019073c1cc353e5541bc7410a190bdf13ab933",
+  "protocol": {
+    "metadata_only": true,
+    "synthetic_fixtures": true,
+    "external_pilot": false,
+    "confirmed_production_incident": false,
+    "execution_postgresql_major": 16,
+    "upstream_sql_and_project_config_unchanged": true,
+    "focused_project_subset": true,
+    "upstream_staging_enrichment_and_seeds_executed": false,
+    "upstream_package_declarations_and_tests_omitted": true,
+    "selected_fact_references_no_external_package_macros": true,
+    "numeric_types_come_from_original_cast_and_seed_declaration": true,
+    "schema_declarations_added": true,
+    "source_catalog_verified": false,
+    "metadata_and_definition_checks_without_password_database_or_subprocess": true,
+    "comparison_tolerance": 0,
+    "source_nonempty_start_guarantee_verified": false,
+    "native_upstream_tests_executed": false
+  },
+  "cases": {},
+  "metadata": {
+    "model": "model.dbt_power.fct_power_generation",
+    "status": "BLOCKED",
+    "reason_code": "UNSUPPORTED_COLUMN_TYPE",
+    "diagnostic": {
+      "code": "UNSUPPORTED_COLUMN_TYPE",
+      "hint": "Use a supported PostgreSQL scalar type or numeric(p,s).",
+      "location": "$.inputs[0].columns[*]"
+    },
+    "parse_invocation_id": "fbb6e11e-69a3-4c69-9765-3a1ac54fccca"
+  }
+}

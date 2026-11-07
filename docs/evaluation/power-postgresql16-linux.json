@@ -1,0 +1,485 @@
+{
+  "schema_version": 1,
+  "status": "PASS",
+  "complete": true,
+  "verification_source_commit": "36bd12110624bb08c3c3a859ccb50e5e94afd356",
+  "package_version": "0.1.0a12",
+  "python_version": "3.12.16",
+  "started_at": "2026-11-07T18:12:20.363819+00:00",
+  "check_script_sha256": "30e44c70311ed4f161c6e255862da323f94a6ec0884b7fa8dbf5500746c8e9f2",
+  "upstream": {
+    "repository": "OlgaAvshister/eu-power-pipeline",
+    "snapshot": "20583ec2d073d27190418be9777592fdeb4125e4",
+    "license": "MIT",
+    "source_project_kind": "public demonstration",
+    "files": {
+      "LICENSE": {
+        "url": "https://raw.githubusercontent.com/OlgaAvshister/eu-power-pipeline/20583ec2d073d27190418be9777592fdeb4125e4/LICENSE",
+        "git_blob_sha": "413c5cee386bf8f374f131746ce76931704c5a51",
+        "sha256": "2e56572cdfed71279ab5c6f39b65bebf374d93ad2cd764a0bd22c138f69804e0"
+      },
+      "dbt_project.yml": {
+        "url": "https://raw.githubusercontent.com/OlgaAvshister/eu-power-pipeline/20583ec2d073d27190418be9777592fdeb4125e4/dbt_power/dbt_project.yml",
+        "git_blob_sha": "7c683d733f77358b67879d8a38a7e5fc8462725c",
+        "sha256": "8f426aabcb7ca7681391e32f225db4e468e219861879dc6236fb490558c9eb33"
+      },
+      "fact.sql": {
+        "url": "https://raw.githubusercontent.com/OlgaAvshister/eu-power-pipeline/20583ec2d073d27190418be9777592fdeb4125e4/dbt_power/models/marts/fct_power_generation.sql",
+        "git_blob_sha": "6975825bfb29a88e14c08cc3cd2daf71d28746dd",
+        "sha256": "a33e55bdde2fe69064384b387257700778746321108a05b8ce642524e5dd0b93"
+      },
+      "enriched.sql": {
+        "url": "https://raw.githubusercontent.com/OlgaAvshister/eu-power-pipeline/20583ec2d073d27190418be9777592fdeb4125e4/dbt_power/models/staging/stg_public_power_enriched.sql",
+        "git_blob_sha": "4fd7f94b7a9e7910338da72df8066772a898c75c",
+        "sha256": "ada4f5149d9cb999362a19514df5e560ff0832e250578e812cccee86e6e201c5"
+      },
+      "deduped.sql": {
+        "url": "https://raw.githubusercontent.com/OlgaAvshister/eu-power-pipeline/20583ec2d073d27190418be9777592fdeb4125e4/dbt_power/models/staging/stg_public_power_deduped.sql",
+        "git_blob_sha": "fe6d0001d95f2797c05b5a9d0c64f1b9e12c519a",
+        "sha256": "98f3aeb4a52c6fd362117998ad29b83acdf5ed1b464048ca0f188dee2ee05116"
+      },
+      "staging.sql": {
+        "url": "https://raw.githubusercontent.com/OlgaAvshister/eu-power-pipeline/20583ec2d073d27190418be9777592fdeb4125e4/dbt_power/models/staging/stg_public_power.sql",
+        "git_blob_sha": "e59911beba71ae6d64aa7f68cf4496b5bea3d3b7",
+        "sha256": "bcfc263e46351a0185aaec0bbc5a873b3a46af9ba2e6068b284bd17a7a457b35"
+      },
+      "sources.yml": {
+        "url": "https://raw.githubusercontent.com/OlgaAvshister/eu-power-pipeline/20583ec2d073d27190418be9777592fdeb4125e4/dbt_power/models/staging/_sources.yml",
+        "git_blob_sha": "b26a8f3623d128d7caa6f5ffe50c5215abf7b9a8",
+        "sha256": "e1786d6f529f9e7d6c933b76de6c1484c6adfa6053e4edfac4f2e471a6299add"
+      },
+      "production_types.csv": {
+        "url": "https://raw.githubusercontent.com/OlgaAvshister/eu-power-pipeline/20583ec2d073d27190418be9777592fdeb4125e4/dbt_power/seeds/production_types.csv",
+        "git_blob_sha": "bf1eee5c96d3bd10c33f7b36be12cb6f32720468",
+        "sha256": "bfa1b3e4b817da44abdb6aba625cebb446ddc27ab247307efa1134a7078fa44f"
+      },
+      "packages.yml": {
+        "url": "https://raw.githubusercontent.com/OlgaAvshister/eu-power-pipeline/20583ec2d073d27190418be9777592fdeb4125e4/dbt_power/packages.yml",
+        "git_blob_sha": "71fdb1a7868cfc95cf183272c17557ed23bbb7c8",
+        "sha256": "b8f2f7736267d87f1fae390a1ec4cb82d28f52fa970d1a852c988fcc05cbe57b"
+      },
+      "package-lock.yml": {
+        "url": "https://raw.githubusercontent.com/OlgaAvshister/eu-power-pipeline/20583ec2d073d27190418be9777592fdeb4125e4/dbt_power/package-lock.yml",
+        "git_blob_sha": "f683b3280228b40279990ed279940bf9e17a235d",
+        "sha256": "3b69fa4efd7fbb7479f377cdbd7f658ad8d5e9b83df8d95f8c7674c331e5c295"
+      },
+      "model-tests.yml": {
+        "url": "https://raw.githubusercontent.com/OlgaAvshister/eu-power-pipeline/20583ec2d073d27190418be9777592fdeb4125e4/dbt_power/models/marts/_marts.yml",
+        "git_blob_sha": "ca2edf33804c18b41895b39a2f846f069425c38b",
+        "sha256": "d7d58653b382f91f97bcaeec383cf1f824008f22b5778af7d6f2e56af32e453c"
+      },
+      "seed-types.yml": {
+        "url": "https://raw.githubusercontent.com/OlgaAvshister/eu-power-pipeline/20583ec2d073d27190418be9777592fdeb4125e4/dbt_power/seeds/_seeds.yml",
+        "sha256": "0f406af15b638971a30e83a86b99322d0162e100f3a9c9bf20292a85be709e6b",
+        "git_blob_sha": "ce0cee010e4fc3e0b4a4c88c87e28846cde12462"
+      }
+    }
+  },
+  "fixture_specification_sha256": "835585e68e70a44fd24d4a40b9019073c1cc353e5541bc7410a190bdf13ab933",
+  "protocol": {
+    "metadata_only": false,
+    "synthetic_fixtures": true,
+    "external_pilot": false,
+    "confirmed_production_incident": false,
+    "execution_postgresql_major": 16,
+    "upstream_sql_and_project_config_unchanged": true,
+    "focused_project_subset": true,
+    "upstream_staging_enrichment_and_seeds_executed": false,
+    "upstream_package_declarations_and_tests_omitted": true,
+    "selected_fact_references_no_external_package_macros": true,
+    "numeric_types_come_from_original_cast_and_seed_declaration": true,
+    "schema_declarations_added": true,
+    "source_catalog_verified": false,
+    "metadata_and_definition_checks_without_password_database_or_subprocess": true,
+    "comparison_tolerance": 0,
+    "source_nonempty_start_guarantee_verified": false,
+    "native_upstream_tests_executed": false
+  },
+  "cases": {
+    "revision_at_window_boundary": {
+      "overall_status": "PASS",
+      "reason_code": null,
+      "cleanup_status": "CLEANED",
+      "scenario_hash": "71280edccbfd50c76a5c29356fe91acec8de6cf20c68131e40eb44dba820f042",
+      "engine_versions": {
+        "dbt-core": "1.11.16",
+        "dbt-postgres": "1.10.2",
+        "postgresql": 160015
+      },
+      "steps": [
+        {
+          "name": "initial",
+          "requested_mode": "initial",
+          "observed_mode": "initial",
+          "observed_mode_evidence": {
+            "operation": "create_table",
+            "method": "dbt_invocation_main_sql_and_target_oid",
+            "invocation_id": "426255b8-9268-4803-b033-8ab9522b0f5b",
+            "statement_sha256": "f9ce81405cfe82d7492abaf4425cbfbf34a13efc70e6b81115029a198d5ab118"
+          },
+          "sql_audit": {
+            "status": "PASS",
+            "method": "sqlglot_postgres_scopes",
+            "checked_relations": 1,
+            "compiled_sha256": "ac38dd4610c6eabf414c5d8b8b92cd0d17f0171fd79a9ecc47a4de149addb388",
+            "run_compiled_sha256": "ac38dd4610c6eabf414c5d8b8b92cd0d17f0171fd79a9ecc47a4de149addb388"
+          },
+          "status": "PASS",
+          "reason_code": null,
+          "diff_counts": {
+            "missing": 0,
+            "unexpected": 0,
+            "changed": 0
+          },
+          "actual_rows": 2,
+          "expected_rows": 2,
+          "changed_columns": [],
+          "duration_ms": 7736
+        },
+        {
+          "name": "incremental",
+          "requested_mode": "incremental",
+          "observed_mode": "incremental",
+          "observed_mode_evidence": {
+            "operation": "merge",
+            "method": "dbt_invocation_main_sql_and_target_oid",
+            "invocation_id": "54dfe079-0989-43e5-b2b4-085ad179bc67",
+            "statement_sha256": "2f828a356e6416bbc50223847d66d88e957a0ee623f7198fd8d3aab4f05f216f"
+          },
+          "sql_audit": {
+            "status": "PASS",
+            "method": "sqlglot_postgres_scopes",
+            "checked_relations": 2,
+            "compiled_sha256": "fcf084a1e7c61f7eb6056036c04bb1b429b3132589f5eb9781dfbc026493e666",
+            "run_compiled_sha256": "fcf084a1e7c61f7eb6056036c04bb1b429b3132589f5eb9781dfbc026493e666"
+          },
+          "status": "PASS",
+          "reason_code": null,
+          "diff_counts": {
+            "missing": 0,
+            "unexpected": 0,
+            "changed": 0
+          },
+          "actual_rows": 3,
+          "expected_rows": 3,
+          "changed_columns": [],
+          "duration_ms": 7753
+        },
+        {
+          "name": "retry",
+          "requested_mode": "incremental",
+          "observed_mode": "incremental",
+          "observed_mode_evidence": {
+            "operation": "merge",
+            "method": "dbt_invocation_main_sql_and_target_oid",
+            "invocation_id": "8ba896e1-c02e-429f-967b-d33853bb22d4",
+            "statement_sha256": "6826124b35730b0fc70fc22ba0bb43e43ba5ea85fe5e6518eadb2b3137349bf4"
+          },
+          "sql_audit": {
+            "status": "PASS",
+            "method": "sqlglot_postgres_scopes",
+            "checked_relations": 2,
+            "compiled_sha256": "fcf084a1e7c61f7eb6056036c04bb1b429b3132589f5eb9781dfbc026493e666",
+            "run_compiled_sha256": "fcf084a1e7c61f7eb6056036c04bb1b429b3132589f5eb9781dfbc026493e666"
+          },
+          "status": "PASS",
+          "reason_code": null,
+          "diff_counts": {
+            "missing": 0,
+            "unexpected": 0,
+            "changed": 0
+          },
+          "actual_rows": 3,
+          "expected_rows": 3,
+          "changed_columns": [],
+          "duration_ms": 7731
+        }
+      ]
+    },
+    "daylight_saving_fold": {
+      "overall_status": "PASS",
+      "reason_code": null,
+      "cleanup_status": "CLEANED",
+      "scenario_hash": "f7a3806e31ae59444c791becd0d11c939366dcbc02c7931e011f88a93df8e87d",
+      "engine_versions": {
+        "dbt-core": "1.11.16",
+        "dbt-postgres": "1.10.2",
+        "postgresql": 160015
+      },
+      "steps": [
+        {
+          "name": "initial",
+          "requested_mode": "initial",
+          "observed_mode": "initial",
+          "observed_mode_evidence": {
+            "operation": "create_table",
+            "method": "dbt_invocation_main_sql_and_target_oid",
+            "invocation_id": "a718e69c-26f5-48a3-915b-27b175f4e35e",
+            "statement_sha256": "ef7df2bfa75eec373b349caea8de1baec5c6b918991ebea9e7ec3e5148c1d0f5"
+          },
+          "sql_audit": {
+            "status": "PASS",
+            "method": "sqlglot_postgres_scopes",
+            "checked_relations": 1,
+            "compiled_sha256": "5ed44d224a8222c9835f7e1162412a738faa604b366d395b6137388566fce8dd",
+            "run_compiled_sha256": "5ed44d224a8222c9835f7e1162412a738faa604b366d395b6137388566fce8dd"
+          },
+          "status": "PASS",
+          "reason_code": null,
+          "diff_counts": {
+            "missing": 0,
+            "unexpected": 0,
+            "changed": 0
+          },
+          "actual_rows": 2,
+          "expected_rows": 2,
+          "changed_columns": [],
+          "duration_ms": 7548
+        },
+        {
+          "name": "incremental",
+          "requested_mode": "incremental",
+          "observed_mode": "incremental",
+          "observed_mode_evidence": {
+            "operation": "merge",
+            "method": "dbt_invocation_main_sql_and_target_oid",
+            "invocation_id": "b6498239-650e-4e43-a4b4-dcdf51c417f4",
+            "statement_sha256": "3b5a4162ee7f22bb79ea7218a9c5fe4fb08911262b74e11cb39e989692103c24"
+          },
+          "sql_audit": {
+            "status": "PASS",
+            "method": "sqlglot_postgres_scopes",
+            "checked_relations": 2,
+            "compiled_sha256": "7c68698c28aa6e1ac097f1992a49f1aa28c958961e36e0484919dea4e08c1b47",
+            "run_compiled_sha256": "7c68698c28aa6e1ac097f1992a49f1aa28c958961e36e0484919dea4e08c1b47"
+          },
+          "status": "PASS",
+          "reason_code": null,
+          "diff_counts": {
+            "missing": 0,
+            "unexpected": 0,
+            "changed": 0
+          },
+          "actual_rows": 4,
+          "expected_rows": 4,
+          "changed_columns": [],
+          "duration_ms": 7686
+        },
+        {
+          "name": "retry",
+          "requested_mode": "incremental",
+          "observed_mode": "incremental",
+          "observed_mode_evidence": {
+            "operation": "merge",
+            "method": "dbt_invocation_main_sql_and_target_oid",
+            "invocation_id": "79b8afba-3ddb-43f5-8f3c-4c0e755187b1",
+            "statement_sha256": "cacc90986589d5f1ad8d76d761c408145b2c5277844a650256e832d925752cff"
+          },
+          "sql_audit": {
+            "status": "PASS",
+            "method": "sqlglot_postgres_scopes",
+            "checked_relations": 2,
+            "compiled_sha256": "7c68698c28aa6e1ac097f1992a49f1aa28c958961e36e0484919dea4e08c1b47",
+            "run_compiled_sha256": "7c68698c28aa6e1ac097f1992a49f1aa28c958961e36e0484919dea4e08c1b47"
+          },
+          "status": "PASS",
+          "reason_code": null,
+          "diff_counts": {
+            "missing": 0,
+            "unexpected": 0,
+            "changed": 0
+          },
+          "actual_rows": 4,
+          "expected_rows": 4,
+          "changed_columns": [],
+          "duration_ms": 7703
+        }
+      ]
+    },
+    "outside_window_retained": {
+      "overall_status": "PASS",
+      "reason_code": null,
+      "cleanup_status": "CLEANED",
+      "scenario_hash": "09d2cad15449a32bce91f07350096b86041ad35df903bdee8844f28eac29cbf3",
+      "engine_versions": {
+        "dbt-core": "1.11.16",
+        "dbt-postgres": "1.10.2",
+        "postgresql": 160015
+      },
+      "steps": [
+        {
+          "name": "initial",
+          "requested_mode": "initial",
+          "observed_mode": "initial",
+          "observed_mode_evidence": {
+            "operation": "create_table",
+            "method": "dbt_invocation_main_sql_and_target_oid",
+            "invocation_id": "9c989887-a1af-439d-b96c-00a0124e3fe6",
+            "statement_sha256": "8c5a07fb33c54c3a30b12016d6ede94c7e36be726e1c1b0aaf32ad6aceaf9b6e"
+          },
+          "sql_audit": {
+            "status": "PASS",
+            "method": "sqlglot_postgres_scopes",
+            "checked_relations": 1,
+            "compiled_sha256": "90b48a7ead4c458a35a2c18777e79f34409956ce0cceeee84acf462bee3099d2",
+            "run_compiled_sha256": "90b48a7ead4c458a35a2c18777e79f34409956ce0cceeee84acf462bee3099d2"
+          },
+          "status": "PASS",
+          "reason_code": null,
+          "diff_counts": {
+            "missing": 0,
+            "unexpected": 0,
+            "changed": 0
+          },
+          "actual_rows": 2,
+          "expected_rows": 2,
+          "changed_columns": [],
+          "duration_ms": 7614
+        },
+        {
+          "name": "incremental",
+          "requested_mode": "incremental",
+          "observed_mode": "incremental",
+          "observed_mode_evidence": {
+            "operation": "merge",
+            "method": "dbt_invocation_main_sql_and_target_oid",
+            "invocation_id": "cb1c9621-4482-4618-a13e-cc3a78c0cf2a",
+            "statement_sha256": "08f38c99951860ffc1996585a36a1cfd5e9c51d3df8926daa5631496e2994d50"
+          },
+          "sql_audit": {
+            "status": "PASS",
+            "method": "sqlglot_postgres_scopes",
+            "checked_relations": 2,
+            "compiled_sha256": "e7bda6c31de1df1556db24468102af06346643f795994025e605978c82cb684e",
+            "run_compiled_sha256": "e7bda6c31de1df1556db24468102af06346643f795994025e605978c82cb684e"
+          },
+          "status": "PASS",
+          "reason_code": null,
+          "diff_counts": {
+            "missing": 0,
+            "unexpected": 0,
+            "changed": 0
+          },
+          "actual_rows": 2,
+          "expected_rows": 2,
+          "changed_columns": [],
+          "duration_ms": 7944
+        },
+        {
+          "name": "retry",
+          "requested_mode": "incremental",
+          "observed_mode": "incremental",
+          "observed_mode_evidence": {
+            "operation": "merge",
+            "method": "dbt_invocation_main_sql_and_target_oid",
+            "invocation_id": "a22d8d1e-e513-40d7-a6b8-8734e15395ed",
+            "statement_sha256": "665f501920417dab3f54b25fef24bfe95db93793ca5735cdfa508d1c0cb12afe"
+          },
+          "sql_audit": {
+            "status": "PASS",
+            "method": "sqlglot_postgres_scopes",
+            "checked_relations": 2,
+            "compiled_sha256": "e7bda6c31de1df1556db24468102af06346643f795994025e605978c82cb684e",
+            "run_compiled_sha256": "e7bda6c31de1df1556db24468102af06346643f795994025e605978c82cb684e"
+          },
+          "status": "PASS",
+          "reason_code": null,
+          "diff_counts": {
+            "missing": 0,
+            "unexpected": 0,
+            "changed": 0
+          },
+          "actual_rows": 2,
+          "expected_rows": 2,
+          "changed_columns": [],
+          "duration_ms": 7776
+        }
+      ]
+    },
+    "empty_start": {
+      "overall_status": "FAIL",
+      "reason_code": null,
+      "cleanup_status": "CLEANED",
+      "scenario_hash": "f6629be2fcc6cf36715af42fe25bccd0495e07b72d3b04ba967b9f6d807f40b7",
+      "engine_versions": {
+        "dbt-core": "1.11.16",
+        "dbt-postgres": "1.10.2",
+        "postgresql": 160015
+      },
+      "steps": [
+        {
+          "name": "initial",
+          "requested_mode": "initial",
+          "observed_mode": "initial",
+          "observed_mode_evidence": {
+            "operation": "create_table",
+            "method": "dbt_invocation_main_sql_and_target_oid",
+            "invocation_id": "84457b26-b0a7-40c2-a7f2-bdd1110c8468",
+            "statement_sha256": "bc03bac5ce6692b9c590fdbf778dd1308e9a9bed738735671f62690c205b2871"
+          },
+          "sql_audit": {
+            "status": "PASS",
+            "method": "sqlglot_postgres_scopes",
+            "checked_relations": 1,
+            "compiled_sha256": "0777efd15ca1a0e683318f93dee3deb890c5d3b13db76a513dcdf74544eae9a0",
+            "run_compiled_sha256": "0777efd15ca1a0e683318f93dee3deb890c5d3b13db76a513dcdf74544eae9a0"
+          },
+          "status": "PASS",
+          "reason_code": null,
+          "diff_counts": {
+            "missing": 0,
+            "unexpected": 0,
+            "changed": 0
+          },
+          "actual_rows": 0,
+          "expected_rows": 0,
+          "changed_columns": [],
+          "duration_ms": 7658
+        },
+        {
+          "name": "incremental",
+          "requested_mode": "incremental",
+          "observed_mode": "incremental",
+          "observed_mode_evidence": {
+            "operation": "merge",
+            "method": "dbt_invocation_main_sql_and_target_oid",
+            "invocation_id": "b71618e8-3e4d-44da-8ccc-9ee0aeb866d7",
+            "statement_sha256": "6aa1c47aa12d8804c9b40551b00c9e1000e4572a160421db17133d208fa4a9a7"
+          },
+          "sql_audit": {
+            "status": "PASS",
+            "method": "sqlglot_postgres_scopes",
+            "checked_relations": 2,
+            "compiled_sha256": "ba5dc8591bbe1268c9bcec9679d392dd4a7ea4072a89301ceb9f78701a16f2c0",
+            "run_compiled_sha256": "ba5dc8591bbe1268c9bcec9679d392dd4a7ea4072a89301ceb9f78701a16f2c0"
+          },
+          "status": "FAIL",
+          "reason_code": "ROWS_MISMATCH",
+          "diff_counts": {
+            "missing": 1,
+            "unexpected": 0,
+            "changed": 0
+          },
+          "actual_rows": 0,
+          "expected_rows": 1,
+          "changed_columns": [],
+          "duration_ms": 7700
+        },
+        {
+          "name": "retry",
+          "status": "NOT_RUN",
+          "reason_code": "PREVIOUS_STEP_UNSUCCESSFUL",
+          "duration_ms": 0
+        }
+      ]
+    }
+  },
+  "metadata": {
+    "model": "model.dbt_power.fct_power_generation",
+    "status": "TEMPLATE_READY",
+    "reason_code": null,
+    "input_count": 1,
+    "parse_invocation_id": "054a98de-9a30-4a74-8fa1-26b97138ab50"
+  },
+  "owned_schemas_unchanged": true
+}

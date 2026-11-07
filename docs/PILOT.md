@@ -18,6 +18,8 @@ Start with a model that uses supported scalar types and ordinary append, delete+
 
 Choose an actual concern from the project's history or review: an update to an existing key, a delayed event, an empty initial build or repeating a batch. Record the expected whole-table state before writing the test. A deliberately injected defect can test detection, but should be labeled as an injected defect rather than a newly discovered bug.
 
+From 0.1.0a12, models producing [unconstrained numeric](UNCONSTRAINED-NUMERIC.md) can retain that native fixture type. Use the model's actual schema contract instead of adding precision/scale just to make initialization accept it; the [power-model check](POWER-COMPATIBILITY.md) records that type blocker and its resolution.
+
 Check the model's documented change policy before requiring an update. The [anti-join compatibility example](CLINICAL-COMPATIBILITY.md) intentionally retains existing keys; the same changed input passes with that expectation and fails when an update is required. An assertion mismatch alone does not establish that the project's intended behavior is wrong.
 
 ## Add the first scenario

@@ -1,0 +1,16 @@
+{
+  "status": "PASS",
+  "package_version": "0.1.0a12",
+  "source_commit": "36bd12110624bb08c3c3a859ccb50e5e94afd356",
+  "platform": "win32",
+  "postgresql": 160015,
+  "installed_package_under_isolated_python": true,
+  "decimal_metadata_preserved_as_native_numeric": true,
+  "invalid_fixtures_rejected": true,
+  "decimal_context_independence_verified": true,
+  "native_extremes_and_150_digit_roundtrip_verified": true,
+  "difference_at_150th_fractional_digit_detected": true,
+  "native_and_fixed_numeric_schemas_distinguished": true,
+  "cleanup_status": "CLEANED",
+  "owned_schemas_unchanged": true
+}

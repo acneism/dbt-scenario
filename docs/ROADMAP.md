@@ -49,6 +49,8 @@ Alpha 10 fixes the packaged empty-start example. Alpha 11 adds finite double pre
 
 A subsequent [selected portfolio-model check](CLINICAL-COMPATIBILITY.md) exercises unchanged correlated anti-join SQL, 28 output columns and the distinction between new-key-only and update expectations. Its typed fixture contract does not validate the complete original pipeline or upstream catalog. Broader compatibility and all three remaining items stay open.
 
+Alpha 12 adds exact unconstrained numeric fixtures, guided by an original PostgreSQL cast and seed declaration in the [power-model check](POWER-COMPATIBILITY.md). That check exercises merge, a three-column key, a seven-day revision boundary and repeated local clock times. Original transformations/packages and an upstream catalog remain outside the focused fact-model execution. This narrows a concrete compatibility gap without completing the broader compatibility or pilot items.
+
 The remaining work is:
 
 - Broader SQL compatibility guided by real projects, while keeping the trusted-code/disposable-database boundary explicit.
