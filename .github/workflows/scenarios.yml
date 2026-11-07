@@ -1,0 +1,228 @@
+name: PostgreSQL scenarios
+on:
+  workflow_call:
+    inputs:
+      project-dir:
+        type: string
+        default: .
+        description: dbt project directory relative to the caller checkout
+      scenario-dir:
+        type: string
+        default: scenarios
+        description: Scenario directory relative to the dbt project
+      config-file:
+        type: string
+        default: ''
+        description: Optional runner configuration relative to the checkout; database settings are replaced
+      install-deps:
+        type: boolean
+        default: false
+        description: Run dbt deps for the caller project's public dependencies
+      artifact-name:
+        type: string
+        default: dbt-scenario-results
+        description: Use a distinct name for each call in a matrix
+permissions:
+  contents: read
+jobs:
+  scenarios:
+    name: PostgreSQL scenarios
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: dbt_scenario_test
+          POSTGRES_PASSWORD: disposable-scenario-admin
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d dbt_scenario_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      DSC_TEST_PASSWORD: disposable-scenario-test
+      DSC_CI_PROJECT_INPUT: ${{ inputs.project-dir }}
+      DSC_CI_SCENARIO_INPUT: ${{ inputs.scenario-dir }}
+      DSC_CI_CONFIG_INPUT: ${{ inputs.config-file }}
+      DBT_SEND_ANONYMOUS_USAGE_STATS: 'false'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Download and verify the released package
+        run: |
+          python -I - <<'PY'
+          import hashlib
+          import os
+          import urllib.request
+          import uuid
+          from pathlib import Path
+
+          root = Path(os.environ["RUNNER_TEMP"]) / ("dbt-scenario-" + uuid.uuid4().hex)
+          root.mkdir()
+          base = "https://github.com/acneism/dbt-scenario/releases/download/v0.1.0a12/"
+          files = {
+              "constraints.txt": "72bdbbc673a0d712dccd6015eb2295d7d28c0123cca12131545513e69d14212e",
+              "dbt_scenario-0.1.0a12-py3-none-any.whl": "483850af67e4ce0af275447f2b1ec33b9716aa4b9fb5b7d48e82208b175938b5",
+          }
+          for name, digest in files.items():
+              with urllib.request.urlopen(base + name, timeout=30) as response:
+                  data = response.read(1024 * 1024 + 1)
+              if len(data) > 1024 * 1024 or hashlib.sha256(data).hexdigest() != digest:
+                  raise SystemExit("RELEASE_CHECKSUM_MISMATCH")
+              (root / name).write_bytes(data)
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as output:
+              output.write("DSC_CI_ROOT=" + str(root) + "\n")
+          PY
+      - name: Install the verified package
+        run: python -m pip --disable-pip-version-check install -c "$DSC_CI_ROOT/constraints.txt" "$DSC_CI_ROOT/dbt_scenario-0.1.0a12-py3-none-any.whl"
+      - name: Prepare isolated configuration
+        run: |
+          python -I - <<'PY'
+          import importlib.metadata
+          import os
+          import sys
+          from pathlib import Path
+
+          import dbt_scenario
+          import yaml
+          from dbt_scenario.loader import read_yaml
+
+          if importlib.metadata.version("dbt-scenario") != "0.1.0a12" or not Path(dbt_scenario.__file__).resolve().is_relative_to(Path(sys.prefix).resolve()):
+              raise SystemExit("INSTALLED_PACKAGE_IDENTITY_MISMATCH")
+          workspace = Path(os.environ["GITHUB_WORKSPACE"]).resolve()
+          values = [os.environ[name] for name in ["DSC_CI_PROJECT_INPUT", "DSC_CI_SCENARIO_INPUT", "DSC_CI_CONFIG_INPUT"]]
+          if any(character in value for value in values for character in "\r\n\0"):
+              raise SystemExit("INVALID_CI_PATH")
+          project = (workspace / values[0]).resolve()
+          scenarios = (project / values[1]).resolve()
+          if not project.is_relative_to(workspace) or not (project / "dbt_project.yml").is_file():
+              raise SystemExit("CI_PROJECT_MUST_BE_INSIDE_CHECKOUT")
+          if not scenarios.is_relative_to(project) or not scenarios.is_dir():
+              raise SystemExit("CI_SCENARIOS_MUST_BE_A_DIRECTORY_INSIDE_PROJECT")
+          configuration = {"version": 1}
+          if values[2]:
+              source = (workspace / values[2]).resolve()
+              if not source.is_relative_to(workspace) or not source.is_file():
+                  raise SystemExit("CI_CONFIG_MUST_BE_A_FILE_INSIDE_CHECKOUT")
+              configuration = read_yaml(source)
+              if not isinstance(configuration, dict):
+                  raise SystemExit("INVALID_CI_CONFIGURATION")
+          configuration["project_dir"] = str(project)
+          configuration["database"] = {
+              "host": "127.0.0.1",
+              "port": 55432,
+              "dbname": "dbt_scenario_test",
+              "user": "dbt_scenario",
+              "password_env": "DSC_TEST_PASSWORD",
+              "sslmode": "disable",
+          }
+          root = Path(os.environ["DSC_CI_ROOT"])
+          (root / "scenario-runner.yml").write_text(yaml.safe_dump(configuration), encoding="utf-8")
+          (root / "reports").mkdir()
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as output:
+              output.write("DSC_CI_PROJECT=" + str(project) + "\n")
+              output.write("DSC_CI_SCENARIOS=" + str(scenarios) + "\n")
+          PY
+      - name: Install public dbt dependencies
+        if: inputs.install-deps
+        run: dbt deps --project-dir "$DSC_CI_PROJECT"
+      - name: Create the restricted test role
+        run: |
+          python -I - <<'PY'
+          import os
+
+          import psycopg
+          from psycopg import sql
+
+          with psycopg.connect(host="127.0.0.1", port=55432, dbname="dbt_scenario_test", user="postgres", password="disposable-scenario-admin", connect_timeout=10, autocommit=True) as connection:
+              connection.execute(sql.SQL("CREATE ROLE dbt_scenario LOGIN PASSWORD {} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS").format(sql.Literal(os.environ["DSC_TEST_PASSWORD"])))
+              connection.execute("GRANT CONNECT, CREATE ON DATABASE dbt_scenario_test TO dbt_scenario")
+              connection.execute("REVOKE CREATE ON SCHEMA public FROM PUBLIC")
+          PY
+      - name: Check database and project dependencies
+        run: python -I -c 'from dbt_scenario.cli import main; main()' doctor --config "$DSC_CI_ROOT/scenario-runner.yml"
+      - name: Run scenarios
+        id: scenarios
+        run: |
+          set +e
+          python -I -c 'from dbt_scenario.cli import main; main()' test --config "$DSC_CI_ROOT/scenario-runner.yml" --scenario-dir "$DSC_CI_SCENARIOS" --report-dir "$DSC_CI_ROOT/reports"
+          result=$?
+          printf 'exit_code=%s\n' "$result" >> "$GITHUB_OUTPUT"
+          exit "$result"
+      - name: Summarize scenario results
+        if: always() && env.DSC_CI_ROOT != ''
+        env:
+          DSC_CI_TEST_OUTCOME: ${{ steps.scenarios.outcome }}
+          DSC_CI_TEST_EXIT: ${{ steps.scenarios.outputs.exit_code }}
+        run: |
+          python -I - <<'PY'
+          import json
+          import os
+          from collections import Counter
+          from pathlib import Path
+
+          root = Path(os.environ["DSC_CI_ROOT"]) / "reports"
+          root.mkdir(exist_ok=True)
+          statuses = Counter()
+          cleanups = Counter()
+          valid = True
+          paths = list(root.glob("*/summary.json"))
+          for path in paths:
+              try:
+                  report = json.loads(path.read_text(encoding="utf-8"))
+                  status = report["overall_status"]
+                  cleanup = report["cleanup_status"]
+                  if status not in {"PASS", "FAIL", "ERROR"} or cleanup not in {"CLEANED", "KEPT", "CLEANUP_FAILED", "NOT_STARTED"}:
+                      raise ValueError
+                  statuses[status] += 1
+                  cleanups[cleanup] += 1
+              except (ValueError, KeyError, TypeError):
+                  valid = False
+          outcome = os.environ["DSC_CI_TEST_OUTCOME"]
+          code = os.environ["DSC_CI_TEST_EXIT"]
+          code = int(code) if code.isdecimal() else None
+          healthy = valid and bool(paths) and outcome == "success" and code == 0 and statuses == {"PASS": len(paths)} and cleanups == {"CLEANED": len(paths)}
+          aggregate = {
+              "schema_version": 1,
+              "package_version": "0.1.0a12",
+              "wheel_sha256": "483850af67e4ce0af275447f2b1ec33b9716aa4b9fb5b7d48e82208b175938b5",
+              "test_outcome": outcome,
+              "test_exit_code": code,
+              "reported_scenarios": len(paths),
+              "statuses": dict(statuses),
+              "cleanup_statuses": dict(cleanups),
+              "summaries_valid": valid,
+              "all_passed_and_cleaned": healthy,
+          }
+          (root / "ci-summary.json").write_text(json.dumps(aggregate, indent=2) + "\n", encoding="utf-8")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as output:
+              output.write("## dbt-scenario\n\n")
+              output.write("Test step: " + (outcome or "not run") + "; reported scenarios: " + str(len(paths)) + ".\n\n")
+              for status in ["PASS", "FAIL", "ERROR"]:
+                  output.write(status + ": " + str(statuses[status]) + "  \n")
+              if not paths:
+                  output.write("\nNo scenario reports were produced. Inspect the configuration and test steps.\n")
+          if outcome == "success" and not healthy:
+              raise SystemExit("CI_REPORT_GATE_FAILED")
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always() && env.DSC_CI_ROOT != ''
+        with:
+          name: ${{ inputs.artifact-name }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            ${{ env.DSC_CI_ROOT }}/reports/ci-summary.json
+            ${{ env.DSC_CI_ROOT }}/reports/**/summary.json
+            ${{ env.DSC_CI_ROOT }}/reports/**/summary.md
+            ${{ env.DSC_CI_ROOT }}/reports/**/junit.xml

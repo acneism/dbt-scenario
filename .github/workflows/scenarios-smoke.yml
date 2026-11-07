@@ -1,0 +1,27 @@
+name: Published package scenarios
+on:
+  workflow_dispatch:
+    inputs:
+      scenario-dir:
+        type: string
+        default: scenarios
+        description: Scenario directory relative to the example project
+  push:
+    paths:
+      - .github/workflows/scenarios.yml
+      - .github/workflows/scenarios-smoke.yml
+      - examples/shop/**
+  pull_request:
+    paths:
+      - .github/workflows/scenarios.yml
+      - .github/workflows/scenarios-smoke.yml
+      - examples/shop/**
+permissions:
+  contents: read
+jobs:
+  scenarios:
+    uses: ./.github/workflows/scenarios.yml
+    with:
+      project-dir: examples/shop
+      scenario-dir: ${{ inputs.scenario-dir || 'scenarios' }}
+      config-file: scenario-runner.yml
