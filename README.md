@@ -6,6 +6,8 @@ Define input snapshots and expected rows in YAML. dbt-scenario runs the model wi
 
 This is an early alpha. It supports PostgreSQL 16, Python 3.12, dbt Core 1.11 and dbt-postgres 1.10. It requires a dedicated disposable test database and refuses superuser, CREATEDB and CREATEROLE roles. A successful test covers the supplied fixtures on this engine; it does not establish correctness for another warehouse.
 
+Trying it on an existing project? Start with [one real model and a concern](docs/PILOT.md), then share a [pilot report or compatibility blocker](https://github.com/acneism/dbt-scenario/issues/new/choose). An anonymized project description is sufficient; report interest before setup if useful.
+
 ## Quickstart
 
 In a Python 3.12 virtual environment, install the [verified alpha release](https://github.com/acneism/dbt-scenario/releases/tag/v0.1.0a13) and generate its example project. PostgreSQL 16 runs through Docker Compose; no repository checkout is needed.

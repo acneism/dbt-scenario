@@ -2,6 +2,8 @@
 
 The open question is whether a team finds this runner easier to keep in CI than its existing tests and scripts. The [synthetic comparison](EVALUATION-RESULTS.md) and [historical replay](HISTORICAL-REGRESSION.md) do not answer that question. This protocol records a real trial without requiring access to production data.
 
+Open a [pilot interest or trial report](https://github.com/acneism/dbt-scenario/issues/new?template=01_pilot.yml) before starting or after an attempt. An anonymized project description and one concern are enough to begin. Update the same issue as the trial progresses; leave unobserved measurements blank. A [bug or compatibility report](https://github.com/acneism/dbt-scenario/issues/new?template=02_bug.yml) is available separately. Reports are public and manually submitted; no telemetry or automatic follow-up is enabled.
+
 ## Choose one model
 
 From 0.1.0a9, list incremental models before choosing one, using existing local dbt artifacts:
@@ -15,6 +17,8 @@ The catalog is optional when column types are declared in the manifest. The inve
 Use an incremental SQL model in an existing PostgreSQL 16 project, with Python 3.12, dbt Core 1.11 and dbt-postgres 1.10. Use a dedicated disposable database and a restricted role as described in the [README](../README.md). Install the original project's dependencies before running the scenario.
 
 Start with a model that uses supported scalar types and ordinary append, delete+insert or merge. From 0.1.0a11, dbt-scenario supports [finite double precision fixtures](DOUBLE-PRECISION.md) with exact native comparisons. JSON/arrays, `real`/`float4`, custom materializations, hooks, versioned refs and another warehouse remain unsupported. Record a compatibility refusal as a trial result; rewriting the project's model just to fit the runner would measure a different workflow.
+
+Alpha13 also refuses nonempty `sql_header`, `incremental_predicates` and `predicates`, because those settings add SQL outside the audited model SELECT. Required private dbt package credentials or custom project environment values need a separate CI setup. Record these as compatibility constraints before preparing rows; the preset GitHub Actions workflow does not supply that setup.
 
 Choose an actual concern from the project's history or review: an update to an existing key, a delayed event, an empty initial build or repeating a batch. Record the expected whole-table state before writing the test. A deliberately injected defect can test detection, but should be labeled as an injected defect rather than a newly discovered bug.
 
@@ -88,4 +92,4 @@ CI after four weeks: kept / removed / trial stopped, meaningful runs, with reaso
 Confirmed defect: yes / no / unresolved, with a permitted minimal example
 ```
 
-Exclude credentials, connection strings, production rows, personal data and unsanitized dbt logs. Runner summaries omit row values; review any attached files before sharing them. Reports can be submitted through the repository's [issue form](https://github.com/acneism/dbt-scenario/issues/new).
+Exclude credentials, connection strings, production rows, personal data and unsanitized dbt logs. Runner summaries omit row values; review any attached files before sharing them. Submit a [pilot report](https://github.com/acneism/dbt-scenario/issues/new?template=01_pilot.yml), or use the text template above. The [maintainer guide](PILOT-REVIEW.md) describes how trial outcomes are reviewed without counting interest or author-run demonstrations as adoption.

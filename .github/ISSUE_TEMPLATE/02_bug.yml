@@ -1,0 +1,40 @@
+name: Bug or compatibility problem
+description: Report incorrect behavior, an unsupported project, or an unclear diagnostic.
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use the smallest synthetic example you can share. This issue is public; omit credentials, connection strings, production rows and raw dbt logs.
+        The [current boundaries](https://github.com/acneism/dbt-scenario#current-boundaries) and [error guide](https://github.com/acneism/dbt-scenario/blob/main/docs/ERRORS.md) may help identify the case. Compatibility refusals are welcome even when documented.
+  - type: textarea
+    id: environment
+    attributes:
+      label: Versions and environment
+      description: Include dbt-scenario, Python, PostgreSQL, dbt Core, dbt-postgres and OS or CI runner.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and observed behavior
+      description: What should happen, and what happened instead? Include the incremental strategy and relevant project configuration.
+    validations:
+      required: true
+  - type: input
+    id: reason_code
+    attributes:
+      label: Safe reason code and exit status
+      placeholder: MODEL_SQL_CONFIG_UNSUPPORTED; exit 2
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Include the command and, if permitted, a small synthetic model/scenario. If you cannot share code, describe the direct inputs, column types and steps. Do not paste your database configuration.
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact and workaround
+      description: Does this block adoption, affect an assertion, leave resources, or only affect diagnostics? Describe any workaround already tried.

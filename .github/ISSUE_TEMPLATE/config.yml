@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Run the example or connect a project
+    url: https://github.com/acneism/dbt-scenario#quickstart
+    about: Installation, disposable PostgreSQL and the no-project GitHub Actions demo.
+  - name: Pilot protocol
+    url: https://github.com/acneism/dbt-scenario/blob/main/docs/PILOT.md
+    about: Choose one real concern, compare setup effort, add a second scenario and record continued use.
