@@ -1,4 +1,4 @@
-{{ config(materialized='incremental', unique_key='order_id', incremental_strategy='delete+insert') }}
+{{ config(materialized='incremental', sql_header='select count(*) from pg_catalog.pg_class;', unique_key='order_id', incremental_strategy='delete+insert') }}
 select
     order_id,
     cast({{ dbt_utils.safe_add(['amount', 'adjustment']) }} as numeric(12,2)) as amount,

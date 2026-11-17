@@ -11,7 +11,7 @@ permissions:
   contents: read
 jobs:
   scenarios:
-    uses: acneism/dbt-scenario/.github/workflows/scenarios.yml@8f4b36cdf41c66b152127f1e0cb1c83f577578e7
+    uses: acneism/dbt-scenario/.github/workflows/scenarios.yml@c862ff3fb2ca2e91b020314addc56a42795af3b4
     with:
       project-dir: .
       scenario-dir: ${{ inputs.scenario-dir || 'scenarios/pass' }}
