@@ -3,7 +3,7 @@ import hashlib
 import json
 import math
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Context, Decimal, InvalidOperation, localcontext
 from importlib.resources import files
@@ -190,19 +190,37 @@ def typed_rows(rows: list, columns: dict, location=()) -> list[tuple]:
 
 
 @dataclass
+class PreparedRows:
+    columns: tuple[tuple[str, str], ...]
+    source: list[tuple] = field(repr=False)
+    values: list[tuple] = field(repr=False)
+
+    def batch(self, rows: list, offset: int, columns: dict[str, str]) -> list[tuple] | None:
+        if not isinstance(rows, list) or self.columns != tuple(columns.items()):
+            return None
+        end = offset + len(rows)
+        original = self.source[offset:end]
+        if len(rows) != len(original):
+            return None
+        for row, prior in zip(rows, original, strict=True):
+            if not isinstance(row, dict) or row.keys() != columns.keys():
+                return None
+            for name, value in zip(columns, prior, strict=True):
+                if type(row[name]) is not type(value) or row[name] != value:
+                    return None
+        return self.values[offset:end]
+
+
+@dataclass
 class Scenario:
     data: dict
     path: Path
     fingerprint: str
     fixture_hashes: dict[str, str]
+    prepared: dict[tuple, PreparedRows] = field(default_factory=dict, repr=False, compare=False)
 
 
-def load_scenario(path: Path, project_dir: Path) -> Scenario:
-    path = path.resolve()
-    root = project_dir.resolve()
-    if not path.is_relative_to(root):
-        raise ScenarioError("SCENARIO_OUTSIDE_PROJECT")
-    data = read_yaml(path)
+def validate_scenario_schema(data) -> None:
     schema = json.loads(files("dbt_scenario").joinpath("scenario.schema.json").read_text())
     error = next(Draft202012Validator(schema).iter_errors(data), None)
     if error:
@@ -214,24 +232,37 @@ def load_scenario(path: Path, project_dir: Path) -> Scenario:
             missing = next(key for key in error.validator_value if key not in error.instance)
             location = (*location, missing)
         raise ScenarioError("INVALID_SCENARIO_SCHEMA", location=location)
-    hashes = {}
-    fixture_cache = {}
 
-    def resolve_fixture(fixture):
-        if "fixture" not in fixture:
-            return
-        target = (path.parent / fixture["fixture"]).resolve()
-        if not target.is_relative_to(root) or not target.is_file():
-            raise ScenarioError("INVALID_FIXTURE_PATH")
-        if target not in fixture_cache:
-            payload, fingerprint = read_yaml_document(target)
-            if not isinstance(payload, dict) or set(payload) != {"rows"}:
-                raise ScenarioError("INVALID_FIXTURE_FILE")
-            fixture_cache[target] = payload
-            hashes[target.relative_to(root).as_posix()] = fingerprint
-        fixture["rows"] = copy.deepcopy(fixture_cache[target]["rows"])
-        del fixture["fixture"]
 
+@dataclass
+class FixtureReader:
+    path: Path
+    root: Path
+    hashes: dict[str, str] = field(default_factory=dict)
+    cache: dict[Path, dict] = field(default_factory=dict)
+    prepared: dict[tuple, PreparedRows] = field(default_factory=dict)
+
+    def prepare(self, fixture: dict, columns: dict[str, str], location: tuple) -> list[tuple]:
+        if "fixture" in fixture:
+            target = (self.path.parent / fixture["fixture"]).resolve()
+            if not target.is_relative_to(self.root) or not target.is_file():
+                raise ScenarioError("INVALID_FIXTURE_PATH")
+            if target not in self.cache:
+                payload, fingerprint = read_yaml_document(target)
+                if not isinstance(payload, dict) or set(payload) != {"rows"}:
+                    raise ScenarioError("INVALID_FIXTURE_FILE")
+                self.cache[target] = payload
+                self.hashes[target.relative_to(self.root).as_posix()] = fingerprint
+            fixture["rows"] = copy.deepcopy(self.cache[target]["rows"])
+            del fixture["fixture"]
+        rows = fixture["rows"]
+        values = typed_rows(rows, columns, location)
+        source = [tuple(row[name] for name in columns) for row in rows]
+        self.prepared[location] = PreparedRows(tuple(columns.items()), source, values)
+        return values
+
+
+def validate_columns(data: dict) -> None:
     definitions = [("inputs", name, definition) for name, definition in data["inputs"].items()]
     definitions.append(("output", data["output"]))
     for *prefix, definition in definitions:
@@ -242,15 +273,17 @@ def load_scenario(path: Path, project_dir: Path) -> Scenario:
                 sql_type(kind)
             except ScenarioError as error:
                 raise ScenarioError(error.code, location=(*prefix, "columns", name)) from None
-    keys = data["output"]["primary_key"]
-    columns = data["output"]["columns"]
-    if len(set(keys)) != len(keys) or not set(keys) <= columns.keys():
-        raise ScenarioError("INVALID_PRIMARY_KEY")
-    seen = set()
-    initialized = set()
+
+
+def validate_steps(data: dict, fixtures: FixtureReader) -> None:
     nodes = [item["node"] for item in data["inputs"].values()]
     if len(set(nodes)) != len(nodes):
         raise ScenarioError("DUPLICATE_INPUT_NODE")
+    columns = data["output"]["columns"]
+    keys = data["output"]["primary_key"]
+    key_indexes = [list(columns).index(key) for key in keys]
+    seen = set()
+    initialized = set()
     for index, step in enumerate(data["steps"]):
         try:
             json.dumps(step["run"].get("vars", {}), allow_nan=False)
@@ -265,10 +298,8 @@ def load_scenario(path: Path, project_dir: Path) -> Scenario:
         for name, update in step.get("inputs", {}).items():
             if name not in data["inputs"]:
                 raise ScenarioError("UNKNOWN_INPUT")
-            fixture = update["replace"]
-            resolve_fixture(fixture)
-            typed_rows(
-                fixture["rows"],
+            fixtures.prepare(
+                update["replace"],
                 data["inputs"][name]["columns"],
                 ("steps", index, "inputs", name, "replace", "rows"),
             )
@@ -282,14 +313,34 @@ def load_scenario(path: Path, project_dir: Path) -> Scenario:
                     "INVALID_SAME_AS_REFERENCE", location=("steps", index, "expect", "same_as")
                 )
         else:
-            resolve_fixture(expected)
-            rows = typed_rows(expected["rows"], columns, ("steps", index, "expect", "rows"))
-            key_indexes = [list(columns).index(key) for key in keys]
+            rows = fixtures.prepare(expected, columns, ("steps", index, "expect", "rows"))
             identities = [tuple(row[i] for i in key_indexes) for row in rows]
             if any(None in key for key in identities) or len(set(identities)) != len(identities):
                 raise ScenarioError(
                     "INVALID_EXPECTED_KEY", location=("steps", index, "expect", "rows")
                 )
         seen.add(step["name"])
+
+
+def load_scenario(path: Path, project_dir: Path) -> Scenario:
+    path = path.resolve()
+    root = project_dir.resolve()
+    if not path.is_relative_to(root):
+        raise ScenarioError("SCENARIO_OUTSIDE_PROJECT")
+    data = read_yaml(path)
+    validate_scenario_schema(data)
+    validate_columns(data)
+    keys = data["output"]["primary_key"]
+    columns = data["output"]["columns"]
+    if len(set(keys)) != len(keys) or not set(keys) <= columns.keys():
+        raise ScenarioError("INVALID_PRIMARY_KEY")
+    fixtures = FixtureReader(path, root)
+    validate_steps(data, fixtures)
     canonical = json.dumps(data, sort_keys=True, separators=(",", ":"), allow_nan=False)
-    return Scenario(data, path, hashlib.sha256(canonical.encode()).hexdigest(), hashes)
+    return Scenario(
+        data,
+        path,
+        hashlib.sha256(canonical.encode()).hexdigest(),
+        fixtures.hashes,
+        fixtures.prepared,
+    )

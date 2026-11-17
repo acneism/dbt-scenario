@@ -1036,9 +1036,9 @@ def test_multi_input_failure_rolls_back_every_replacement(project, monkeypatch):
     original = Database.replace
     updates = 0
 
-    def failing(self, schema, table, columns, rows):
+    def failing(self, schema, table, columns, rows, **options):
         nonlocal updates
-        original(self, schema, table, columns, rows)
+        original(self, schema, table, columns, rows, **options)
         if table == "input_1":
             updates += 1
             if updates == 2:

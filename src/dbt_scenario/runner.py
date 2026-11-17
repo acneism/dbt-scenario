@@ -19,7 +19,7 @@ from dbt_scenario.deadline import Deadline
 from dbt_scenario.errors import ScenarioError
 from dbt_scenario.journal import Journal, schema_names
 from dbt_scenario.lifecycle import finish_run
-from dbt_scenario.loader import Scenario
+from dbt_scenario.loader import PreparedRows, Scenario
 from dbt_scenario.project import Project
 from dbt_scenario.report import ErrorStage, RunMode, ScenarioReport, StepSummary, write_report
 from dbt_scenario.requirements import check_model_config
@@ -89,6 +89,7 @@ class StepExecution:
     node: dict
     mapping: dict[str, str]
     database_name: str
+    prepared: dict[tuple, PreparedRows]
     snapshots: dict[str, str] = field(default_factory=dict)
 
     def execute(self, index: int, step: dict, budget: Deadline, summary: StepSummary) -> None:
@@ -103,6 +104,9 @@ class StepExecution:
                         self.mapping[source["node"]],
                         source["columns"],
                         update["replace"]["rows"],
+                        prepared=self.prepared.get(
+                            ("steps", index, "inputs", name, "replace", "rows")
+                        ),
                     )
             before = self.database.oid(actual_schema, self.node["alias"])
             if (before is None) != (mode == "initial"):
@@ -151,7 +155,13 @@ class StepExecution:
             expected_table = self.snapshots[expected["same_as"]]
         else:
             expected_table = f"expected_{index}"
-            self.database.replace(expected_schema, expected_table, columns, expected["rows"])
+            self.database.replace(
+                expected_schema,
+                expected_table,
+                columns,
+                expected["rows"],
+                prepared=self.prepared.get(("steps", index, "expect", "rows")),
+            )
         summary.update(
             self.database.compare(
                 actual_schema,
@@ -264,6 +274,7 @@ def run_scenario(
                 node,
                 mapping,
                 config.database["dbname"],
+                scenario.prepared,
             )
             stage = "step"
             for index, step in enumerate(definition["steps"]):

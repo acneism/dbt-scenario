@@ -10,7 +10,8 @@ from dbt_scenario.config import Config
 from dbt_scenario.deadline import Deadline
 from dbt_scenario.errors import ScenarioError
 from dbt_scenario.journal import Journal
-from dbt_scenario.loader import typed_rows
+from dbt_scenario.loader import PreparedRows, typed_rows
+from dbt_scenario.report import ComparisonResult, DiffCounts
 
 
 def relation(schema: str, table: str):
@@ -147,7 +148,15 @@ class Database:
     def close(self):
         self.connection.close()
 
-    def replace(self, schema: str, table: str, columns: dict, rows: list):
+    def replace(
+        self,
+        schema: str,
+        table: str,
+        columns: dict[str, str],
+        rows: list,
+        *,
+        prepared: PreparedRows | None = None,
+    ) -> None:
         name = relation(schema, table)
         definitions = sql.SQL(", ").join(
             sql.SQL("{} {}").format(sql.Identifier(key), sql.SQL(kind))
@@ -162,7 +171,10 @@ class Database:
             with self.connection.cursor() as cursor:
                 for offset in range(0, len(rows), 1000):
                     self.check_deadline()
-                    values = typed_rows(rows[offset : offset + 1000], columns)
+                    batch = rows[offset : offset + 1000]
+                    values = prepared.batch(batch, offset, columns) if prepared else None
+                    if values is None:
+                        values = typed_rows(batch, columns)
                     cursor.executemany(statement, values)
                     self.check_deadline()
 
@@ -181,27 +193,7 @@ class Database:
             )
         )
 
-    def compare(
-        self,
-        actual_schema: str,
-        table: str,
-        expected_schema: str,
-        expected_table: str,
-        columns: dict,
-        keys: list,
-    ) -> dict:
-        actual = relation(actual_schema, table)
-        expected = relation(expected_schema, expected_table)
-        base = {
-            "status": "PASS",
-            "reason_code": None,
-            "diff_counts": None,
-            "actual_rows": None,
-            "expected_rows": None,
-            "changed_columns": [],
-        }
-        if self.oid(actual_schema, table) is None:
-            raise ScenarioError("TARGET_MISSING")
+    def columns_match(self, actual_schema: str, table: str, columns: dict[str, str]) -> bool:
         actual_types = dict(
             self.execute(
                 "SELECT a.attname, format_type(a.atttypid,a.atttypmod) "
@@ -216,28 +208,34 @@ class Database:
             "timestamptz": "timestamp with time zone",
         }
         expected_types = {key: aliases.get(kind, kind) for key, kind in columns.items()}
-        if actual_types != expected_types:
-            return {**base, "status": "FAIL", "reason_code": "SCHEMA_MISMATCH"}
-        base["actual_rows"] = self.execute(
-            sql.SQL("SELECT count(*) FROM {}").format(actual)
-        ).fetchone()[0]
-        base["expected_rows"] = self.execute(
-            sql.SQL("SELECT count(*) FROM {}").format(expected)
-        ).fetchone()[0]
+        return actual_types == expected_types
+
+    def key_problem(
+        self, actual: sql.Identifier, columns: dict[str, str], keys: list[str]
+    ) -> str | None:
         nulls = sql.SQL(" OR ").join(
             sql.SQL("{} IS NULL").format(sql.Identifier(key)) for key in keys
         )
         if self.execute(
             sql.SQL("SELECT EXISTS(SELECT 1 FROM {} WHERE {})").format(actual, nulls)
         ).fetchone()[0]:
-            return {**base, "status": "FAIL", "reason_code": "NULL_KEY"}
+            return "NULL_KEY"
         key_columns = sql.SQL(", ").join(value_column(key, columns[key]) for key in keys)
         if self.execute(
             sql.SQL("SELECT EXISTS(SELECT 1 FROM {} GROUP BY {} HAVING count(*)>1)").format(
                 actual, key_columns
             )
         ).fetchone()[0]:
-            return {**base, "status": "FAIL", "reason_code": "DUPLICATE_KEY"}
+            return "DUPLICATE_KEY"
+        return None
+
+    def compare_rows(
+        self,
+        actual: sql.Identifier,
+        expected: sql.Identifier,
+        columns: dict[str, str],
+        keys: list[str],
+    ) -> tuple[DiffCounts, list[str]]:
         join = sql.SQL(" AND ").join(
             sql.SQL("{} = {}").format(
                 value_column(key, columns[key], "a"), value_column(key, columns[key], "e")
@@ -273,9 +271,7 @@ class Database:
             join=join,
         )
         missing, unexpected, modified = self.execute(query).fetchone()
-        base["diff_counts"] = {"missing": missing, "unexpected": unexpected, "changed": modified}
-        if missing or unexpected or modified:
-            base.update(status="FAIL", reason_code="ROWS_MISMATCH")
+        changed_columns = []
         if modified:
             for name, expression in differences:
                 exists = self.execute(
@@ -284,5 +280,42 @@ class Database:
                     )
                 ).fetchone()[0]
                 if exists:
-                    base["changed_columns"].append(name)
+                    changed_columns.append(name)
+        return {"missing": missing, "unexpected": unexpected, "changed": modified}, changed_columns
+
+    def compare(
+        self,
+        actual_schema: str,
+        table: str,
+        expected_schema: str,
+        expected_table: str,
+        columns: dict[str, str],
+        keys: list[str],
+    ) -> ComparisonResult:
+        actual = relation(actual_schema, table)
+        expected = relation(expected_schema, expected_table)
+        base: ComparisonResult = {
+            "status": "PASS",
+            "reason_code": None,
+            "diff_counts": None,
+            "actual_rows": None,
+            "expected_rows": None,
+            "changed_columns": [],
+        }
+        if self.oid(actual_schema, table) is None:
+            raise ScenarioError("TARGET_MISSING")
+        if not self.columns_match(actual_schema, table, columns):
+            return {**base, "status": "FAIL", "reason_code": "SCHEMA_MISMATCH"}
+        base["actual_rows"] = self.execute(
+            sql.SQL("SELECT count(*) FROM {}").format(actual)
+        ).fetchone()[0]
+        base["expected_rows"] = self.execute(
+            sql.SQL("SELECT count(*) FROM {}").format(expected)
+        ).fetchone()[0]
+        if reason := self.key_problem(actual, columns, keys):
+            return {**base, "status": "FAIL", "reason_code": reason}
+        differences, changed_columns = self.compare_rows(actual, expected, columns, keys)
+        base.update(diff_counts=differences, changed_columns=changed_columns)
+        if any(differences.values()):
+            base.update(status="FAIL", reason_code="ROWS_MISMATCH")
         return base

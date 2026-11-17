@@ -97,6 +97,21 @@ def test_blocks_fixture_path_escape(tmp_path):
         load_scenario(write_scenario(tmp_path, data), tmp_path)
 
 
+def test_prepared_rows_require_unchanged_values_and_column_order():
+    scenario = load_scenario(SCENARIO, PROJECT)
+    rows = scenario.data["steps"][0]["inputs"]["orders"]["replace"]["rows"]
+    columns = scenario.data["inputs"]["orders"]["columns"]
+    location = ("steps", 0, "inputs", "orders", "replace", "rows")
+    batch = scenario.prepared[location]
+
+    values = batch.batch(rows[:1], 0, columns)
+    assert values is not None
+    assert values[0][0] == 1
+    assert batch.batch(rows[:1], 0, dict(reversed(list(columns.items())))) is None
+    rows[0]["order_id"] = True
+    assert batch.batch(rows[:1], 0, columns) is None
+
+
 def test_var_change_changes_fingerprint(tmp_path):
     data = inline_example()
     path = write_scenario(tmp_path, data)

@@ -15,6 +15,15 @@ class DiffCounts(TypedDict):
     changed: int
 
 
+class ComparisonResult(TypedDict):
+    status: Literal["PASS", "FAIL"]
+    reason_code: str | None
+    diff_counts: DiffCounts | None
+    actual_rows: int | None
+    expected_rows: int | None
+    changed_columns: list[str]
+
+
 class StepSummary(TypedDict):
     name: str
     status: ScenarioStatus | Literal["NOT_RUN"]

@@ -1,21 +1,31 @@
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import NotRequired, TypedDict, cast
 
 from dbt_scenario.environment import selected_environment
 from dbt_scenario.errors import ScenarioError
 from dbt_scenario.loader import read_yaml
 
 
+class DatabaseConfig(TypedDict):
+    host: str
+    port: int
+    dbname: str
+    user: str
+    password: str
+    sslmode: NotRequired[str]
+
+
 @dataclass
 class Config:
     project_dir: Path
-    database: dict = field(repr=False)
+    database: DatabaseConfig = field(repr=False)
     step_timeout: int = 120
     scenario_timeout: int = 600
     project_env: dict[str, str] = field(default_factory=dict, repr=False)
 
-    def connection_kwargs(self):
+    def connection_kwargs(self) -> dict[str, str | int]:
         return {**self.database, "connect_timeout": 10}
 
 
@@ -65,4 +75,4 @@ def load_config(path: Path, *, load_project_env: bool = True) -> Config:
     limits = [data.get("step_timeout", 120), data.get("scenario_timeout", 600)]
     if any(type(value) is not int or value <= 0 for value in limits):
         raise ScenarioError("INVALID_TIMEOUT")
-    return Config(project_dir, database, *limits, project_env)
+    return Config(project_dir, cast(DatabaseConfig, database), *limits, project_env)

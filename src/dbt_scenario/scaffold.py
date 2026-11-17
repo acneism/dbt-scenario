@@ -133,8 +133,7 @@ def scenario_filename(name):
     return f"scenarios/{name}.yml"
 
 
-def scaffold_from_metadata(settings, selector, manifest, catalog=None, primary_key=()):
-    project = settings["name"]
+def select_model(project: str, selector: str, manifest: dict) -> tuple[str, dict]:
     direct = manifest["nodes"].get(selector)
     entries = [(selector, direct)] if isinstance(direct, dict) else manifest["nodes"].items()
     candidates = [
@@ -150,17 +149,24 @@ def scaffold_from_metadata(settings, selector, manifest, catalog=None, primary_k
     if len(candidates) != 1:
         raise ScenarioError("INIT_MODEL_AMBIGUOUS")
     identity, model = candidates[0]
-    name = model.get("name")
-    if (
-        not isinstance(name, str)
-        or not re.fullmatch(r"[A-Za-z0-9_]{1,120}", name)
-        or identity != f"model.{project}.{name}"
-        or model.get("unique_id") != identity
-        or model.get("version") is not None
+    return identity, model
+
+
+def metadata_columns(
+    node_id: str, node: dict, location: tuple, catalog: dict | None
+) -> dict[str, str]:
+    if catalog is None:
+        return column_types(node, location)
+    collection = "sources" if node_id.startswith("source.") else "nodes"
+    entry = catalog[collection].get(node_id)
+    if not isinstance(entry, dict) or (
+        entry.get("unique_id") is not None and entry["unique_id"] != node_id
     ):
-        raise ScenarioError("DIRECT_BUILTIN_OR_VERSIONED_REF_UNSUPPORTED")
-    check_model_config(model.get("config"))
-    check_project_macros(manifest.get("macros", {}))
+        raise ScenarioError("INIT_CATALOG_MISMATCH", location=location)
+    return column_types(entry, location, catalog=True)
+
+
+def model_inputs(project: str, model: dict, manifest: dict, catalog: dict | None) -> dict:
     depends_on = model.get("depends_on")
     dependencies = depends_on.get("nodes") if isinstance(depends_on, dict) else None
     if (
@@ -170,17 +176,6 @@ def scaffold_from_metadata(settings, selector, manifest, catalog=None, primary_k
         or len(set(dependencies)) != len(dependencies)
     ):
         raise ScenarioError("INPUT_DEPENDENCIES_MISMATCH")
-
-    def columns(node_id, node, location):
-        if catalog is None:
-            return column_types(node, location)
-        collection = "sources" if node_id.startswith("source.") else "nodes"
-        entry = catalog[collection].get(node_id)
-        if not isinstance(entry, dict) or (
-            entry.get("unique_id") is not None and entry["unique_id"] != node_id
-        ):
-            raise ScenarioError("INIT_CATALOG_MISMATCH", location=location)
-        return column_types(entry, location, catalog=True)
 
     inputs = {}
     for index, dependency in enumerate(dependencies):
@@ -206,9 +201,28 @@ def scaffold_from_metadata(settings, selector, manifest, catalog=None, primary_k
                 raise ScenarioError("DIRECT_BUILTIN_OR_VERSIONED_REF_UNSUPPORTED")
         inputs[f"input_{index + 1}"] = {
             "node": dependency,
-            "columns": columns(dependency, node, ("inputs", index, "columns")),
+            "columns": metadata_columns(dependency, node, ("inputs", index, "columns"), catalog),
         }
-    output = columns(identity, model, ("output", "columns"))
+    return inputs
+
+
+def prepare_model_metadata(
+    project: str, selector: str, manifest: dict, catalog: dict | None, primary_key
+) -> tuple[str, str, dict, dict[str, str], list[str]]:
+    identity, model = select_model(project, selector, manifest)
+    name = model.get("name")
+    if (
+        not isinstance(name, str)
+        or not re.fullmatch(r"[A-Za-z0-9_]{1,120}", name)
+        or identity != f"model.{project}.{name}"
+        or model.get("unique_id") != identity
+        or model.get("version") is not None
+    ):
+        raise ScenarioError("DIRECT_BUILTIN_OR_VERSIONED_REF_UNSUPPORTED")
+    check_model_config(model.get("config"))
+    check_project_macros(manifest.get("macros", {}))
+    inputs = model_inputs(project, model, manifest, catalog)
+    output = metadata_columns(identity, model, ("output", "columns"), catalog)
     keys = list(primary_key) if primary_key else model["config"].get("unique_key")
     if isinstance(keys, str):
         keys = [keys]
@@ -219,6 +233,27 @@ def scaffold_from_metadata(settings, selector, manifest, catalog=None, primary_k
         or len(set(keys)) != len(keys)
     ):
         raise ScenarioError("INIT_PRIMARY_KEY_REQUIRED")
+    return identity, name, inputs, output, keys
+
+
+def validate_template(scenario: dict) -> None:
+    prototype = copy.deepcopy(scenario)
+    for step in prototype["steps"]:
+        for update in step.get("inputs", {}).values():
+            update["replace"]["rows"] = []
+        if "rows" in step["expect"]:
+            step["expect"]["rows"] = []
+    schema = json.loads(files("dbt_scenario").joinpath("scenario.schema.json").read_text())
+    if next(Draft202012Validator(schema).iter_errors(prototype), None):
+        raise ScenarioError("INIT_TEMPLATE_UNSUPPORTED")
+
+
+def scaffold_from_metadata(
+    settings: dict, selector: str, manifest: dict, catalog: dict | None = None, primary_key=()
+) -> tuple[str, dict]:
+    identity, name, inputs, output, keys = prepare_model_metadata(
+        settings["name"], selector, manifest, catalog, primary_key
+    )
     scenario = {
         "version": 1,
         "name": "test_" + name[:75],
@@ -244,13 +279,5 @@ def scaffold_from_metadata(settings, selector, manifest, catalog=None, primary_k
             }
         ],
     }
-    prototype = copy.deepcopy(scenario)
-    for step in prototype["steps"]:
-        for update in step.get("inputs", {}).values():
-            update["replace"]["rows"] = []
-        if "rows" in step["expect"]:
-            step["expect"]["rows"] = []
-    schema = json.loads(files("dbt_scenario").joinpath("scenario.schema.json").read_text())
-    if next(Draft202012Validator(schema).iter_errors(prototype), None):
-        raise ScenarioError("INIT_TEMPLATE_UNSUPPORTED")
+    validate_template(scenario)
     return name, scenario
