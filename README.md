@@ -41,6 +41,8 @@ docker compose up -d --wait
 dbt-scenario test --config scenario-runner.yml --scenario examples/shop/scenarios/orders.yml
 ```
 
+If you already have PostgreSQL 16, follow [the disposable database setup](docs/POSTGRESQL.md) and start with `dbt-scenario doctor`.
+
 The example tests an initial load, an update together with a late-arriving order, and an unchanged retry. Input `replace` operations replace the full input snapshot while retaining the model's existing target table. The model SQL stays unchanged in your project; fixture routing is installed only in a temporary project copy.
 
 From 0.1.0a10, the example also includes an empty initial load followed by data and a retry:
@@ -191,13 +193,13 @@ From 0.1.0a11, the CLI checks that `--scenario-dir` names a directory and `--sce
 
 A [real CLI regression check](docs/evaluation/scenario-selection-postgresql16-windows.json) confirmed that alpha 10 ignored a file passed as `--scenario-dir` while successfully running the other selected scenario on PostgreSQL. The corrected CLI rejects the same arguments before loading configuration, including with password variables removed.
 
-Each run writes `summary.json`, `summary.md` and `junit.xml` beneath `artifacts/scenarios/<run_id>/`. Reports contain counts and column names, without row values or raw dbt errors. dbt logs and temporary profiles are deleted with the temporary workspace. GitHub branch rules must make your test job required if you want it to block merges.
+Each run writes `summary.json`, `summary.md` and `junit.xml` beneath `artifacts/scenarios/<run_id>/`. The terminal and Markdown show scenario and cleanup errors, including the dbt phase and reported node when available. Markdown includes missing, unexpected and changed row counts. Reports omit row values and raw dbt errors. dbt logs and temporary profiles are deleted with the temporary workspace. Make the test job required in GitHub branch rules to block merges on failures.
 
 For GitHub Actions, use the [ready workflow](docs/GITHUB-ACTIONS.md). It installs the verified public package, creates a disposable PostgreSQL service and restricted role, preserves failures and uploads summaries/JUnit even after a failed scenario. Configure the project/scenario paths and enable public dependency installation when needed; no production credentials or tool source checkout are required. Controlled runs verify success, an assertion failure followed by a passing scenario, and an empty selection.
 
 Execution evidence binds manifest and run-results to the current dbt invocation, requires one successful selected model, rejects forced full refresh and checks the target OID and emitted materialization SQL. Missing, stale or inconsistent evidence returns ERROR. Reports retain the invocation ID and SQL hash. See [execution verification](docs/EXECUTION.md).
 
-Each step compiles before running its model and [audits SQL relations](docs/SQL-AUDIT.md). Physical references must point to that scenario's fixtures or, for an incremental step, its target. External/unqualified tables and unsupported query forms return ERROR. The extra compilation uses the same step deadline. SQLGlot is pinned to 30.27.0.
+Each step compiles before running its model and [audits SQL relations](docs/SQL-AUDIT.md). Keep native `data_tests` in the project and run them separately with `dbt test`. Scenario compilation selects only the model. Physical references must point to that scenario's fixtures or, for an incremental step, its target. External/unqualified tables and unsupported query forms return ERROR. The extra compilation uses the same step deadline. SQLGlot is pinned to 30.27.0.
 
 ## Recovery and deadlines
 
@@ -207,8 +209,9 @@ To retain database tables for debugging a failed scenario:
 
 ```sh
 dbt-scenario test --config scenario-runner.yml --scenario examples/shop/scenarios/orders.yml --keep-on-failure
-dbt-scenario cleanup --config scenario-runner.yml --run-id <run_id>
 ```
+
+Use the run ID in `summary.json` to [inspect the retained tables and clean up](docs/POSTGRESQL.md#inspect-a-retained-mismatch).
 
 The first command still exits with FAIL or ERROR; intentionally retained data is reported as `cleanup_status: KEPT`. Successful scenarios are always cleaned. The cleanup command also recovers schemas after a process terminates without running its cleanup handler. It uses the same configuration and database role as the original run, refuses an active runner, validates every ownership marker before deleting anything and does not cascade into other schemas. Repeating a completed cleanup is a no-op. If another object depends on a run's tables, cleanup fails without partially deleting the run's resources. Cleanup requires the database password, but does not require project-only variables from env_allowlist.
 
@@ -256,7 +259,7 @@ The [recorded alpha 6 Linux benchmark](docs/BENCHMARK.md) completed 20 valid sam
 
 See [existing approaches and the comparison plan](docs/ALTERNATIVES.md) for the product hypothesis and alternatives that already support materialization checks.
 
-[Controlled evaluation](docs/EVALUATION.md) reproduces native-dbt checks, a manual gate and audit-helper-ext integration on synthetic cases, and measures the current runner under verified Linux resource limits. These checks do not establish a real-world bug discovery or adoption advantage.
+[Controlled evaluation](docs/EVALUATION.md) compares native dbt checks, a manual gate and audit-helper-ext on synthetic cases. The published Linux measurements cover alpha 6. Use the [benchmark instructions](docs/BENCHMARK.md) to measure this checkout.
 
 The [recorded comparison](docs/EVALUATION-RESULTS.md) includes a built-in unit test that passes despite duplicate append materialization; a native unique test after the retry catches those duplicates too. No new external-project bug discovery has been confirmed.
 

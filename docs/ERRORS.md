@@ -38,6 +38,8 @@ ERROR INVALID_TYPED_VALUE at $.steps[1].inputs[*].replace.rows[2][*]
 
 The path identifies the third row of the second step. Mapping names are masked to keep arbitrary keys out of diagnostics. Values are never included in these messages. YAML syntax errors instead report one-based line and column positions.
 
-Execution errors keep stable reason codes and safe hints in summary JSON. They do not include raw SQL, credentials or exception text. A generic DBT_EXECUTION_ERROR can also mean a project compilation/runtime error that the preflight checks cannot classify.
+For `DBT_EXECUTION_ERROR`, inspect the dbt phase and selected model in the terminal or `summary.md`. If dbt reports a failed node in its structured events, the report includes its ID. In `summary.json`, look in `diagnostic` for `dbt_command` and the optional `dbt_node_unique_id`. The reports omit raw SQL, credentials and exception text.
+
+For `ROWS_MISMATCH`, `summary.md` shows how many keys are missing or unexpected and how many matched rows have different values. [Inspect retained tables locally](POSTGRESQL.md#inspect-a-retained-mismatch) to find a specific row.
 
 `validate --project-dir ... --scenario ...` checks the definition and fixtures before database setup. It uses these same redacted diagnostics. A placeholder is special only as an entire row-list value; the same text inside a legitimate text cell remains ordinary data. A valid definition does not establish that its model exists or executes correctly.

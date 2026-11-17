@@ -1,10 +1,11 @@
 import importlib.util
-from pathlib import Path
+import pathlib
 
 import pytest
 
 SPEC = importlib.util.spec_from_file_location(
-    "resource_limits", Path(__file__).resolve().parents[1] / "scripts/resource_limits.py"
+    "resource_limits",
+    pathlib.Path(__file__).resolve().parents[1] / "scripts/resource_limits.py",
 )
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
@@ -24,7 +25,11 @@ SPEC.loader.exec_module(MODULE)
 def test_only_verified_target_limits_can_support_a_performance_claim(
     tmp_path, cpu, memory, swap, verified
 ):
-    for name, value in [("cpu.max", cpu), ("memory.max", memory), ("memory.swap.max", swap)]:
+    for name, value in [
+        ("cpu.max", cpu),
+        ("memory.max", memory),
+        ("memory.swap.max", swap),
+    ]:
         (tmp_path / name).write_text(value)
     assert MODULE.resource_limits(tmp_path)["verified"] is verified
 

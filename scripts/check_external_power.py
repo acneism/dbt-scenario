@@ -1,31 +1,27 @@
 import argparse
 import copy
+import dataclasses
+import datetime
 import hashlib
 import json
 import os
+import pathlib
 import re
 import shutil
 import sys
 import tempfile
-from dataclasses import replace
-from datetime import UTC, datetime
-from pathlib import Path
-from unittest.mock import patch
-from uuid import UUID
+import uuid
 
-from check_external_postgres import owned_schemas
-from reproduce_history import verified_sources, write_yaml
+import check_external_postgres
+import compare_approaches
+import external_metadata
+import reproduce_history
 
-from dbt_scenario import __version__
-from dbt_scenario.config import load_config
-from dbt_scenario.discovery import discover_models
-from dbt_scenario.errors import ScenarioError
-from dbt_scenario.initialize import initialize
-from dbt_scenario.loader import load_scenario, read_yaml
-from dbt_scenario.project import Project
-from dbt_scenario.runner import run_scenario
+import dbt_scenario
+from dbt_scenario import config as scenario_config
+from dbt_scenario import discovery, errors, initialize, loader, runner
 
-ASSETS = Path(__file__).resolve().parents[1] / "compatibility/power"
+ASSETS = pathlib.Path(__file__).resolve().parents[1] / "compatibility/power"
 MODEL = "fct_power_generation"
 CASES = {
     "revision_at_window_boundary": ("PASS", [2, 3, 3]),
@@ -47,12 +43,21 @@ def build_scenario(template, case, fixtures):
     elif case == "empty_start":
         initial, arrival = [], [fixtures["newer"]]
     else:
-        arrival = [dict(initial[0], **fixtures["revision"]), initial[1], fixtures["newer"]]
+        arrival = [
+            dict(initial[0], **fixtures["revision"]),
+            initial[1],
+            fixtures["newer"],
+        ]
     expected = initial if case == "outside_window_retained" else arrival
-    for index, (rows, target) in enumerate([(initial, initial), (arrival, expected)]):
-        scenario["steps"][index]["inputs"]["input_1"]["replace"]["rows"] = copy.deepcopy(rows)
+    for index, (rows, target) in enumerate(
+        [(initial, initial), (arrival, expected)]
+    ):
+        scenario["steps"][index]["inputs"]["input_1"]["replace"]["rows"] = (
+            copy.deepcopy(rows)
+        )
         scenario["steps"][index]["expect"]["rows"] = [
-            {**row, "ts_local": fixtures["local_times"][row["ts_utc"]]} for row in target
+            {**row, "ts_local": fixtures["local_times"][row["ts_utc"]]}
+            for row in target
         ]
     return scenario
 
@@ -75,7 +80,7 @@ def prepare_project(root, sources, config, fixtures):
     }
     for name, relative in destinations.items():
         shutil.copyfile(sources / name, project / relative)
-    write_yaml(
+    compare_approaches.write_yaml(
         project / "models/scenario_columns.yml",
         {
             "version": 2,
@@ -87,39 +92,48 @@ def prepare_project(root, sources, config, fixtures):
                         for column, kind in fixtures[which + "_columns"].items()
                     ],
                 }
-                for name, which in [("stg_public_power_enriched", "input"), (MODEL, "output")]
+                for name, which in [
+                    ("stg_public_power_enriched", "input"),
+                    (MODEL, "output"),
+                ]
             ],
         },
     )
-    return replace(config, project_dir=project), destinations
+    return dataclasses.replace(config, project_dir=project), destinations
 
 
 def prepare_metadata(root, config, fixtures, password_variable):
-    manifest, artifacts = Project(config, root / "parse", "dsc_power_metadata").invoke("parse", 120)
-    environment = {
-        key: value
-        for key, value in os.environ.items()
-        if key not in {password_variable, "DBT_ENV_SECRET_DSC_PASSWORD"}
-    }
-    with (
-        patch.dict(os.environ, environment, clear=True),
-        patch("psycopg.connect", side_effect=RuntimeError("STATIC_DATABASE_ACCESS")),
-        patch("subprocess.Popen", side_effect=RuntimeError("STATIC_SUBPROCESS_ACCESS")),
-    ):
-        manifest_path = artifacts / "target/manifest.json"
-        models = discover_models(config.project_dir, manifest_path)["models"]
+    manifest, manifest_path = external_metadata.parse_metadata(
+        config, root, "dsc_power_metadata"
+    )
+    with external_metadata.static_metadata(password_variable):
+        models = discovery.discover_models(config.project_dir, manifest_path)[
+            "models"
+        ]
         if len(models) != 1 or models[0]["model"] != "model.dbt_power." + MODEL:
             raise RuntimeError("POWER_METADATA_MODEL_MISMATCH")
         state = models[0]
-        record = {**state, "parse_invocation_id": manifest["metadata"]["invocation_id"]}
-        if state["status"] == "BLOCKED" and state["reason_code"] == "UNSUPPORTED_COLUMN_TYPE":
+        record = {
+            **state,
+            "parse_invocation_id": manifest["metadata"]["invocation_id"],
+        }
+        if (
+            state["status"] == "BLOCKED"
+            and state["reason_code"] == "UNSUPPORTED_COLUMN_TYPE"
+        ):
             try:
-                initialize(config.project_dir, model=MODEL, manifest_path=manifest_path)
-            except ScenarioError as error:
+                initialize.initialize(
+                    config.project_dir, model=MODEL, manifest_path=manifest_path
+                )
+            except errors.ScenarioError as error:
                 if error.code != "UNSUPPORTED_COLUMN_TYPE":
-                    raise RuntimeError("POWER_BASELINE_DIAGNOSTIC_MISMATCH") from None
+                    raise RuntimeError(
+                        "POWER_BASELINE_DIAGNOSTIC_MISMATCH"
+                    ) from None
             else:
-                raise RuntimeError("POWER_BASELINE_INITIALIZATION_DID_NOT_REFUSE")
+                raise RuntimeError(
+                    "POWER_BASELINE_INITIALIZATION_DID_NOT_REFUSE"
+                )
             if any(
                 (config.project_dir / name).exists()
                 for name in ["scenario-runner.yml", "scenarios"]
@@ -132,9 +146,11 @@ def prepare_metadata(root, config, fixtures, password_variable):
             or state["input_count"] != 1
         ):
             raise RuntimeError("POWER_METADATA_NOT_READY")
-        initialize(config.project_dir, model=MODEL, manifest_path=manifest_path)
+        initialize.initialize(
+            config.project_dir, model=MODEL, manifest_path=manifest_path
+        )
         template_path = config.project_dir / f"scenarios/{MODEL}.yml"
-        template = read_yaml(template_path)
+        template = loader.read_yaml(template_path)
         if template["output"] != {
             "columns": fixtures["output_columns"],
             "primary_key": ["country", "ts_utc", "production_type"],
@@ -144,17 +160,21 @@ def prepare_metadata(root, config, fixtures, password_variable):
         }:
             raise RuntimeError("POWER_METADATA_SCHEMA_MISMATCH")
         try:
-            load_scenario(template_path, config.project_dir)
-        except ScenarioError as error:
+            loader.load_scenario(template_path, config.project_dir)
+        except errors.ScenarioError as error:
             if error.code != "UNFILLED_TEMPLATE_ROWS":
-                raise RuntimeError("POWER_TEMPLATE_DIAGNOSTIC_MISMATCH") from None
+                raise RuntimeError(
+                    "POWER_TEMPLATE_DIAGNOSTIC_MISMATCH"
+                ) from None
         else:
             raise RuntimeError("POWER_TEMPLATE_MUST_REQUIRE_ROWS")
         paths = {}
         for case in CASES:
             path = config.project_dir / f"scenarios/power_{case}.yml"
-            write_yaml(path, build_scenario(template, case, fixtures))
-            load_scenario(path, config.project_dir)
+            compare_approaches.write_yaml(
+                path, build_scenario(template, case, fixtures)
+            )
+            loader.load_scenario(path, config.project_dir)
             paths[case] = path
     return paths, record
 
@@ -176,7 +196,9 @@ def validate_report(report, case):
                 raise RuntimeError("POWER_RETRY_NOT_SKIPPED")
             continue
         failed = step["status"] == "FAIL"
-        if step["reason_code"] != ("ROWS_MISMATCH" if failed else None) or step["diff_counts"] != {
+        if step["reason_code"] != ("ROWS_MISMATCH" if failed else None) or step[
+            "diff_counts"
+        ] != {
             "missing": int(failed),
             "unexpected": 0,
             "changed": 0,
@@ -185,40 +207,52 @@ def validate_report(report, case):
         evidence = step.get("observed_mode_evidence", {})
         if (
             step["sql_audit"]["status"] != "PASS"
-            or evidence.get("operation") != ("create_table" if index == 0 else "merge")
-            or not re.fullmatch("[0-9a-f]{64}", evidence.get("statement_sha256", ""))
+            or evidence.get("operation")
+            != ("create_table" if index == 0 else "merge")
+            or not re.fullmatch(
+                "[0-9a-f]{64}", evidence.get("statement_sha256", "")
+            )
         ):
             raise RuntimeError("POWER_EXECUTION_EVIDENCE_MISSING")
-        UUID(evidence["invocation_id"])
+        uuid.UUID(evidence["invocation_id"])
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--sources-dir", type=Path, required=True)
+    parser.add_argument("--sources-dir", type=pathlib.Path, required=True)
     parser.add_argument("--fetch-only", action="store_true")
     parser.add_argument("--metadata-only", action="store_true")
-    parser.add_argument("--config", type=Path)
-    parser.add_argument("--output", type=Path)
+    parser.add_argument("--config", type=pathlib.Path)
+    parser.add_argument("--output", type=pathlib.Path)
     arguments = parser.parse_args()
-    provenance = verified_sources(
+    provenance = reproduce_history.verified_sources(
         arguments.sources_dir, arguments.fetch_only, ASSETS / "sources.json"
     )
     if arguments.fetch_only:
-        print("Verified pinned power model, numeric declarations and MIT license", flush=True)
+        print(
+            "Verified pinned power model, numeric declarations and MIT license",
+            flush=True,
+        )
         return
-    if not arguments.config or not arguments.output or arguments.output.exists():
+    if (
+        not arguments.config
+        or not arguments.output
+        or arguments.output.exists()
+    ):
         parser.error("execution requires --config and a new --output file")
-    config = load_config(arguments.config)
-    fixtures = read_yaml(ASSETS / "fixtures.yml")
+    config = scenario_config.load_config(arguments.config)
+    fixtures = loader.read_yaml(ASSETS / "fixtures.yml")
     result = {
         "schema_version": 1,
         "status": "ERROR",
         "complete": False,
         "verification_source_commit": os.environ.get("GITHUB_SHA"),
-        "package_version": __version__,
+        "package_version": dbt_scenario.__version__,
         "python_version": sys.version.split()[0],
-        "started_at": datetime.now(UTC).isoformat(),
-        "check_script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "started_at": datetime.datetime.now(datetime.UTC).isoformat(),
+        "check_script_sha256": hashlib.sha256(
+            pathlib.Path(__file__).read_bytes()
+        ).hexdigest(),
         "upstream": provenance,
         "fixture_specification_sha256": hashlib.sha256(
             (ASSETS / "fixtures.yml").read_bytes()
@@ -237,7 +271,10 @@ def main():
             "numeric_types_come_from_original_cast_and_seed_declaration": True,
             "schema_declarations_added": True,
             "source_catalog_verified": False,
-            "metadata_and_definition_checks_without_password_database_or_subprocess": True,
+            (
+                "metadata_and_definition_checks_without_password_database_or_"
+                "subprocess"
+            ): True,
             "comparison_tolerance": 0,
             "source_nonempty_start_guarantee_verified": False,
             "native_upstream_tests_executed": False,
@@ -245,21 +282,30 @@ def main():
         "cases": {},
     }
     arguments.output.parent.mkdir(parents=True, exist_ok=True)
-    arguments.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    arguments.output.write_text(
+        json.dumps(result, indent=2) + "\n", encoding="utf-8"
+    )
     with tempfile.TemporaryDirectory(prefix="dbt-scenario-power-") as temporary:
-        root = Path(temporary)
-        prepared, destinations = prepare_project(root, arguments.sources_dir, config, fixtures)
+        root = pathlib.Path(temporary)
+        prepared, destinations = prepare_project(
+            root, arguments.sources_dir, config, fixtures
+        )
         paths, metadata = prepare_metadata(
-            root, prepared, fixtures, read_yaml(arguments.config)["database"]["password_env"]
+            root,
+            prepared,
+            fixtures,
+            loader.read_yaml(arguments.config)["database"]["password_env"],
         )
         result["metadata"] = metadata
         if not arguments.metadata_only:
             if metadata["status"] != "TEMPLATE_READY":
                 raise RuntimeError("POWER_EXECUTION_REQUIRES_READY_METADATA")
-            baseline = owned_schemas(config)
+            baseline = check_external_postgres.owned_schemas(config)
             for case, path in paths.items():
-                report = run_scenario(
-                    load_scenario(path, prepared.project_dir), prepared, root / "reports"
+                report = runner.run_scenario(
+                    loader.load_scenario(path, prepared.project_dir),
+                    prepared,
+                    root / "reports",
                 )
                 result["cases"][case] = {
                     key: report[key]
@@ -272,7 +318,9 @@ def main():
                         "steps",
                     ]
                 }
-                arguments.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+                arguments.output.write_text(
+                    json.dumps(result, indent=2) + "\n", encoding="utf-8"
+                )
                 validate_report(result["cases"][case], case)
                 print(case + ": " + report["overall_status"], flush=True)
             identifiers = [
@@ -284,7 +332,7 @@ def main():
             if (
                 len(identifiers) != len(set(identifiers))
                 or len(identifiers) != 11
-                or owned_schemas(config) != baseline
+                or check_external_postgres.owned_schemas(config) != baseline
             ):
                 raise RuntimeError("POWER_INVOCATION_OR_CLEANUP_MISMATCH")
             result["owned_schemas_unchanged"] = True
@@ -294,7 +342,9 @@ def main():
             ).read_bytes():
                 raise RuntimeError("POWER_UPSTREAM_BYTES_CHANGED")
     result.update(status="PASS", complete=True)
-    arguments.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    arguments.output.write_text(
+        json.dumps(result, indent=2) + "\n", encoding="utf-8"
+    )
     print("Metadata: " + metadata["status"], flush=True)
 
 
@@ -304,4 +354,6 @@ if __name__ == "__main__":
     except RuntimeError as error:
         raise SystemExit(str(error)) from None
     except Exception as error:
-        raise SystemExit("EXTERNAL_POWER_CHECK_FAILED_" + type(error).__name__) from None
+        raise SystemExit(
+            "EXTERNAL_POWER_CHECK_FAILED_" + type(error).__name__
+        ) from None

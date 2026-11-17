@@ -1,13 +1,13 @@
+import contextlib
+import pathlib
 import secrets
 import subprocess
 import tempfile
-from contextlib import contextmanager
-from pathlib import Path
 
 import psycopg
 from psycopg import sql
 
-from dbt_scenario.config import Config
+from dbt_scenario import config
 
 
 def command(arguments):
@@ -17,11 +17,15 @@ def command(arguments):
         raise RuntimeError("LOCAL_POSTGRES_COMMAND_FAILED") from None
 
 
-@contextmanager
+@contextlib.contextmanager
 def local_postgres():
-    admin_password, test_password = [secrets.token_urlsafe(24) for _ in range(2)]
-    with tempfile.TemporaryDirectory(prefix="dbt-scenario-evaluation-") as temporary:
-        root = Path(temporary)
+    admin_password, test_password = [
+        secrets.token_urlsafe(24) for _ in range(2)
+    ]
+    with tempfile.TemporaryDirectory(
+        prefix="dbt-scenario-evaluation-"
+    ) as temporary:
+        root = pathlib.Path(temporary)
         data = root / "pgdata"
         password_file = root / "admin-password"
         password_file.write_text(admin_password + "\n")
@@ -52,7 +56,8 @@ def local_postgres():
                     "-w",
                     "start",
                     "-o",
-                    f"-h 127.0.0.1 -p 55432 -k {root} -c unix_socket_permissions=0700",
+                    f"-h 127.0.0.1 -p 55432 -k {root} "
+                    "-c unix_socket_permissions=0700",
                 ]
             )
             started = True
@@ -73,12 +78,13 @@ def local_postgres():
                 )
                 connection.execute("CREATE DATABASE dbt_scenario_test")
                 connection.execute(
-                    "GRANT CONNECT, CREATE ON DATABASE dbt_scenario_test TO dbt_scenario"
+                    "GRANT CONNECT, CREATE ON DATABASE dbt_scenario_test TO "
+                    "dbt_scenario"
                 )
             administrator["dbname"] = "dbt_scenario_test"
             with psycopg.connect(**administrator) as connection:
                 connection.execute("REVOKE CREATE ON SCHEMA public FROM PUBLIC")
-            yield Config(
+            yield config.Config(
                 root,
                 {
                     "host": "127.0.0.1",

@@ -1,11 +1,11 @@
 import ctypes
 from ctypes import wintypes
 
-from dbt_scenario.errors import ScenarioError
+from dbt_scenario import errors
 
 
 class WindowsJob:
-    def __init__(self):
+    def __init__(self) -> None:
         class BasicLimits(ctypes.Structure):
             _fields_ = [
                 ("PerProcessUserTimeLimit", ctypes.c_int64),
@@ -52,35 +52,44 @@ class WindowsJob:
             wintypes.DWORD,
         ]
         self.api.SetInformationJobObject.restype = wintypes.BOOL
-        self.api.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        self.api.OpenProcess.argtypes = [
+            wintypes.DWORD,
+            wintypes.BOOL,
+            wintypes.DWORD,
+        ]
         self.api.OpenProcess.restype = wintypes.HANDLE
-        self.api.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
+        self.api.AssignProcessToJobObject.argtypes = [
+            wintypes.HANDLE,
+            wintypes.HANDLE,
+        ]
         self.api.AssignProcessToJobObject.restype = wintypes.BOOL
         self.api.CloseHandle.argtypes = [wintypes.HANDLE]
         self.api.CloseHandle.restype = wintypes.BOOL
         self.handle = self.api.CreateJobObjectW(None, None)
         if not self.handle:
-            raise ScenarioError("PROCESS_ISOLATION_FAILED")
+            raise errors.ScenarioError("PROCESS_ISOLATION_FAILED")
         limits = ExtendedLimits()
         limits.BasicLimitInformation.LimitFlags = 0x2000
         if not self.api.SetInformationJobObject(
             self.handle, 9, ctypes.byref(limits), ctypes.sizeof(limits)
         ):
             self.close()
-            raise ScenarioError("PROCESS_ISOLATION_FAILED")
+            raise errors.ScenarioError("PROCESS_ISOLATION_FAILED")
 
-    def assign(self, pid):
+    def assign(self, pid: int) -> None:
         process_handle = self.api.OpenProcess(0x0101, False, pid)
         if not process_handle:
-            raise ScenarioError("PROCESS_ISOLATION_FAILED")
+            raise errors.ScenarioError("PROCESS_ISOLATION_FAILED")
         try:
-            if not self.api.AssignProcessToJobObject(self.handle, process_handle):
-                raise ScenarioError("PROCESS_ISOLATION_FAILED")
+            if not self.api.AssignProcessToJobObject(
+                self.handle, process_handle
+            ):
+                raise errors.ScenarioError("PROCESS_ISOLATION_FAILED")
         finally:
             self.api.CloseHandle(process_handle)
 
-    def close(self):
+    def close(self) -> None:
         if self.handle:
             if not self.api.CloseHandle(self.handle):
-                raise ScenarioError("PROCESS_ISOLATION_FAILED")
+                raise errors.ScenarioError("PROCESS_ISOLATION_FAILED")
             self.handle = None

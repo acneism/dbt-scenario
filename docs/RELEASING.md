@@ -2,15 +2,7 @@
 
 GitHub prereleases distribute the Python wheel and source archive. The project is not published to PyPI by this process. Each prerelease includes SHA256SUMS, dependency constraints and a verification report for the uploaded artifacts.
 
-The [distribution workflow](../.github/workflows/package.yml) builds a source archive and then builds its wheel from that archive. It installs the wheel with the repository's dependency constraints into a fresh Python 3.12 environment. The [verification script](../scripts/check_distribution.py) runs under isolated Python mode, rejects an import outside that environment, and checks every packaged file against both archives and the installed copy.
-
-The script also checks package identity/version/license metadata, the installed CLI version, dependency compatibility, and packaged initialization resources. From outside the checkout it generates a demo, runs doctor, and completes the real PostgreSQL 16 initial/update/retry sequence. Required counts are 2 / 3 / 3 with successful SQL audits, cleanup and an independent schema-ownership check. The test uses a restricted database role. It does not assert a network sandbox or fixed resource limits; the separate offline job covers execution without external networking.
-
-From 0.1.0a8, the installed-package script also validates the generated scenario with password environment variables removed. The separate offline job performs this definition check before starting PostgreSQL, then verifies database execution. Definition validity and model execution remain separate checks.
-
-From 0.1.0a9, the installed-package check also uses a real parsed manifest to discover the example model with password variables removed. Its metadata initialization report records the discovery result separately from the materialized scenario.
-
-Before publishing:
+## Release checklist
 
 1. Require green CI and distribution checks for the source commit. Keep the version in pyproject.toml and dbt_scenario.__version__ identical. A tag is never moved to replace an existing published version.
 2. Build from a clean source export of that commit, with output files outside the export. Verify the wheel and sdist in a fresh environment using the same check script. Record the exact source commit and actual artifact hashes.
@@ -19,7 +11,13 @@ Before publishing:
 5. Create a GitHub prerelease at the verified commit. Upload the wheel, sdist, constraints, hashes and verification JSON. The source commit's tagged archives and the uploaded Python sdist serve different download purposes.
 6. Download the public assets again and verify their hashes before adding installation links to the README. Preserve the release assets rather than replacing them silently.
 
-An alpha release establishes availability of tested artifacts. It does not establish external adoption, a new production bug discovery, or support for another warehouse.
+## Distribution checks
+
+The [distribution workflow](../.github/workflows/package.yml) builds the wheel from the source archive and installs it in a fresh Python 3.12 environment using the dependency constraints. The [verification script](../scripts/check_distribution.py) runs in isolated Python mode and compares the installed files with both archives.
+
+The script checks package metadata, CLI version, dependencies and initialization resources. From outside the checkout it creates a demo and validates its definition without the password environment variables. It runs doctor, checks discovery using a parsed manifest, and executes the initial load, update and retry on PostgreSQL 16 with a restricted role. It requires row counts of 2 / 3 / 3, successful SQL audits, cleanup and a schema-ownership check. The offline job checks execution without external networking.
+
+The following sections record verification for earlier releases. See the [changelog](CHANGELOG.md) for changes in each version.
 
 ## Audit-corrections prerelease
 

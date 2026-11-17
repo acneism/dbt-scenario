@@ -1,35 +1,37 @@
 import copy
 import json
 import os
+import pathlib
 import shutil
 import signal
 import subprocess
 import sys
 import time
 import uuid
-from pathlib import Path
 
 import psycopg
 import pytest
 import yaml
-from click.testing import CliRunner
+from click import testing
 from psycopg import sql
 
-from dbt_scenario.cli import main
-from dbt_scenario.config import Config, load_config
-from dbt_scenario.database import Database
-from dbt_scenario.deadline import Deadline
-from dbt_scenario.environment import process_environment
-from dbt_scenario.errors import ScenarioError
-from dbt_scenario.initialize import initialize
-from dbt_scenario.journal import Journal
-from dbt_scenario.lifecycle import cleanup_run, finish_run
-from dbt_scenario.loader import load_scenario
-from dbt_scenario.process import run_process
-from dbt_scenario.project import Project, fingerprint
-from dbt_scenario.runner import run_scenario
+from dbt_scenario import (
+    cli,
+    deadline,
+    environment,
+    errors,
+    initialize,
+    lifecycle,
+    loader,
+    runner,
+)
+from dbt_scenario import config as scenario_config
+from dbt_scenario import database as scenario_database
+from dbt_scenario import journal as scenario_journal
+from dbt_scenario import process as scenario_process
+from dbt_scenario import project as scenario_project
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = pathlib.Path(__file__).resolve().parents[1]
 pytestmark = pytest.mark.integration
 
 
@@ -37,11 +39,15 @@ pytestmark = pytest.mark.integration
 def project(tmp_path):
     if "DSC_TEST_PASSWORD" not in os.environ:
         pytest.skip("DSC_TEST_PASSWORD is required for disposable PostgreSQL")
-    config = load_config(ROOT / "scenario-runner.yml")
+    config = scenario_config.load_config(ROOT / "scenario-runner.yml")
     copied = tmp_path / "shop"
-    shutil.copytree(config.project_dir, copied, ignore=shutil.ignore_patterns(".dbt-scenario"))
+    shutil.copytree(
+        config.project_dir,
+        copied,
+        ignore=shutil.ignore_patterns(".dbt-scenario"),
+    )
     config.project_dir = copied
-    scenario = load_scenario(copied / "scenarios" / "orders.yml", copied)
+    scenario = loader.load_scenario(copied / "scenarios" / "orders.yml", copied)
     return config, scenario, tmp_path / "reports"
 
 
@@ -69,7 +75,8 @@ def slow_model(config):
     model.write_text(
         model.read_text().replace(
             "from {{ source('raw', 'orders') }}",
-            "from {{ source('raw', 'orders') }} cross join (select pg_sleep(60)) delay",
+            "from {{ source('raw', 'orders') }} cross join (select "
+            "pg_sleep(60)) delay",
         )
     )
 
@@ -79,13 +86,13 @@ def test_real_incremental_update_late_arrival_retry(project, strategy):
     config, scenario, reports = project
     for step in scenario.data["steps"]:
         step["run"]["vars"] = {"strategy": strategy}
-    before = fingerprint(config.project_dir)
-    result = run_scenario(scenario, config, reports)
+    before = scenario_project.fingerprint(config.project_dir)
+    result = runner.run_scenario(scenario, config, reports)
     assert result["overall_status"] == "PASS", result
     assert result["cleanup_status"] == "CLEANED"
     assert result["steps"][1]["observed_mode_evidence"]["operation"] == strategy
     assert [s["actual_rows"] for s in result["steps"]] == [2, 3, 3]
-    assert fingerprint(config.project_dir) == before
+    assert scenario_project.fingerprint(config.project_dir) == before
     with psycopg.connect(**config.connection_kwargs()) as connection:
         assert not connection.execute(
             "SELECT 1 FROM pg_namespace WHERE nspname LIKE %s",
@@ -101,17 +108,79 @@ def test_detects_wrong_watermark_and_stops_dependent_steps(project):
         .replace("where updated_at >=", "where event_at >")
         .replace("max(updated_at)", "max(event_at)")
     )
-    result = run_scenario(scenario, config, reports)
+    result = runner.run_scenario(scenario, config, reports)
     assert result["overall_status"] == "FAIL", result
-    assert result["steps"][1]["diff_counts"] == {"missing": 1, "unexpected": 0, "changed": 1}
+    assert result["steps"][1]["diff_counts"] == {
+        "missing": 1,
+        "unexpected": 0,
+        "changed": 1,
+    }
     assert result["steps"][2]["status"] == "NOT_RUN"
+
+
+def test_scenario_preserves_native_data_tests(project, tmp_path):
+    config, scenario, reports = project
+    model = config.project_dir / "models/fct_orders.sql"
+    original = model.read_text(encoding="utf-8")
+    schema = model.with_name("schema.yml")
+    native_tests = (
+        "version: 2\n"
+        "models:\n"
+        "  - name: fct_orders\n"
+        "    columns:\n"
+        "      - name: order_id\n"
+        "        data_tests: [unique, not_null]\n"
+    )
+    schema.write_text(native_tests, encoding="utf-8")
+    model.write_text(
+        original.replace("where updated_at >=", "where event_at >").replace(
+            "max(updated_at)", "max(event_at)"
+        ),
+        encoding="utf-8",
+    )
+    config_path = config_file(config, tmp_path)
+    arguments = [
+        "test",
+        "--config",
+        str(config_path),
+        "--scenario",
+        str(scenario.path),
+        "--report-dir",
+        str(reports),
+    ]
+    red = testing.CliRunner().invoke(cli.main, arguments)
+    assert red.exit_code == 1, red.output
+    assert "ROWS_MISMATCH" in red.output
+    (bad,) = [
+        json.loads(path.read_text(encoding="utf-8"))
+        for path in reports.glob("*/summary.json")
+    ]
+    assert [step["status"] for step in bad["steps"]] == [
+        "PASS",
+        "FAIL",
+        "NOT_RUN",
+    ]
+    assert bad["cleanup_status"] == "CLEANED"
+
+    model.write_text(original, encoding="utf-8")
+    green = testing.CliRunner().invoke(cli.main, arguments)
+    assert green.exit_code == 0, green.output
+    (good,) = [
+        json.loads(path.read_text(encoding="utf-8"))
+        for path in reports.glob("*/summary.json")
+        if path.parent.name != bad["run_id"]
+    ]
+    assert [step["status"] for step in good["steps"]] == ["PASS"] * 3
+    assert good["cleanup_status"] == "CLEANED"
+    assert bad["scenario_hash"] == good["scenario_hash"]
+    assert schema.read_text(encoding="utf-8") == native_tests
 
 
 def test_reports_duplicate_keys_instead_of_collapsing_append_rows(project):
     config, scenario, reports = project
     for step in scenario.data["steps"]:
         step["run"]["vars"] = {"strategy": "append"}
-    result = run_scenario(scenario, config, reports)
+    result = runner.run_scenario(scenario, config, reports)
     assert result["overall_status"] == "FAIL", result
     assert result["steps"][1]["reason_code"] == "DUPLICATE_KEY"
 
@@ -119,37 +188,86 @@ def test_reports_duplicate_keys_instead_of_collapsing_append_rows(project):
 def test_detects_equal_sum_value_swap(project):
     config, scenario, reports = project
     expected = scenario.data["steps"][1]["expect"]["rows"]
-    expected[0]["amount"], expected[1]["amount"] = expected[1]["amount"], expected[0]["amount"]
-    result = run_scenario(scenario, config, reports)
+    expected[0]["amount"], expected[1]["amount"] = (
+        expected[1]["amount"],
+        expected[0]["amount"],
+    )
+    result = runner.run_scenario(scenario, config, reports)
     assert result["overall_status"] == "FAIL", result
-    assert result["steps"][1]["diff_counts"] == {"missing": 0, "unexpected": 0, "changed": 2}
+    assert result["steps"][1]["diff_counts"] == {
+        "missing": 0,
+        "unexpected": 0,
+        "changed": 2,
+    }
 
 
 def test_ref_input_is_fixtured_without_running_upstream_sql(project):
     config, scenario, reports = project
     model = config.project_dir / "models" / "fct_orders.sql"
-    model.write_text(model.read_text().replace("source('raw', 'orders')", "ref('stg_orders')"))
+    model.write_text(
+        model.read_text().replace(
+            "source('raw', 'orders')", "ref('stg_orders')"
+        )
+    )
     (config.project_dir / "models" / "stg_orders.sql").write_text(
         "select * from table_that_must_never_be_read"
     )
     scenario.data["inputs"]["orders"]["node"] = "model.shop.stg_orders"
-    result = run_scenario(scenario, config, reports)
+    result = runner.run_scenario(scenario, config, reports)
     assert result["overall_status"] == "PASS", result
 
 
-def test_errors_are_redacted_and_never_pass(project):
+@pytest.mark.parametrize("phase", ["parse", "compile", "run"])
+def test_errors_are_redacted_and_never_pass(project, phase, tmp_path):
     config, scenario, reports = project
     secret = "synthetic.person@example.invalid"
-    (config.project_dir / "models" / "fct_orders.sql").write_text(
-        "{{ exceptions.raise_compiler_error('" + secret + "') }}"
+    model = config.project_dir / "models/fct_orders.sql"
+    failure = "{{ exceptions.raise_compiler_error('" + secret + "') }}"
+    if phase != "parse":
+        failure = (
+            "{% if execute and flags.WHICH == '"
+            + phase
+            + "' %}"
+            + failure
+            + "{% endif %}\n"
+            + model.read_text(encoding="utf-8")
+        )
+    model.write_text(failure, encoding="utf-8")
+    outcome = testing.CliRunner().invoke(
+        cli.main,
+        [
+            "test",
+            "--config",
+            str(config_file(config, tmp_path)),
+            "--scenario",
+            str(scenario.path),
+            "--report-dir",
+            str(reports),
+        ],
     )
-    result = run_scenario(scenario, config, reports)
+    assert outcome.exit_code == 2, outcome.output
+    assert f"dbt phase: {phase}" in outcome.output
+    assert "dbt selected model: model.shop.fct_orders" in outcome.output
+    assert secret not in outcome.output
+    (summary,) = reports.glob("*/summary.json")
+    result = json.loads(summary.read_text(encoding="utf-8"))
     assert result["overall_status"] == "ERROR", result
     assert result["reason_code"] == "DBT_EXECUTION_ERROR"
-    for path in (reports / result["run_id"]).iterdir():
+    diagnostic = result["diagnostic"]
+    assert diagnostic["dbt_command"] == phase
+    markdown = summary.with_name("summary.md").read_text(encoding="utf-8")
+    assert f"dbt phase: {phase}" in markdown
+    if phase in {"compile", "run"}:
+        assert diagnostic["dbt_node_unique_id"] == "model.shop.fct_orders"
+        assert "dbt failed node: model.shop.fct_orders" in outcome.output
+        assert "dbt failed node: model.shop.fct_orders" in markdown
+    else:
+        assert "dbt_node_unique_id" not in diagnostic
+    for path in summary.parent.iterdir():
         assert path.is_file()
-        assert secret not in path.read_text()
-        assert config.database["password"] not in path.read_text()
+        contents = path.read_text(encoding="utf-8")
+        assert secret not in contents
+        assert config.database["password"] not in contents
 
 
 def test_cli_nonzero_and_json_junit_artifacts(project, tmp_path):
@@ -162,8 +280,8 @@ def test_cli_nonzero_and_json_junit_artifacts(project, tmp_path):
     runner_config["project_dir"] = str(config.project_dir)
     config_path = tmp_path / "runner.yml"
     config_path.write_text(yaml.safe_dump(runner_config))
-    result = CliRunner().invoke(
-        main,
+    result = testing.CliRunner().invoke(
+        cli.main,
         [
             "test",
             "--config",
@@ -179,21 +297,30 @@ def test_cli_nonzero_and_json_junit_artifacts(project, tmp_path):
     assert len(summaries) == 1
     assert json.loads(summaries[0].read_text())["overall_status"] == "FAIL"
     assert summaries[0].with_name("junit.xml").is_file()
+    markdown = summaries[0].with_name("summary.md").read_text(encoding="utf-8")
+    assert "| Missing | Unexpected | Changed |" in markdown
+    assert "| initial_load | FAIL | ROWS_MISMATCH | 0 | 0 | 1 |" in markdown
+    assert (
+        "| retry_without_changes | NOT_RUN | PREVIOUS_STEP_UNSUCCESSFUL |"
+        in (markdown)
+    )
 
 
 def test_kept_failure_can_be_cleaned_twice_from_cli(project, tmp_path):
     config, scenario, reports = project
     scenario.data["steps"][0]["expect"]["rows"][0]["amount"] = "99.00"
-    result = run_scenario(scenario, config, reports, keep_on_failure=True)
+    result = runner.run_scenario(
+        scenario, config, reports, keep_on_failure=True
+    )
     assert result["overall_status"] == "FAIL", result
     assert result["cleanup_status"] == "KEPT"
-    journal = Journal.load(config, result["run_id"])
+    journal = scenario_journal.Journal.load(config, result["run_id"])
     assert len(existing_schemas(config, journal)) == 3
     path = config_file(config, tmp_path)
     try:
         for _ in range(2):
-            response = CliRunner().invoke(
-                main,
+            response = testing.CliRunner().invoke(
+                cli.main,
                 [
                     "cleanup",
                     "--config",
@@ -204,96 +331,133 @@ def test_kept_failure_can_be_cleaned_twice_from_cli(project, tmp_path):
             )
             assert response.exit_code == 0, response.output
         assert not existing_schemas(config, journal)
-        assert Journal.load(config, result["run_id"]).data["state"] == "CLEANED"
+        assert (
+            scenario_journal.Journal.load(config, result["run_id"]).data[
+                "state"
+            ]
+            == "CLEANED"
+        )
     finally:
-        cleanup_run(config, result["run_id"])
+        lifecycle.cleanup_run(config, result["run_id"])
 
 
 def test_cleanup_refuses_an_active_runner(project):
     config, _, _ = project
-    database = Database(config)
-    journal = Journal.create(config, uuid.uuid4().hex)
+    database = scenario_database.Database(config)
+    journal = scenario_journal.Journal.create(config, uuid.uuid4().hex)
     try:
         database.create_schemas(journal)
-        with pytest.raises(ScenarioError, match="RUN_STILL_ACTIVE"):
-            cleanup_run(config, journal.data["run_id"])
+        with pytest.raises(errors.ScenarioError, match="RUN_STILL_ACTIVE"):
+            lifecycle.cleanup_run(config, journal.data["run_id"])
         assert len(existing_schemas(config, journal)) == 3
-        assert Journal.load(config, journal.data["run_id"]).data["state"] == "RUNNING"
+        assert (
+            scenario_journal.Journal.load(config, journal.data["run_id"]).data[
+                "state"
+            ]
+            == "RUNNING"
+        )
     finally:
         database.close()
-        cleanup_run(config, journal.data["run_id"])
+        lifecycle.cleanup_run(config, journal.data["run_id"])
 
 
 def test_cleanup_validates_every_marker_before_deleting_anything(project):
     config, _, _ = project
-    database = Database(config)
-    journal = Journal.create(config, uuid.uuid4().hex)
+    database = scenario_database.Database(config)
+    journal = scenario_journal.Journal.create(config, uuid.uuid4().hex)
     database.create_schemas(journal)
     name = journal.data["schemas"][1]
-    database.execute(sql.SQL("COMMENT ON SCHEMA {} IS 'not-owned'").format(sql.Identifier(name)))
+    database.execute(
+        sql.SQL("COMMENT ON SCHEMA {} IS 'not-owned'").format(
+            sql.Identifier(name)
+        )
+    )
     database.close()
     try:
-        with pytest.raises(ScenarioError, match="CLEANUP_OWNERSHIP_MISMATCH"):
-            cleanup_run(config, journal.data["run_id"])
+        with pytest.raises(
+            errors.ScenarioError, match="CLEANUP_OWNERSHIP_MISMATCH"
+        ):
+            lifecycle.cleanup_run(config, journal.data["run_id"])
         assert len(existing_schemas(config, journal)) == 3
-        assert Journal.load(config, journal.data["run_id"]).data["state"] == "CLEANUP_FAILED"
+        assert (
+            scenario_journal.Journal.load(config, journal.data["run_id"]).data[
+                "state"
+            ]
+            == "CLEANUP_FAILED"
+        )
     finally:
-        with psycopg.connect(**config.connection_kwargs(), autocommit=True) as connection:
+        with psycopg.connect(
+            **config.connection_kwargs(), autocommit=True
+        ) as connection:
             connection.execute(
                 sql.SQL("COMMENT ON SCHEMA {} IS {}").format(
                     sql.Identifier(name), sql.Literal(journal.marker())
                 )
             )
-        cleanup_run(config, journal.data["run_id"])
+        lifecycle.cleanup_run(config, journal.data["run_id"])
 
 
 def test_cleanup_never_cascades_into_another_run(project):
     config, _, _ = project
-    first, second = [Journal.create(config, uuid.uuid4().hex) for _ in range(2)]
-    databases = [Database(config), Database(config)]
+    first, second = [
+        scenario_journal.Journal.create(config, uuid.uuid4().hex)
+        for _ in range(2)
+    ]
+    databases = [
+        scenario_database.Database(config),
+        scenario_database.Database(config),
+    ]
     try:
         for database, journal in zip(databases, [first, second], strict=True):
             database.create_schemas(journal)
         table = sql.Identifier(first.data["schemas"][0], "owned")
         view = sql.Identifier(second.data["schemas"][0], "foreign_view")
-        databases[0].execute(sql.SQL("CREATE TABLE {} (id integer)").format(table))
-        databases[1].execute(sql.SQL("CREATE VIEW {} AS SELECT * FROM {}").format(view, table))
+        databases[0].execute(
+            sql.SQL("CREATE TABLE {} (id integer)").format(table)
+        )
+        databases[1].execute(
+            sql.SQL("CREATE VIEW {} AS SELECT * FROM {}").format(view, table)
+        )
     finally:
         for database in databases:
             database.close()
     try:
         with pytest.raises(psycopg.errors.DependentObjectsStillExist):
-            cleanup_run(config, first.data["run_id"])
+            lifecycle.cleanup_run(config, first.data["run_id"])
         assert len(existing_schemas(config, first)) == 3
         assert len(existing_schemas(config, second)) == 3
-        with psycopg.connect(**config.connection_kwargs(), autocommit=True) as connection:
+        with psycopg.connect(
+            **config.connection_kwargs(), autocommit=True
+        ) as connection:
             connection.execute(sql.SQL("SELECT * FROM {}").format(view))
             connection.execute(sql.SQL("DROP VIEW {} RESTRICT").format(view))
     finally:
-        cleanup_run(config, first.data["run_id"])
-        cleanup_run(config, second.data["run_id"])
+        lifecycle.cleanup_run(config, first.data["run_id"])
+        lifecycle.cleanup_run(config, second.data["run_id"])
 
 
 def test_deadline_cancels_sql_and_rolls_back_all_input_updates(project):
     config, _, _ = project
-    database = Database(config)
-    journal = Journal.create(config, uuid.uuid4().hex)
+    database = scenario_database.Database(config)
+    journal = scenario_journal.Journal.create(config, uuid.uuid4().hex)
     try:
         database.create_schemas(journal)
         name = journal.data["schemas"][1]
         database.replace(name, "input", {"id": "integer"}, [{"id": 1}])
         started = time.monotonic()
-        with pytest.raises(ScenarioError, match="STEP_TIMEOUT"):
-            with database.budget(Deadline(0.25, "STEP_TIMEOUT")):
+        with pytest.raises(errors.ScenarioError, match="STEP_TIMEOUT"):
+            with database.budget(deadline.Deadline(0.25, "STEP_TIMEOUT")):
                 with database.connection.transaction():
-                    database.replace(name, "input", {"id": "integer"}, [{"id": 2}])
+                    database.replace(
+                        name, "input", {"id": "integer"}, [{"id": 2}]
+                    )
                     database.execute("SELECT pg_sleep(60)")
         assert time.monotonic() - started < 4
         assert database.execute(
             sql.SQL("SELECT id FROM {}.input").format(sql.Identifier(name))
         ).fetchall() == [(1,)]
     finally:
-        finish_run(database, journal)
+        lifecycle.finish_run(database, journal)
         database.close()
 
 
@@ -301,15 +465,16 @@ def test_timeout_in_dbt_stops_server_query_and_cleans_schemas(project):
     config, scenario, reports = project
     slow_model(config)
     config.step_timeout = 24
-    result = run_scenario(scenario, config, reports)
+    result = runner.run_scenario(scenario, config, reports)
     assert result["overall_status"] == "ERROR", result
     assert result["reason_code"] == "STEP_TIMEOUT", result
     assert result["cleanup_status"] == "CLEANED", result
-    journal = Journal.load(config, result["run_id"])
+    journal = scenario_journal.Journal.load(config, result["run_id"])
     assert not existing_schemas(config, journal)
     with psycopg.connect(**config.connection_kwargs()) as connection:
         assert not connection.execute(
-            "SELECT 1 FROM pg_stat_activity WHERE application_name=%s AND state='active'",
+            "SELECT 1 FROM pg_stat_activity WHERE application_name=%s AND "
+            "state='active'",
             [f"dbt-scenario:{journal.data['schemas'][0]}"],
         ).fetchall()
 
@@ -317,14 +482,16 @@ def test_timeout_in_dbt_stops_server_query_and_cleans_schemas(project):
 def test_snapshot_is_inside_the_step_deadline(project, monkeypatch):
     config, scenario, reports = project
     config.step_timeout = 24
-    original = Database.snapshot
+    original = scenario_database.Database.snapshot
 
     def delayed_snapshot(database, *args):
         database.execute("SELECT pg_sleep(60)")
         return original(database, *args)
 
-    monkeypatch.setattr(Database, "snapshot", delayed_snapshot)
-    result = run_scenario(scenario, config, reports)
+    monkeypatch.setattr(
+        scenario_database.Database, "snapshot", delayed_snapshot
+    )
+    result = runner.run_scenario(scenario, config, reports)
     assert result["overall_status"] == "ERROR", result
     assert result["reason_code"] == "STEP_TIMEOUT", result
     assert result["cleanup_status"] == "CLEANED", result
@@ -333,7 +500,7 @@ def test_snapshot_is_inside_the_step_deadline(project, monkeypatch):
 def test_scenario_deadline_also_limits_setup(project):
     config, scenario, reports = project
     config.scenario_timeout = 1
-    result = run_scenario(scenario, config, reports)
+    result = runner.run_scenario(scenario, config, reports)
     assert result["overall_status"] == "ERROR", result
     assert result["reason_code"] == "SCENARIO_TIMEOUT", result
     assert result["duration_ms"] < 10000, result
@@ -358,9 +525,9 @@ def test_abandoned_process_resources_can_be_recovered(project, tmp_path):
         check=False,
     )
     assert result.returncode == 17, result.stderr
-    journal = Journal.load(config, run_id)
+    journal = scenario_journal.Journal.load(config, run_id)
     assert len(existing_schemas(config, journal)) == 3
-    cleanup_run(config, run_id)
+    lifecycle.cleanup_run(config, run_id)
     assert not existing_schemas(config, journal)
 
 
@@ -380,18 +547,24 @@ def test_two_cli_processes_do_not_share_state(project, tmp_path):
         str(reports),
     ]
     processes = [
-        subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE) for _ in range(2)
+        subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        for _ in range(2)
     ]
     try:
         for process in processes:
             stdout, stderr = process.communicate(timeout=120)
             assert process.returncode == 0, (stdout, stderr)
-        summaries = [json.loads(path.read_text()) for path in reports.glob("*/summary.json")]
+        summaries = [
+            json.loads(path.read_text())
+            for path in reports.glob("*/summary.json")
+        ]
         assert len(summaries) == 2
         assert len({report["run_id"] for report in summaries}) == 2
         assert all(report["overall_status"] == "PASS" for report in summaries)
         for report in summaries:
-            assert not existing_schemas(config, Journal.load(config, report["run_id"]))
+            assert not existing_schemas(
+                config, scenario_journal.Journal.load(config, report["run_id"])
+            )
     finally:
         for process in processes:
             if process.poll() is None:
@@ -416,13 +589,16 @@ def test_sigint_cleans_resources_and_returns_130(project, tmp_path):
         "--report-dir",
         str(reports),
     ]
-    process = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    process = subprocess.Popen(
+        argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
     try:
         end = time.monotonic() + 45
         while time.monotonic() < end:
             with psycopg.connect(**config.connection_kwargs()) as connection:
                 active = connection.execute(
-                    "SELECT 1 FROM pg_stat_activity WHERE application_name LIKE 'dbt-scenario:%' "
+                    "SELECT 1 FROM pg_stat_activity WHERE application_name "
+                    "LIKE 'dbt-scenario:%' "
                     "AND state='active' AND query LIKE '%%pg_sleep%%'"
                 ).fetchone()
             if active:
@@ -437,7 +613,9 @@ def test_sigint_cleans_resources_and_returns_130(project, tmp_path):
         report = json.loads(next(reports.glob("*/summary.json")).read_text())
         assert report["reason_code"] == "INTERRUPTED", report
         assert report["cleanup_status"] == "CLEANED", report
-        assert not existing_schemas(config, Journal.load(config, report["run_id"]))
+        assert not existing_schemas(
+            config, scenario_journal.Journal.load(config, report["run_id"])
+        )
     finally:
         if process.poll() is None:
             process.kill()
@@ -448,20 +626,26 @@ def test_initialized_demo_runs_on_real_postgresql(tmp_path):
     if "DSC_TEST_PASSWORD" not in os.environ:
         pytest.skip("DSC_TEST_PASSWORD is required for disposable PostgreSQL")
     destination = tmp_path / "generated-demo"
-    initialize(destination, demo=True)
-    config = load_config(destination / "scenario-runner.yml")
-    scenario = load_scenario(destination / "examples/shop/scenarios/orders.yml", config.project_dir)
-    report = run_scenario(scenario, config, tmp_path / "reports")
+    initialize.initialize(destination, demo=True)
+    config = scenario_config.load_config(destination / "scenario-runner.yml")
+    scenario = loader.load_scenario(
+        destination / "examples/shop/scenarios/orders.yml", config.project_dir
+    )
+    report = runner.run_scenario(scenario, config, tmp_path / "reports")
     assert report["overall_status"] == "PASS", report
     assert report["cleanup_status"] == "CLEANED"
     assert [step["actual_rows"] for step in report["steps"]] == [2, 3, 3]
 
 
-def test_real_manifest_refuses_custom_macros_before_template_writes(tmp_path, monkeypatch):
+def test_real_manifest_refuses_custom_macros_before_template_writes(
+    tmp_path, monkeypatch
+):
     root = tmp_path / "analytics"
     (root / "models").mkdir(parents=True)
     (root / "macros").mkdir()
-    (root / "dbt_project.yml").write_text("name: analytics\nconfig-version: 2\n")
+    (root / "dbt_project.yml").write_text(
+        "name: analytics\nconfig-version: 2\n"
+    )
     (root / "models/fct_orders.sql").write_text(
         "{{ config(materialized='incremental', unique_key='order_id') }}\n"
         "select order_id from {{ source('raw', 'orders') }}\n"
@@ -475,7 +659,12 @@ def test_real_manifest_refuses_custom_macros_before_template_writes(tmp_path, mo
                 "sources": [
                     {
                         "name": "raw",
-                        "tables": [{"name": "orders", "columns": copy.deepcopy(columns)}],
+                        "tables": [
+                            {
+                                "name": "orders",
+                                "columns": copy.deepcopy(columns),
+                            }
+                        ],
                     }
                 ],
             }
@@ -485,7 +674,7 @@ def test_real_manifest_refuses_custom_macros_before_template_writes(tmp_path, mo
         "{% macro generate_schema_name(custom_schema_name, node) %}"
         "{{ target.schema }}{% endmacro %}"
     )
-    config = Config(
+    config = scenario_config.Config(
         root,
         {
             "host": "127.0.0.1",
@@ -496,31 +685,46 @@ def test_real_manifest_refuses_custom_macros_before_template_writes(tmp_path, mo
             "sslmode": "disable",
         },
     )
-    _, artifacts = Project(config, tmp_path / "parse", "dsc_metadata_probe").invoke("parse", 120)
+    _, artifacts = scenario_project.Project(
+        config, tmp_path / "parse", "dsc_metadata_probe"
+    ).invoke("parse", 120)
     before = {
-        path.relative_to(root): path.read_bytes() for path in root.rglob("*") if path.is_file()
+        path.relative_to(root): path.read_bytes()
+        for path in root.rglob("*")
+        if path.is_file()
     }
     with monkeypatch.context() as patch:
         patch.delenv("DSC_TEST_PASSWORD", raising=False)
         patch.delenv("DBT_ENV_SECRET_DSC_PASSWORD", raising=False)
-        patch.setattr("psycopg.connect", lambda *a, **kw: pytest.fail("database accessed"))
-        patch.setattr("subprocess.Popen", lambda *a, **kw: pytest.fail("subprocess started"))
+        patch.setattr(
+            "psycopg.connect", lambda *a, **kw: pytest.fail("database accessed")
+        )
+        patch.setattr(
+            "subprocess.Popen",
+            lambda *a, **kw: pytest.fail("subprocess started"),
+        )
         arguments = [
             "--project-dir",
             str(root),
             "--manifest",
             str(artifacts / "target/manifest.json"),
         ]
-        discovered = CliRunner().invoke(main, ["discover", *arguments])
+        discovered = testing.CliRunner().invoke(
+            cli.main, ["discover", *arguments]
+        )
         assert discovered.exit_code == 0, discovered.output
         entry = json.loads(discovered.output)["models"][0]
         assert entry["status"] == "BLOCKED"
         assert entry["reason_code"] == "CUSTOM_MACRO_UNSUPPORTED"
-        initialized = CliRunner().invoke(main, ["init", *arguments, "--model", "fct_orders"])
+        initialized = testing.CliRunner().invoke(
+            cli.main, ["init", *arguments, "--model", "fct_orders"]
+        )
         assert initialized.exit_code == 2, initialized.output
         assert "CUSTOM_MACRO_UNSUPPORTED" in initialized.output
     assert {
-        path.relative_to(root): path.read_bytes() for path in root.rglob("*") if path.is_file()
+        path.relative_to(root): path.read_bytes()
+        for path in root.rglob("*")
+        if path.is_file()
     } == before
 
 
@@ -528,8 +732,8 @@ def test_metadata_template_from_real_catalog_runs_after_explicit_fixture_edits(
     project, tmp_path, monkeypatch
 ):
     config, original, reports = project
-    native = Database(config)
-    journal = Journal.create(config, uuid.uuid4().hex)
+    native = scenario_database.Database(config)
+    journal = scenario_journal.Journal.create(config, uuid.uuid4().hex)
     actual, inputs, _ = journal.data["schemas"]
     try:
         native.create_schemas(journal)
@@ -547,16 +751,24 @@ def test_metadata_template_from_real_catalog_runs_after_explicit_fixture_edits(
         profiles = tmp_path / "native_profiles"
         profiles.mkdir()
         profile = {
-            key: config.database[key] for key in ["host", "port", "dbname", "user", "sslmode"]
+            key: config.database[key]
+            for key in ["host", "port", "dbname", "user", "sslmode"]
         }
         profile.update(type="postgres", schema=actual, threads=1)
         profile["pass"] = "{{ env_var('DBT_ENV_SECRET_DSC_PASSWORD') }}"
         (profiles / "profiles.yml").write_text(
-            yaml.safe_dump({"shop": {"target": "test", "outputs": {"test": profile}}})
+            yaml.safe_dump(
+                {"shop": {"target": "test", "outputs": {"test": profile}}}
+            )
         )
-        executable = Path(sys.executable).parent / ("dbt.exe" if os.name == "nt" else "dbt")
+        executable = pathlib.Path(sys.executable).parent / (
+            "dbt.exe" if os.name == "nt" else "dbt"
+        )
         artifacts = tmp_path / "docs_artifacts"
-        for command in [["run", "--select", "fct_orders"], ["docs", "generate"]]:
+        for command in [
+            ["run", "--select", "fct_orders"],
+            ["docs", "generate"],
+        ]:
             arguments = [
                 str(executable),
                 "--no-use-colors",
@@ -572,21 +784,29 @@ def test_metadata_template_from_real_catalog_runs_after_explicit_fixture_edits(
                 str(artifacts),
             ]
             assert (
-                run_process(
+                scenario_process.run_process(
                     arguments,
-                    process_environment({}, config.database["password"]),
+                    environment.process_environment(
+                        {}, config.database["password"]
+                    ),
                     config.project_dir,
-                    Deadline(120, "DBT_TIMEOUT"),
+                    deadline.Deadline(120, "DBT_TIMEOUT"),
                 )
                 == 0
             )
         model = config.project_dir / "models/fct_orders.sql"
         before = model.read_bytes()
         with monkeypatch.context() as patch:
-            patch.setattr("psycopg.connect", lambda *a, **kw: pytest.fail("init accessed database"))
-            patch.setattr("subprocess.Popen", lambda *a, **kw: pytest.fail("subprocess started"))
-            discovered = CliRunner().invoke(
-                main,
+            patch.setattr(
+                "psycopg.connect",
+                lambda *a, **kw: pytest.fail("init accessed database"),
+            )
+            patch.setattr(
+                "subprocess.Popen",
+                lambda *a, **kw: pytest.fail("subprocess started"),
+            )
+            discovered = testing.CliRunner().invoke(
+                cli.main,
                 [
                     "discover",
                     "--project-dir",
@@ -608,8 +828,8 @@ def test_metadata_template_from_real_catalog_runs_after_explicit_fixture_edits(
                     "input_count": 1,
                 }
             ]
-            result = CliRunner().invoke(
-                main,
+            result = testing.CliRunner().invoke(
+                cli.main,
                 [
                     "init",
                     "--project-dir",
@@ -629,19 +849,30 @@ def test_metadata_template_from_real_catalog_runs_after_explicit_fixture_edits(
         assert data["output"]["columns"] == original.data["output"]["columns"]
         for index, fixture_name in enumerate(["initial", "updated"]):
             rows = yaml.safe_load(
-                (config.project_dir / f"scenarios/fixtures/{fixture_name}.yml").read_text()
+                (
+                    config.project_dir
+                    / f"scenarios/fixtures/{fixture_name}.yml"
+                ).read_text()
             )["rows"]
-            data["steps"][index]["inputs"]["input_1"]["replace"]["rows"] = copy.deepcopy(rows)
+            data["steps"][index]["inputs"]["input_1"]["replace"]["rows"] = (
+                copy.deepcopy(rows)
+            )
             data["steps"][index]["expect"]["rows"] = copy.deepcopy(rows)
         path.write_text(yaml.safe_dump(data, sort_keys=False))
-        generated = load_config(config.project_dir / "scenario-runner.yml")
-        report = run_scenario(load_scenario(path, generated.project_dir), generated, reports)
+        generated = scenario_config.load_config(
+            config.project_dir / "scenario-runner.yml"
+        )
+        report = runner.run_scenario(
+            loader.load_scenario(path, generated.project_dir),
+            generated,
+            reports,
+        )
         assert report["overall_status"] == "PASS", report
         assert report["cleanup_status"] == "CLEANED"
         assert [step["actual_rows"] for step in report["steps"]] == [2, 3, 3]
         assert model.read_bytes() == before
     finally:
-        finish_run(native, journal)
+        lifecycle.finish_run(native, journal)
         native.close()
 
 
@@ -650,17 +881,20 @@ def test_project_env_allowlist_reaches_dbt_without_forwarding_other_values(
 ):
     config, scenario, reports = project
     monkeypatch.setenv("SCENARIO_ADJUSTMENT", "1.00")
-    monkeypatch.setenv("SCENARIO_UNLISTED_SENTINEL", "synthetic.private@example.invalid")
+    monkeypatch.setenv(
+        "SCENARIO_UNLISTED_SENTINEL", "synthetic.private@example.invalid"
+    )
     path = config_file(config, tmp_path)
     settings = yaml.safe_load(path.read_text())
     settings["env_allowlist"] = ["SCENARIO_ADJUSTMENT"]
     path.write_text(yaml.safe_dump(settings))
-    config = load_config(path)
+    config = scenario_config.load_config(path)
     model = config.project_dir / "models/fct_orders.sql"
     code = model.read_text().replace(
         "select order_id, event_at, updated_at, amount",
         "select order_id, event_at, updated_at, "
-        "cast(amount + {{ env_var('SCENARIO_ADJUSTMENT') }} as numeric(12,2)) as amount",
+        "cast(amount + {{ env_var('SCENARIO_ADJUSTMENT') }} as numeric(12,2)) "
+        "as amount",
     )
     code += (
         "\n{% if env_var('SCENARIO_UNLISTED_SENTINEL', 'absent') != 'absent' %}"
@@ -673,7 +907,7 @@ def test_project_env_allowlist_reaches_dbt_without_forwarding_other_values(
     for step in scenario.data["steps"]:
         for row in step["expect"].get("rows", []):
             row["amount"] = str(Decimal(row["amount"]) + Decimal("1.00"))
-    report = run_scenario(scenario, config, reports)
+    report = runner.run_scenario(scenario, config, reports)
     assert report["overall_status"] == "PASS", report
     assert report["project_env_names"] == ["SCENARIO_ADJUSTMENT"]
     encoded = json.dumps(report)
@@ -683,23 +917,31 @@ def test_project_env_allowlist_reaches_dbt_without_forwarding_other_values(
 
 @pytest.mark.parametrize("strategy", ["delete+insert", "merge"])
 @pytest.mark.parametrize("historical", [False, True])
-def test_incremental_model_can_grow_from_an_empty_initial_table(project, strategy, historical):
+def test_incremental_model_can_grow_from_an_empty_initial_table(
+    project, strategy, historical
+):
     config, _, reports = project
-    scenario = load_scenario(config.project_dir / "scenarios/empty-start.yml", config.project_dir)
+    scenario = loader.load_scenario(
+        config.project_dir / "scenarios/empty-start.yml", config.project_dir
+    )
     for step in scenario.data["steps"]:
         step["run"]["vars"] = {"strategy": strategy}
         if historical:
-            snapshots = [update["replace"] for update in step.get("inputs", {}).values()]
+            snapshots = [
+                update["replace"] for update in step.get("inputs", {}).values()
+            ]
             snapshots.append(step["expect"])
             for snapshot in snapshots:
                 for row in snapshot.get("rows", []):
                     for column in ["event_at", "updated_at"]:
                         row[column] = (
-                            row[column].replace("2026-", "1800-").replace("2025-", "1799-")
+                            row[column]
+                            .replace("2026-", "1800-")
+                            .replace("2025-", "1799-")
                         )
     model = config.project_dir / "models/fct_orders.sql"
     before = model.read_bytes()
-    report = run_scenario(scenario, config, reports)
+    report = runner.run_scenario(scenario, config, reports)
     assert report["overall_status"] == "PASS", report
     assert [step["actual_rows"] for step in report["steps"]] == [0, 3, 3]
     assert report["steps"][1]["observed_mode_evidence"]["operation"] == strategy
@@ -711,7 +953,7 @@ def test_empty_incoming_snapshot_keeps_existing_target_rows(project):
     config, scenario, reports = project
     scenario.data["steps"][1]["inputs"]["orders"]["replace"]["rows"] = []
     scenario.data["steps"][1]["expect"] = {"same_as": "initial_load"}
-    report = run_scenario(scenario, config, reports)
+    report = runner.run_scenario(scenario, config, reports)
     assert report["overall_status"] == "PASS", report
     assert [step["actual_rows"] for step in report["steps"]] == [2, 2, 2]
 
@@ -730,7 +972,7 @@ def test_runtime_schema_addition_is_an_assertion_failure(project):
     )
     model.write_text(code)
     scenario.data["steps"][1]["run"]["vars"] = {"add_extra": True}
-    report = run_scenario(scenario, config, reports)
+    report = runner.run_scenario(scenario, config, reports)
     assert report["overall_status"] == "FAIL", report
     assert report["steps"][0]["status"] == "PASS"
     assert report["steps"][1]["reason_code"] == "SCHEMA_MISMATCH"
@@ -745,8 +987,10 @@ def test_append_accepts_disjoint_new_input_batches(project):
     for step in scenario.data["steps"]:
         step["run"]["vars"] = {"strategy": "append"}
     scenario.data["steps"][1]["inputs"]["orders"]["replace"]["rows"] = new_rows
-    scenario.data["steps"][1]["expect"]["rows"] = first_rows + copy.deepcopy(new_rows)
-    report = run_scenario(scenario, config, reports)
+    scenario.data["steps"][1]["expect"]["rows"] = first_rows + copy.deepcopy(
+        new_rows
+    )
+    report = runner.run_scenario(scenario, config, reports)
     assert report["overall_status"] == "PASS", report
     assert report["steps"][1]["observed_mode_evidence"]["operation"] == "append"
 
@@ -790,12 +1034,15 @@ def test_compound_model_roundtrips_all_supported_types(project):
         "columns": copy.deepcopy(columns),
         "primary_key": ["tenant_id", "order_id"],
     }
-    for step, rows in zip(definition["steps"][:2], [initial, updated], strict=True):
+    for step, rows in zip(
+        definition["steps"][:2], [initial, updated], strict=True
+    ):
         step["inputs"]["orders"]["replace"]["rows"] = copy.deepcopy(rows)
         step["expect"]["rows"] = copy.deepcopy(rows)
     model = config.project_dir / "models/fct_orders.sql"
     model.write_text(
-        "{{ config(materialized='incremental', unique_key=['tenant_id','order_id'], "
+        "{{ config(materialized='incremental', "
+        "unique_key=['tenant_id','order_id'], "
         "incremental_strategy='merge') }}\n"
         "select * from {{ source('raw','orders') }}\n"
         "{% if is_incremental() %}\n"
@@ -804,7 +1051,9 @@ def test_compound_model_roundtrips_all_supported_types(project):
     )
     path = config.project_dir / "scenarios/wide.yml"
     path.write_text(yaml.safe_dump(definition))
-    report = run_scenario(load_scenario(path, config.project_dir), config, reports)
+    report = runner.run_scenario(
+        loader.load_scenario(path, config.project_dir), config, reports
+    )
     assert report["overall_status"] == "PASS", report
     assert [step["actual_rows"] for step in report["steps"]] == [2, 2, 2]
 
@@ -830,12 +1079,13 @@ def test_unchanged_ref_fixture_survives_updates_to_another_input(project):
     model.write_text(
         "{{ config(materialized='incremental', unique_key='order_id') }}\n"
         "select o.order_id,o.event_at,o.updated_at,o.amount,d.region\n"
-        "from {{ source('raw','orders') }} o cross join {{ ref('dimensions') }} d\n"
+        "from {{ source('raw','orders') }} o cross join {{ ref('dimensions') "
+        "}} d\n"
         "{% if is_incremental() %}\n"
         "where o.updated_at >= (select max(updated_at) from {{ this }})\n"
         "{% endif %}\n"
     )
-    report = run_scenario(scenario, config, reports)
+    report = runner.run_scenario(scenario, config, reports)
     assert report["overall_status"] == "PASS", report
     assert [step["actual_rows"] for step in report["steps"]] == [2, 3, 3]
 
@@ -845,16 +1095,19 @@ def test_unexpected_cleanup_failure_never_turns_into_pass(project, monkeypatch):
     scenario.data["steps"] = scenario.data["steps"][:1]
 
     def fail_cleanup(*args):
-        raise ScenarioError("SIMULATED_CLEANUP_FAILURE")
+        raise errors.ScenarioError("SIMULATED_CLEANUP_FAILURE")
 
     with monkeypatch.context() as context:
-        context.setattr(Database, "cleanup", fail_cleanup)
-        report = run_scenario(scenario, config, reports)
+        context.setattr(scenario_database.Database, "cleanup", fail_cleanup)
+        report = runner.run_scenario(scenario, config, reports)
     assert report["overall_status"] == "ERROR", report
     assert report["steps"][0]["status"] == "PASS"
     assert report["cleanup_reason_code"] == "SIMULATED_CLEANUP_FAILURE"
-    assert Journal.load(config, report["run_id"]).data["state"] == "CLEANUP_FAILED"
-    cleanup_run(config, report["run_id"])
+    assert (
+        scenario_journal.Journal.load(config, report["run_id"]).data["state"]
+        == "CLEANUP_FAILED"
+    )
+    lifecycle.cleanup_run(config, report["run_id"])
 
 
 @pytest.mark.parametrize(
@@ -866,9 +1119,11 @@ def test_unexpected_cleanup_failure_never_turns_into_pass(project, monkeypatch):
         ("skipped", "DBT_MODEL_NOT_SUCCESSFUL"),
     ],
 )
-def test_damaged_real_dbt_results_never_pass(project, monkeypatch, fault, reason):
+def test_damaged_real_dbt_results_never_pass(
+    project, monkeypatch, fault, reason
+):
     config, scenario, reports = project
-    original = Project.invoke
+    original = scenario_project.Project.invoke
     runs = 0
 
     def damaged(self, command, timeout, args=()):
@@ -893,11 +1148,15 @@ def test_damaged_real_dbt_results_never_pass(project, monkeypatch, fault, reason
                     path.unlink()
         return manifest, directory
 
-    monkeypatch.setattr(Project, "invoke", damaged)
-    report = run_scenario(scenario, config, reports)
+    monkeypatch.setattr(scenario_project.Project, "invoke", damaged)
+    report = runner.run_scenario(scenario, config, reports)
     assert report["overall_status"] == "ERROR", report
     assert report["reason_code"] == reason
-    assert [step["status"] for step in report["steps"]] == ["PASS", "ERROR", "NOT_RUN"]
+    assert [step["status"] for step in report["steps"]] == [
+        "PASS",
+        "ERROR",
+        "NOT_RUN",
+    ]
     assert report["cleanup_status"] == "CLEANED"
 
 
@@ -910,15 +1169,18 @@ def test_damaged_real_dbt_results_never_pass(project, monkeypatch, fault, reason
         ("rebuild", "TARGET_REBUILT"),
     ],
 )
-def test_forced_or_unverified_incremental_mode_never_passes(project, monkeypatch, fault, reason):
+def test_forced_or_unverified_incremental_mode_never_passes(
+    project, monkeypatch, fault, reason
+):
     config, scenario, reports = project
-    original = Project.invoke
+    original = scenario_project.Project.invoke
     if fault == "configuration":
         model = config.project_dir / "models/fct_orders.sql"
         model.write_text(
             model.read_text().replace(
                 "materialized='incremental'",
-                "materialized='incremental', full_refresh=var('force_refresh', false)",
+                "materialized='incremental', "
+                "full_refresh=var('force_refresh', false)",
             )
         )
         scenario.data["steps"][1]["run"]["vars"] = {"force_refresh": True}
@@ -935,14 +1197,25 @@ def test_forced_or_unverified_incremental_mode_never_passes(project, monkeypatch
             node = manifest["nodes"][scenario.data["model"]]
             if fault == "missing_sql":
                 (
-                    directory / "target/run" / node["package_name"] / node["original_file_path"]
+                    directory
+                    / "target/run"
+                    / node["package_name"]
+                    / node["original_file_path"]
                 ).unlink()
             elif fault == "rebuild":
                 target = sql.Identifier(self.schema, node["alias"])
                 saved = sql.Identifier(self.schema, "rebuilt_target")
-                with psycopg.connect(**config.connection_kwargs()) as connection:
-                    connection.execute(sql.SQL("CREATE TABLE {} AS TABLE {}").format(saved, target))
-                    connection.execute(sql.SQL("DROP TABLE {} RESTRICT").format(target))
+                with psycopg.connect(
+                    **config.connection_kwargs()
+                ) as connection:
+                    connection.execute(
+                        sql.SQL("CREATE TABLE {} AS TABLE {}").format(
+                            saved, target
+                        )
+                    )
+                    connection.execute(
+                        sql.SQL("DROP TABLE {} RESTRICT").format(target)
+                    )
                     connection.execute(
                         sql.SQL("ALTER TABLE {} RENAME TO {}").format(
                             saved, sql.Identifier(node["alias"])
@@ -950,8 +1223,8 @@ def test_forced_or_unverified_incremental_mode_never_passes(project, monkeypatch
                     )
         return manifest, directory
 
-    monkeypatch.setattr(Project, "invoke", changed)
-    report = run_scenario(scenario, config, reports)
+    monkeypatch.setattr(scenario_project.Project, "invoke", changed)
+    report = runner.run_scenario(scenario, config, reports)
     assert report["overall_status"] == "ERROR", report
     assert report["reason_code"] == reason
     assert report["steps"][0]["status"] == "PASS"
@@ -959,15 +1232,26 @@ def test_forced_or_unverified_incremental_mode_never_passes(project, monkeypatch
     assert report["cleanup_status"] == "CLEANED"
 
 
-def test_cli_continues_independent_scenarios_and_redacts_fixture_values(project, tmp_path):
+def test_cli_continues_independent_scenarios_and_redacts_fixture_values(
+    project, tmp_path
+):
     config, scenario, reports = project
     secrets = ["synthetic.private@example.invalid", "synthetic-api-key-123456"]
     model = config.project_dir / "models/fct_orders.sql"
-    model.write_text(model.read_text().replace("updated_at, amount", "updated_at, amount, note"))
+    model.write_text(
+        model.read_text().replace(
+            "updated_at, amount", "updated_at, amount, note"
+        )
+    )
     scenario.data["inputs"]["orders"]["columns"]["note"] = "text"
     scenario.data["output"]["columns"]["note"] = "text"
     for step in scenario.data["steps"]:
-        for row in step.get("inputs", {}).get("orders", {}).get("replace", {}).get("rows", []):
+        for row in (
+            step.get("inputs", {})
+            .get("orders", {})
+            .get("replace", {})
+            .get("rows", [])
+        ):
             row["note"] = secrets[0]
         for row in step["expect"].get("rows", []):
             row["note"] = secrets[0]
@@ -982,8 +1266,8 @@ def test_cli_continues_independent_scenarios_and_redacts_fixture_values(project,
         path = config.project_dir / f"scenarios/{name}.yml"
         path.write_text(yaml.safe_dump(data))
         paths.append(path)
-    result = CliRunner().invoke(
-        main,
+    result = testing.CliRunner().invoke(
+        cli.main,
         [
             "test",
             "--config",
@@ -1008,10 +1292,14 @@ def test_cli_continues_independent_scenarios_and_redacts_fixture_values(project,
         "NOT_RUN",
         "NOT_RUN",
     ]
-    assert all(report["cleanup_status"] == "CLEANED" for report in summaries.values())
+    assert all(
+        report["cleanup_status"] == "CLEANED" for report in summaries.values()
+    )
     texts = [result.output, *(path.read_text() for path in reports.glob("*/*"))]
     assert all(
-        secret not in text for secret in [*secrets, config.database["password"]] for text in texts
+        secret not in text
+        for secret in [*secrets, config.database["password"]]
+        for text in texts
     )
 
 
@@ -1023,30 +1311,37 @@ def test_multi_input_failure_rolls_back_every_replacement(project, monkeypatch):
     }
     for index, step in enumerate(scenario.data["steps"][:2]):
         step["inputs"]["dimensions"] = {
-            "replace": {"rows": [{"region": "initial" if index == 0 else "updated"}]}
+            "replace": {
+                "rows": [{"region": "initial" if index == 0 else "updated"}]
+            }
         }
-    (config.project_dir / "models/dimensions.sql").write_text("select * from must_not_run")
+    (config.project_dir / "models/dimensions.sql").write_text(
+        "select * from must_not_run"
+    )
     model = config.project_dir / "models/fct_orders.sql"
     model.write_text(
         model.read_text().replace(
             "from {{ source('raw', 'orders') }}",
-            "from {{ source('raw', 'orders') }} cross join {{ ref('dimensions') }}",
+            "from {{ source('raw', 'orders') }} cross join {{ "
+            "ref('dimensions') }}",
         )
     )
-    original = Database.replace
+    original = scenario_database.Database.replace
     updates = 0
 
-    def failing(self, schema, table, columns, rows):
+    def failing(self, schema, table, columns, rows, **options):
         nonlocal updates
-        original(self, schema, table, columns, rows)
+        original(self, schema, table, columns, rows, **options)
         if table == "input_1":
             updates += 1
             if updates == 2:
-                raise ScenarioError("SIMULATED_INPUT_UPDATE_FAILURE")
+                raise errors.ScenarioError("SIMULATED_INPUT_UPDATE_FAILURE")
 
-    monkeypatch.setattr(Database, "replace", failing)
-    report = run_scenario(scenario, config, reports, keep_on_failure=True)
-    journal = Journal.load(config, report["run_id"])
+    monkeypatch.setattr(scenario_database.Database, "replace", failing)
+    report = runner.run_scenario(
+        scenario, config, reports, keep_on_failure=True
+    )
+    journal = scenario_journal.Journal.load(config, report["run_id"])
     try:
         assert report["overall_status"] == "ERROR", report
         assert report["reason_code"] == "SIMULATED_INPUT_UPDATE_FAILURE"
@@ -1054,15 +1349,17 @@ def test_multi_input_failure_rolls_back_every_replacement(project, monkeypatch):
         schema = journal.data["schemas"][1]
         with psycopg.connect(**config.connection_kwargs()) as connection:
             assert connection.execute(
-                sql.SQL("SELECT region FROM {}").format(sql.Identifier(schema, "input_1"))
+                sql.SQL("SELECT region FROM {}").format(
+                    sql.Identifier(schema, "input_1")
+                )
             ).fetchall() == [("initial",)]
             assert connection.execute(
-                sql.SQL("SELECT order_id, amount::text FROM {} ORDER BY order_id").format(
-                    sql.Identifier(schema, "input_0")
-                )
+                sql.SQL(
+                    "SELECT order_id, amount::text FROM {} ORDER BY order_id"
+                ).format(sql.Identifier(schema, "input_0"))
             ).fetchall() == [(1, "10.00"), (2, "20.00")]
     finally:
-        cleanup_run(config, report["run_id"])
+        lifecycle.cleanup_run(config, report["run_id"])
 
 
 @pytest.mark.parametrize("omit_later", [False, True])
@@ -1075,7 +1372,8 @@ def test_explicit_as_of_var_controls_time_for_every_step(project, omit_later):
         + model.read_text()
         .replace(
             "{% if is_incremental() %}",
-            "where event_at <= '{{ var('as_of') }}'::timestamp\n{% if is_incremental() %}",
+            "where event_at <= '{{ var('as_of') }}'::timestamp\n{% if "
+            "is_incremental() %}",
         )
         .replace("where updated_at", "and updated_at")
     )
@@ -1092,19 +1390,33 @@ def test_explicit_as_of_var_controls_time_for_every_step(project, omit_later):
             )
     if omit_later:
         scenario.data["steps"][1]["run"].pop("vars")
-    report = run_scenario(scenario, config, reports)
+    report = runner.run_scenario(scenario, config, reports)
     if omit_later:
         assert report["overall_status"] == "ERROR", report
         assert report["reason_code"] == "DBT_EXECUTION_ERROR"
-        assert [step["status"] for step in report["steps"]] == ["PASS", "ERROR", "NOT_RUN"]
+        assert [step["status"] for step in report["steps"]] == [
+            "PASS",
+            "ERROR",
+            "NOT_RUN",
+        ]
         return
     assert report["overall_status"] == "PASS", report
     assert [step["actual_rows"] for step in report["steps"]] == [2, 3, 3]
-    assert len({step["observed_mode_evidence"]["invocation_id"] for step in report["steps"]}) == 3
+    assert (
+        len(
+            {
+                step["observed_mode_evidence"]["invocation_id"]
+                for step in report["steps"]
+            }
+        )
+        == 3
+    )
 
 
 @pytest.mark.parametrize("style", ["direct", "nested", "macro", "later"])
-def test_external_relation_is_rejected_before_model_execution(project, monkeypatch, style):
+def test_external_relation_is_rejected_before_model_execution(
+    project, monkeypatch, style
+):
     config, scenario, reports = project
     external = "public.synthetic_sensitive_relation"
     model = config.project_dir / "models/fct_orders.sql"
@@ -1123,18 +1435,19 @@ def test_external_relation_is_rejected_before_model_execution(project, monkeypat
         scenario.data["steps"][1]["run"]["vars"] = {"external": True}
     model.write_text(
         model.read_text().replace(
-            "from {{ source('raw', 'orders') }}", "from {{ source('raw', 'orders') }}" + clause
+            "from {{ source('raw', 'orders') }}",
+            "from {{ source('raw', 'orders') }}" + clause,
         )
     )
-    original = Project.invoke
+    original = scenario_project.Project.invoke
     calls = []
 
     def observed(self, command, timeout, args=()):
         calls.append(command)
         return original(self, command, timeout, args)
 
-    monkeypatch.setattr(Project, "invoke", observed)
-    report = run_scenario(scenario, config, reports)
+    monkeypatch.setattr(scenario_project.Project, "invoke", observed)
+    report = runner.run_scenario(scenario, config, reports)
     assert report["overall_status"] == "ERROR", report
     assert report["reason_code"] == "SQL_EXTERNAL_RELATION"
     assert calls.count("run") == (1 if style == "later" else 0)
@@ -1142,24 +1455,27 @@ def test_external_relation_is_rejected_before_model_execution(project, monkeypat
     assert "synthetic_sensitive_relation" not in json.dumps(report)
 
 
-def test_table_function_is_rejected_before_model_execution(project, monkeypatch):
+def test_table_function_is_rejected_before_model_execution(
+    project, monkeypatch
+):
     config, scenario, reports = project
     model = config.project_dir / "models/fct_orders.sql"
     model.write_text(
         model.read_text().replace(
             "from {{ source('raw', 'orders') }}",
-            "from {{ source('raw', 'orders') }} cross join generate_series(1,3) series",
+            "from {{ source('raw', 'orders') }} cross join "
+            "generate_series(1,3) series",
         )
     )
-    original = Project.invoke
+    original = scenario_project.Project.invoke
     calls = []
 
     def observed(self, command, timeout, args=()):
         calls.append(command)
         return original(self, command, timeout, args)
 
-    monkeypatch.setattr(Project, "invoke", observed)
-    report = run_scenario(scenario, config, reports)
+    monkeypatch.setattr(scenario_project.Project, "invoke", observed)
+    report = runner.run_scenario(scenario, config, reports)
     assert report["overall_status"] == "ERROR", report
     assert report["reason_code"] == "SQL_AUDIT_UNSUPPORTED"
     assert "run" not in calls
@@ -1177,13 +1493,19 @@ def test_cte_model_passes_compiled_relation_audit(project):
         + selected
         + ") select * from SELECTED_ORDERS"
     )
-    report = run_scenario(scenario, config, reports)
+    report = runner.run_scenario(scenario, config, reports)
     assert report["overall_status"] == "PASS", report
-    assert [step["sql_audit"]["checked_relations"] for step in report["steps"]] == [1, 2, 2]
+    assert [
+        step["sql_audit"]["checked_relations"] for step in report["steps"]
+    ] == [1, 2, 2]
 
 
-@pytest.mark.parametrize("change", ["hook", "strategy", "sql_header", "incremental_predicates"])
-def test_later_unsupported_config_is_rejected_before_model_run(project, monkeypatch, change):
+@pytest.mark.parametrize(
+    "change", ["hook", "strategy", "sql_header", "incremental_predicates"]
+)
+def test_later_unsupported_config_is_rejected_before_model_run(
+    project, monkeypatch, change
+):
     config, scenario, reports = project
     if change == "hook":
         model = config.project_dir / "models/fct_orders.sql"
@@ -1195,38 +1517,49 @@ def test_later_unsupported_config_is_rejected_before_model_run(project, monkeypa
         )
         scenario.data["steps"][1]["run"]["vars"] = {"hook_sql": ["select 1"]}
     elif change == "strategy":
-        scenario.data["steps"][1]["run"]["vars"] = {"strategy": "unsupported_custom"}
+        scenario.data["steps"][1]["run"]["vars"] = {
+            "strategy": "unsupported_custom"
+        }
     else:
         model = config.project_dir / "models" / "fct_orders.sql"
         default = "''" if change == "sql_header" else "[]"
         model.write_text(
             model.read_text().replace(
                 "materialized='incremental'",
-                f"materialized='incremental', {change}=var('unaudited_sql', {default})",
+                f"materialized='incremental', "
+                f"{change}=var('unaudited_sql', {default})",
             )
         )
         sql = "select count(*) from pg_catalog.pg_class;"
         scenario.data["steps"][1]["run"]["vars"] = {
-            "unaudited_sql": sql if change == "sql_header" else ["exists (" + sql[:-1] + ")"]
+            "unaudited_sql": sql
+            if change == "sql_header"
+            else ["exists (" + sql[:-1] + ")"]
         }
-    original = Project.invoke
+    original = scenario_project.Project.invoke
     calls = []
 
     def observed(self, command, timeout, args=()):
         calls.append(command)
         return original(self, command, timeout, args)
 
-    monkeypatch.setattr(Project, "invoke", observed)
-    report = run_scenario(scenario, config, reports)
+    monkeypatch.setattr(scenario_project.Project, "invoke", observed)
+    report = runner.run_scenario(scenario, config, reports)
     assert report["overall_status"] == "ERROR", report
     assert report["reason_code"] == "MODEL_CONFIGURATION_CHANGED"
     assert calls.count("run") == 1
-    assert [step["status"] for step in report["steps"]] == ["PASS", "ERROR", "NOT_RUN"]
+    assert [step["status"] for step in report["steps"]] == [
+        "PASS",
+        "ERROR",
+        "NOT_RUN",
+    ]
     assert report["cleanup_status"] == "CLEANED"
 
 
 @pytest.mark.parametrize("setting", ["sql_header", "incremental_predicates"])
-def test_model_sql_configuration_is_refused_before_materialization(project, monkeypatch, setting):
+def test_model_sql_configuration_is_refused_before_materialization(
+    project, monkeypatch, setting
+):
     config, scenario, reports = project
     model = config.project_dir / "models/fct_orders.sql"
     value = (
@@ -1236,18 +1569,19 @@ def test_model_sql_configuration_is_refused_before_materialization(project, monk
     )
     model.write_text(
         model.read_text().replace(
-            "materialized='incremental'", f"materialized='incremental', {setting}={value}"
+            "materialized='incremental'",
+            f"materialized='incremental', {setting}={value}",
         )
     )
-    original = Project.invoke
+    original = scenario_project.Project.invoke
     calls = []
 
     def observed(self, command, timeout, args=()):
         calls.append(command)
         return original(self, command, timeout, args)
 
-    monkeypatch.setattr(Project, "invoke", observed)
-    report = run_scenario(scenario, config, reports)
+    monkeypatch.setattr(scenario_project.Project, "invoke", observed)
+    report = runner.run_scenario(scenario, config, reports)
     assert report["overall_status"] == "ERROR"
     assert report["reason_code"] == "MODEL_SQL_CONFIG_UNSUPPORTED"
     assert "run" not in calls and "compile" not in calls

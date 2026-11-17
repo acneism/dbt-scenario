@@ -1,13 +1,21 @@
-from dbt_scenario.config import Config
-from dbt_scenario.database import Database
-from dbt_scenario.deadline import Deadline
-from dbt_scenario.journal import Journal
+from typing import Literal
+
+from dbt_scenario import config as scenario_config
+from dbt_scenario import database as scenario_database
+from dbt_scenario import deadline
+from dbt_scenario import journal as scenario_journal
 
 
-def finish_run(database: Database, journal: Journal, keep: bool = False):
-    with database.budget(Deadline(10, "CLEANUP_TIMEOUT")):
+def finish_run(
+    database: scenario_database.Database,
+    journal: scenario_journal.Journal,
+    keep: bool = False,
+) -> Literal["KEPT", "CLEANED"]:
+    with database.budget(deadline.Deadline(10, "CLEANUP_TIMEOUT")):
         database.acquire_run_lock(journal.data["run_id"])
-        database.cancel_model_queries(f"dbt-scenario:{journal.data['schemas'][0]}")
+        database.cancel_model_queries(
+            f"dbt-scenario:{journal.data['schemas'][0]}"
+        )
         if keep:
             journal.transition("KEPT")
             return "KEPT"
@@ -16,11 +24,13 @@ def finish_run(database: Database, journal: Journal, keep: bool = False):
         return "CLEANED"
 
 
-def cleanup_run(config: Config, run_id: str):
-    journal = Journal.load(config, run_id)
+def cleanup_run(
+    config: scenario_config.Config, run_id: str
+) -> Literal["CLEANED"]:
+    journal = scenario_journal.Journal.load(config, run_id)
     if journal.data["state"] == "CLEANED":
         return "CLEANED"
-    database = Database(config)
+    database = scenario_database.Database(config)
     try:
         return finish_run(database, journal)
     except BaseException:

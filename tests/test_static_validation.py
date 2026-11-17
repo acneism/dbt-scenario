@@ -1,37 +1,47 @@
 import copy
+import pathlib
 import shutil
-from pathlib import Path
 
 import pytest
 import yaml
-from click.testing import CliRunner
+from click import testing
 
-from dbt_scenario.cli import main
-from dbt_scenario.loader import read_yaml
+from dbt_scenario import cli, loader
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 @pytest.fixture
 def definition(tmp_path):
     project = tmp_path / "shop"
-    shutil.copytree(ROOT / "examples/shop", project, ignore=shutil.ignore_patterns(".dbt-scenario"))
+    shutil.copytree(
+        ROOT / "examples/shop",
+        project,
+        ignore=shutil.ignore_patterns(".dbt-scenario"),
+    )
     scenario = project / "scenarios/orders.yml"
-    return project, scenario, read_yaml(scenario)
+    return project, scenario, loader.read_yaml(scenario)
 
 
 def invoke(project, path):
-    return CliRunner().invoke(
-        main, ["validate", "--project-dir", str(project), "--scenario", str(path)]
+    return testing.CliRunner().invoke(
+        cli.main,
+        ["validate", "--project-dir", str(project), "--scenario", str(path)],
     )
 
 
-def test_static_validation_needs_no_password_database_or_dbt_process(definition, monkeypatch):
+def test_static_validation_needs_no_password_database_or_dbt_process(
+    definition, monkeypatch
+):
     project, path, _ = definition
     monkeypatch.delenv("DSC_TEST_PASSWORD", raising=False)
     monkeypatch.delenv("DBT_ENV_SECRET_DSC_PASSWORD", raising=False)
-    monkeypatch.setattr("psycopg.connect", lambda *a, **kw: pytest.fail("database accessed"))
-    monkeypatch.setattr("subprocess.Popen", lambda *a, **kw: pytest.fail("subprocess started"))
+    monkeypatch.setattr(
+        "psycopg.connect", lambda *a, **kw: pytest.fail("database accessed")
+    )
+    monkeypatch.setattr(
+        "subprocess.Popen", lambda *a, **kw: pytest.fail("subprocess started")
+    )
     result = invoke(project, path)
     assert result.exit_code == 0, result.output
     assert "VALID definition:" in result.output
@@ -41,11 +51,15 @@ def test_static_validation_needs_no_password_database_or_dbt_process(definition,
 
 @pytest.mark.parametrize("step", [0, 1])
 @pytest.mark.parametrize("kind", ["input", "expected"])
-def test_inline_template_rows_get_a_specific_redacted_diagnostic(definition, step, kind):
+def test_inline_template_rows_get_a_specific_redacted_diagnostic(
+    definition, step, kind
+):
     project, path, data = definition
     placeholder = "replace_with_private_canary_9_rows"
     if kind == "input":
-        data["steps"][step]["inputs"]["orders"]["replace"] = {"rows": placeholder}
+        data["steps"][step]["inputs"]["orders"]["replace"] = {
+            "rows": placeholder
+        }
     else:
         data["steps"][step]["expect"] = {"rows": placeholder}
     path.write_text(yaml.safe_dump(data))
@@ -58,7 +72,9 @@ def test_inline_template_rows_get_a_specific_redacted_diagnostic(definition, ste
     assert "private_canary_9" not in result.output
 
 
-def test_external_fixture_placeholder_gets_the_same_actionable_error(definition):
+def test_external_fixture_placeholder_gets_the_same_actionable_error(
+    definition,
+):
     project, path, _ = definition
     fixture = project / "scenarios/fixtures/initial.yml"
     fixture.write_text("rows: replace_with_expected_initial_rows\n")
@@ -73,7 +89,7 @@ def test_placeholder_spelling_inside_a_real_text_cell_remains_valid(definition):
     data["output"]["columns"]["note"] = "text"
     for name in ["initial", "updated"]:
         fixture = project / f"scenarios/fixtures/{name}.yml"
-        rows = read_yaml(fixture)["rows"]
+        rows = loader.read_yaml(fixture)["rows"]
         for row in rows:
             row["note"] = "replace_with_expected_initial_rows"
         fixture.write_text(yaml.safe_dump({"rows": rows}))
@@ -94,7 +110,7 @@ def test_other_invalid_strings_keep_the_schema_error(definition):
 def test_value_errors_are_found_without_revealing_fixture_values(definition):
     project, path, _ = definition
     fixture = project / "scenarios/fixtures/initial.yml"
-    rows = read_yaml(fixture)["rows"]
+    rows = loader.read_yaml(fixture)["rows"]
     rows[0]["amount"] = "synthetic.private@example.invalid"
     fixture.write_text(yaml.safe_dump({"rows": rows}))
     result = invoke(project, path)
@@ -106,7 +122,7 @@ def test_value_errors_are_found_without_revealing_fixture_values(definition):
 def test_duplicate_expected_keys_are_refused_before_execution(definition):
     project, path, _ = definition
     fixture = project / "scenarios/fixtures/initial.yml"
-    rows = read_yaml(fixture)["rows"]
+    rows = loader.read_yaml(fixture)["rows"]
     rows.append(copy.deepcopy(rows[0]))
     fixture.write_text(yaml.safe_dump({"rows": rows}))
     result = invoke(project, path)
@@ -114,7 +130,9 @@ def test_duplicate_expected_keys_are_refused_before_execution(definition):
     assert "INVALID_EXPECTED_KEY" in result.output
 
 
-def test_definition_validation_does_not_claim_model_existence_or_sql_correctness(definition):
+def test_definition_validation_skips_model_existence_and_sql_correctness(
+    definition,
+):
     project, path, data = definition
     data["model"] = "model.shop.not_created_yet"
     path.write_text(yaml.safe_dump(data))
@@ -124,7 +142,9 @@ def test_definition_validation_does_not_claim_model_existence_or_sql_correctness
     assert "Next: plan and test" in result.output
 
 
-def test_static_validation_preserves_project_path_boundary(definition, tmp_path):
+def test_static_validation_preserves_project_path_boundary(
+    definition, tmp_path
+):
     project, path, _ = definition
     outside = tmp_path / "outside.yml"
     outside.write_bytes(path.read_bytes())

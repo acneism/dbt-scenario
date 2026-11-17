@@ -1,16 +1,18 @@
 import contextlib
+import pathlib
 import re
-from importlib.resources import files
-from pathlib import Path
+from collections.abc import Sequence
+from importlib import resources
+from importlib.resources import abc as resource_abc
 
 import yaml
 
-from dbt_scenario.errors import ScenarioError
-from dbt_scenario.requirements import project_settings
-from dbt_scenario.scaffold import scaffold, scenario_filename
+from dbt_scenario import errors, requirements, scaffold
 
 
-def template_files(directory, prefix="") -> dict[str, str]:
+def template_files(
+    directory: resource_abc.Traversable, prefix: str = ""
+) -> dict[str, str]:
     result = {}
     for child in sorted(directory.iterdir(), key=lambda item: item.name):
         relative = f"{prefix}{child.name}"
@@ -21,22 +23,24 @@ def template_files(directory, prefix="") -> dict[str, str]:
     return result
 
 
-def write_new_files(root: Path, contents: dict[str, str]):
+def write_new_files(root: pathlib.Path, contents: dict[str, str]) -> list[str]:
     if root.is_symlink():
-        raise ScenarioError("INIT_UNSAFE_PATH")
+        raise errors.ScenarioError("INIT_UNSAFE_PATH")
     root = root.resolve()
     destinations = []
     for relative, text in contents.items():
         path = root / relative
         if not path.resolve().is_relative_to(root):
-            raise ScenarioError("INIT_UNSAFE_PATH")
+            raise errors.ScenarioError("INIT_UNSAFE_PATH")
         for parent in [path, *path.parents]:
             if parent == root.parent:
                 break
-            if parent.is_symlink() or (parent.exists() and parent != path and not parent.is_dir()):
-                raise ScenarioError("INIT_UNSAFE_PATH")
+            if parent.is_symlink() or (
+                parent.exists() and parent != path and not parent.is_dir()
+            ):
+                raise errors.ScenarioError("INIT_UNSAFE_PATH")
         if path.exists():
-            raise ScenarioError("INIT_WOULD_OVERWRITE")
+            raise errors.ScenarioError("INIT_WOULD_OVERWRITE")
         destinations.append((path, text))
     created_files = []
     created_directories = []
@@ -66,34 +70,52 @@ def write_new_files(root: Path, contents: dict[str, str]):
 
 
 def initialize(
-    project_dir: Path,
+    project_dir: pathlib.Path,
     demo: bool = False,
     *,
-    model=None,
-    manifest_path=None,
-    catalog_path=None,
-    primary_key=(),
-    scenario_name=None,
+    model: str | None = None,
+    manifest_path: pathlib.Path | None = None,
+    catalog_path: pathlib.Path | None = None,
+    primary_key: Sequence[str] = (),
+    scenario_name: str | None = None,
 ) -> list[str]:
     if (
-        (demo and (model or manifest_path or catalog_path or primary_key or scenario_name))
+        (
+            demo
+            and (
+                model
+                or manifest_path
+                or catalog_path
+                or primary_key
+                or scenario_name
+            )
+        )
         or (bool(model) != bool(manifest_path))
-        or ((catalog_path or primary_key or scenario_name is not None) and not model)
+        or (
+            (catalog_path or primary_key or scenario_name is not None)
+            and not model
+        )
     ):
-        raise ScenarioError("INIT_OPTIONS_INVALID")
-    templates = files("dbt_scenario").joinpath("templates", "demo")
+        raise errors.ScenarioError("INIT_OPTIONS_INVALID")
+    templates = resources.files("dbt_scenario").joinpath("templates", "demo")
     contents = template_files(templates)
     if demo:
         return write_new_files(project_dir, contents)
-    settings = project_settings(project_dir)
+    settings = requirements.project_settings(project_dir)
     if model:
-        name, scenario = scaffold(settings, model, manifest_path, catalog_path, primary_key)
+        name, scenario = scaffold.scaffold(
+            settings, model, manifest_path, catalog_path, primary_key
+        )
         if scenario_name is not None:
             if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{0,79}", scenario_name):
-                raise ScenarioError("INIT_SCENARIO_NAME_INVALID")
+                raise errors.ScenarioError("INIT_SCENARIO_NAME_INVALID")
             name = scenario_name
             scenario["name"] = scenario_name
-        generated = {scenario_filename(name): yaml.safe_dump(scenario, sort_keys=False)}
+        generated = {
+            scaffold.scenario_filename(name): yaml.safe_dump(
+                scenario, sort_keys=False
+            )
+        }
         config_path = project_dir / "scenario-runner.yml"
         if not config_path.exists():
             config = yaml.safe_load(contents["scenario-runner.yml"])
@@ -103,21 +125,26 @@ def initialize(
                 **generated,
             }
         elif not config_path.is_file():
-            raise ScenarioError("INIT_WOULD_OVERWRITE")
+            raise errors.ScenarioError("INIT_WOULD_OVERWRITE")
         return write_new_files(project_dir, generated)
     scenario_root = templates.joinpath("examples", "shop", "scenarios")
     scenario = yaml.safe_load(scenario_root.joinpath("orders.yml").read_text())
     scenario["name"] = "example_incremental_scenario"
     scenario["model"] = f"model.{settings['name']}.replace_with_your_model"
     scenario["inputs"]["orders"]["node"] = (
-        f"source.{settings['name']}.replace_with_your_source.replace_with_your_table"
+        f"source.{settings['name']}."
+        "replace_with_your_source.replace_with_your_table"
     )
     for step in scenario["steps"]:
-        fixture_definitions = [update["replace"] for update in step.get("inputs", {}).values()]
+        fixture_definitions = [
+            update["replace"] for update in step.get("inputs", {}).values()
+        ]
         fixture_definitions.append(step["expect"])
         for fixture in fixture_definitions:
             if "fixture" in fixture:
-                payload = yaml.safe_load(scenario_root.joinpath(fixture.pop("fixture")).read_text())
+                payload = yaml.safe_load(
+                    scenario_root.joinpath(fixture.pop("fixture")).read_text()
+                )
                 fixture["rows"] = payload["rows"]
     config = yaml.safe_load(contents["scenario-runner.yml"])
     config["project_dir"] = "."

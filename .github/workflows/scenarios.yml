@@ -63,16 +63,22 @@ jobs:
           python -I - <<'PY'
           import hashlib
           import os
+          import pathlib
           import urllib.request
           import uuid
-          from pathlib import Path
 
-          root = Path(os.environ["RUNNER_TEMP"]) / ("dbt-scenario-" + uuid.uuid4().hex)
+          root = pathlib.Path(os.environ["RUNNER_TEMP"]) / (
+              "dbt-scenario-" + uuid.uuid4().hex
+          )
           root.mkdir()
           base = "https://github.com/acneism/dbt-scenario/releases/download/v0.1.0a13/"
           files = {
-              "constraints.txt": "a8c8776ccbdee1279d00bab6559566dfc6d7c0a7e49dbb1453b38e35247a2b1f",
-              "dbt_scenario-0.1.0a13-py3-none-any.whl": "26b09557f7d6b08df53b8b90666cdb60b1b2ba695e1d01ad38cd0641cb6ec0cc",
+              "constraints.txt": (
+                  "a8c8776ccbdee1279d00bab6559566dfc6d7c0a7e49dbb1453b38e35247a2b1f"
+              ),
+              "dbt_scenario-0.1.0a13-py3-none-any.whl": (
+                  "26b09557f7d6b08df53b8b90666cdb60b1b2ba695e1d01ad38cd0641cb6ec0cc"
+              ),
           }
           for name, digest in files.items():
               with urllib.request.urlopen(base + name, timeout=30) as response:
@@ -90,22 +96,37 @@ jobs:
           python -I - <<'PY'
           import importlib.metadata
           import os
+          import pathlib
           import sys
-          from pathlib import Path
+
+          import yaml
 
           import dbt_scenario
-          import yaml
-          from dbt_scenario.loader import read_yaml
+          from dbt_scenario import loader
 
-          if importlib.metadata.version("dbt-scenario") != "0.1.0a13" or not Path(dbt_scenario.__file__).resolve().is_relative_to(Path(sys.prefix).resolve()):
+          installed = pathlib.Path(dbt_scenario.__file__).resolve()
+          environment = pathlib.Path(sys.prefix).resolve()
+          if importlib.metadata.version(
+              "dbt-scenario"
+          ) != "0.1.0a13" or not installed.is_relative_to(environment):
               raise SystemExit("INSTALLED_PACKAGE_IDENTITY_MISMATCH")
-          workspace = Path(os.environ["GITHUB_WORKSPACE"]).resolve()
-          values = [os.environ[name] for name in ["DSC_CI_PROJECT_INPUT", "DSC_CI_SCENARIO_INPUT", "DSC_CI_CONFIG_INPUT"]]
+          workspace = pathlib.Path(os.environ["GITHUB_WORKSPACE"]).resolve()
+          values = [
+              os.environ[name]
+              for name in [
+                  "DSC_CI_PROJECT_INPUT",
+                  "DSC_CI_SCENARIO_INPUT",
+                  "DSC_CI_CONFIG_INPUT",
+              ]
+          ]
           if any(character in value for value in values for character in "\r\n\0"):
               raise SystemExit("INVALID_CI_PATH")
           project = (workspace / values[0]).resolve()
           scenarios = (project / values[1]).resolve()
-          if not project.is_relative_to(workspace) or not (project / "dbt_project.yml").is_file():
+          if (
+              not project.is_relative_to(workspace)
+              or not (project / "dbt_project.yml").is_file()
+          ):
               raise SystemExit("CI_PROJECT_MUST_BE_INSIDE_CHECKOUT")
           if not scenarios.is_relative_to(project) or not scenarios.is_dir():
               raise SystemExit("CI_SCENARIOS_MUST_BE_A_DIRECTORY_INSIDE_PROJECT")
@@ -114,7 +135,7 @@ jobs:
               source = (workspace / values[2]).resolve()
               if not source.is_relative_to(workspace) or not source.is_file():
                   raise SystemExit("CI_CONFIG_MUST_BE_A_FILE_INSIDE_CHECKOUT")
-              configuration = read_yaml(source)
+              configuration = loader.read_yaml(source)
               if not isinstance(configuration, dict):
                   raise SystemExit("INVALID_CI_CONFIGURATION")
           configuration["project_dir"] = str(project)
@@ -126,8 +147,10 @@ jobs:
               "password_env": "DSC_TEST_PASSWORD",
               "sslmode": "disable",
           }
-          root = Path(os.environ["DSC_CI_ROOT"])
-          (root / "scenario-runner.yml").write_text(yaml.safe_dump(configuration), encoding="utf-8")
+          root = pathlib.Path(os.environ["DSC_CI_ROOT"])
+          (root / "scenario-runner.yml").write_text(
+              yaml.safe_dump(configuration), encoding="utf-8"
+          )
           (root / "reports").mkdir()
           with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as output:
               output.write("DSC_CI_PROJECT=" + str(project) + "\n")
@@ -144,18 +167,45 @@ jobs:
           import psycopg
           from psycopg import sql
 
-          with psycopg.connect(host="127.0.0.1", port=55432, dbname="dbt_scenario_test", user="postgres", password="disposable-scenario-admin", connect_timeout=10, autocommit=True) as connection:
-              connection.execute(sql.SQL("CREATE ROLE dbt_scenario LOGIN PASSWORD {} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS").format(sql.Literal(os.environ["DSC_TEST_PASSWORD"])))
-              connection.execute("GRANT CONNECT, CREATE ON DATABASE dbt_scenario_test TO dbt_scenario")
+          with psycopg.connect(
+              host="127.0.0.1",
+              port=55432,
+              dbname="dbt_scenario_test",
+              user="postgres",
+              password="disposable-scenario-admin",
+              connect_timeout=10,
+              autocommit=True,
+          ) as connection:
+              connection.execute(
+                  sql.SQL(
+                      "CREATE ROLE dbt_scenario LOGIN PASSWORD {} NOSUPERUSER "
+                      "NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS"
+                  ).format(sql.Literal(os.environ["DSC_TEST_PASSWORD"]))
+              )
+              connection.execute(
+                  "GRANT CONNECT, CREATE ON DATABASE dbt_scenario_test TO dbt_scenario"
+              )
               connection.execute("REVOKE CREATE ON SCHEMA public FROM PUBLIC")
           PY
       - name: Check database and project dependencies
-        run: python -I -c 'from dbt_scenario.cli import main; main()' doctor --config "$DSC_CI_ROOT/scenario-runner.yml"
+        run: |
+          python -I -c '
+          from dbt_scenario import cli
+
+          cli.main()
+          ' doctor --config "$DSC_CI_ROOT/scenario-runner.yml"
       - name: Run scenarios
         id: scenarios
         run: |
           set +e
-          python -I -c 'from dbt_scenario.cli import main; main()' test --config "$DSC_CI_ROOT/scenario-runner.yml" --scenario-dir "$DSC_CI_SCENARIOS" --report-dir "$DSC_CI_ROOT/reports"
+          python -I -c '
+          from dbt_scenario import cli
+
+          cli.main()
+          ' test \
+            --config "$DSC_CI_ROOT/scenario-runner.yml" \
+            --scenario-dir "$DSC_CI_SCENARIOS" \
+            --report-dir "$DSC_CI_ROOT/reports"
           result=$?
           printf 'exit_code=%s\n' "$result" >> "$GITHUB_OUTPUT"
           exit "$result"
@@ -166,23 +216,33 @@ jobs:
           DSC_CI_TEST_EXIT: ${{ steps.scenarios.outputs.exit_code }}
         run: |
           python -I - <<'PY'
+          import collections
           import json
           import os
-          from collections import Counter
-          from pathlib import Path
+          import pathlib
 
-          root = Path(os.environ["DSC_CI_ROOT"]) / "reports"
+          root = pathlib.Path(os.environ["DSC_CI_ROOT"]) / "reports"
           root.mkdir(exist_ok=True)
-          statuses = Counter()
-          cleanups = Counter()
+          statuses = collections.Counter()
+          cleanups = collections.Counter()
           valid = True
           paths = list(root.glob("*/summary.json"))
           for path in paths:
               try:
                   report = json.loads(path.read_text(encoding="utf-8"))
+                  if (
+                      type(report["schema_version"]) is not int
+                      or report["schema_version"] != 1
+                  ):
+                      raise ValueError
                   status = report["overall_status"]
                   cleanup = report["cleanup_status"]
-                  if status not in {"PASS", "FAIL", "ERROR"} or cleanup not in {"CLEANED", "KEPT", "ERROR", "NOT_NEEDED"}:
+                  if status not in {"PASS", "FAIL", "ERROR"} or cleanup not in {
+                      "CLEANED",
+                      "KEPT",
+                      "ERROR",
+                      "NOT_NEEDED",
+                  }:
                       raise ValueError
                   statuses[status] += 1
                   cleanups[cleanup] += 1
@@ -191,11 +251,20 @@ jobs:
           outcome = os.environ["DSC_CI_TEST_OUTCOME"]
           code = os.environ["DSC_CI_TEST_EXIT"]
           code = int(code) if code.isdecimal() else None
-          healthy = valid and bool(paths) and outcome == "success" and code == 0 and statuses == {"PASS": len(paths)} and cleanups == {"CLEANED": len(paths)}
+          healthy = (
+              valid
+              and bool(paths)
+              and outcome == "success"
+              and code == 0
+              and statuses == {"PASS": len(paths)}
+              and cleanups == {"CLEANED": len(paths)}
+          )
           aggregate = {
               "schema_version": 1,
               "package_version": "0.1.0a13",
-              "wheel_sha256": "26b09557f7d6b08df53b8b90666cdb60b1b2ba695e1d01ad38cd0641cb6ec0cc",
+              "wheel_sha256": (
+                  "26b09557f7d6b08df53b8b90666cdb60b1b2ba695e1d01ad38cd0641cb6ec0cc"
+              ),
               "test_outcome": outcome,
               "test_exit_code": code,
               "reported_scenarios": len(paths),
@@ -204,14 +273,25 @@ jobs:
               "summaries_valid": valid,
               "all_passed_and_cleaned": healthy,
           }
-          (root / "ci-summary.json").write_text(json.dumps(aggregate, indent=2) + "\n", encoding="utf-8")
+          (root / "ci-summary.json").write_text(
+              json.dumps(aggregate, indent=2) + "\n", encoding="utf-8"
+          )
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as output:
               output.write("## dbt-scenario\n\n")
-              output.write("Test step: " + (outcome or "not run") + "; reported scenarios: " + str(len(paths)) + ".\n\n")
+              output.write(
+                  "Test step: "
+                  + (outcome or "not run")
+                  + "; reported scenarios: "
+                  + str(len(paths))
+                  + ".\n\n"
+              )
               for status in ["PASS", "FAIL", "ERROR"]:
                   output.write(status + ": " + str(statuses[status]) + "  \n")
               if not paths:
-                  output.write("\nNo scenario reports were produced. Inspect the configuration and test steps.\n")
+                  output.write(
+                      "\nNo scenario reports were produced. "
+                      "Inspect the configuration and test steps.\n"
+                  )
           if outcome == "success" and not healthy:
               raise SystemExit("CI_REPORT_GATE_FAILED")
           PY

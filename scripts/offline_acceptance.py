@@ -1,15 +1,15 @@
 import json
 import os
+import pathlib
 import secrets
 import socket
 import subprocess
 import tempfile
-from pathlib import Path
 
 import psycopg
 from psycopg import sql
 
-from dbt_scenario import __version__
+import dbt_scenario
 
 
 class AcceptanceError(Exception):
@@ -18,13 +18,19 @@ class AcceptanceError(Exception):
 
 def run(arguments, **kwargs):
     try:
-        return subprocess.run(arguments, check=True, capture_output=True, timeout=300, **kwargs)
+        return subprocess.run(
+            arguments, check=True, capture_output=True, timeout=300, **kwargs
+        )
     except (OSError, subprocess.SubprocessError):
-        raise AcceptanceError("COMMAND_FAILED_" + Path(arguments[0]).name.upper()) from None
+        raise AcceptanceError(
+            "COMMAND_FAILED_" + pathlib.Path(arguments[0]).name.upper()
+        ) from None
 
 
 def network_proof():
-    interfaces = sorted(path.name for path in Path("/sys/class/net").iterdir())
+    interfaces = sorted(
+        path.name for path in pathlib.Path("/sys/class/net").iterdir()
+    )
     if interfaces != ["lo"]:
         raise AcceptanceError("NETWORK_ISOLATION_REQUIRED")
     blocked = {}
@@ -45,9 +51,13 @@ def network_proof():
 
 def main():
     network = network_proof()
-    admin_password, test_password = [secrets.token_urlsafe(24) for _ in range(2)]
-    with tempfile.TemporaryDirectory(prefix="dbt-scenario-offline-") as temporary:
-        root = Path(temporary)
+    admin_password, test_password = [
+        secrets.token_urlsafe(24) for _ in range(2)
+    ]
+    with tempfile.TemporaryDirectory(
+        prefix="dbt-scenario-offline-"
+    ) as temporary:
+        root = pathlib.Path(temporary)
         project = root / "demo"
         static_environment = {
             key: value
@@ -99,7 +109,8 @@ def main():
                     "-w",
                     "start",
                     "-o",
-                    f"-h 127.0.0.1 -p 55432 -k {root} -c unix_socket_permissions=0700",
+                    f"-h 127.0.0.1 -p 55432 -k {root} "
+                    "-c unix_socket_permissions=0700",
                 ]
             )
             started = True
@@ -120,7 +131,8 @@ def main():
                 )
                 database.execute("CREATE DATABASE dbt_scenario_test")
                 database.execute(
-                    "GRANT CONNECT, CREATE ON DATABASE dbt_scenario_test TO dbt_scenario"
+                    "GRANT CONNECT, CREATE ON DATABASE dbt_scenario_test TO "
+                    "dbt_scenario"
                 )
             connection["dbname"] = "dbt_scenario_test"
             with psycopg.connect(**connection) as database:
@@ -151,7 +163,10 @@ def main():
                 for path in summaries
                 for report in [json.loads(path.read_text())]
             }
-            if set(indexed) != {"orders_update_late_arrival_retry", "orders_empty_start"}:
+            if set(indexed) != {
+                "orders_update_late_arrival_retry",
+                "orders_empty_start",
+            }:
                 raise AcceptanceError("REPORT_MISMATCH")
             for name, expected in [
                 ("orders_update_late_arrival_retry", [2, 3, 3]),
@@ -161,8 +176,12 @@ def main():
                 if (
                     report["overall_status"] != "PASS"
                     or report["cleanup_status"] != "CLEANED"
-                    or [step.get("actual_rows") for step in report["steps"]] != expected
-                    or not all(step["sql_audit"]["status"] == "PASS" for step in report["steps"])
+                    or [step.get("actual_rows") for step in report["steps"]]
+                    != expected
+                    or not all(
+                        step["sql_audit"]["status"] == "PASS"
+                        for step in report["steps"]
+                    )
                 ):
                     raise AcceptanceError("SCENARIO_NOT_SUCCESSFUL")
             report = indexed["orders_update_late_arrival_retry"]
@@ -175,7 +194,7 @@ def main():
                 server_version = database.info.server_version
             result = {
                 "status": "PASS",
-                "package_version": __version__,
+                "package_version": dbt_scenario.__version__,
                 "postgresql": server_version,
                 "network": network,
                 "static_validation": {
@@ -184,11 +203,15 @@ def main():
                     "without_password_env": True,
                 },
                 "steps": [step["status"] for step in report["steps"]],
-                "actual_rows": [step["actual_rows"] for step in report["steps"]],
+                "actual_rows": [
+                    step["actual_rows"] for step in report["steps"]
+                ],
                 "cleanup_status": report["cleanup_status"],
                 "empty_start_demo": {
                     "status": empty["overall_status"],
-                    "actual_rows": [step["actual_rows"] for step in empty["steps"]],
+                    "actual_rows": [
+                        step["actual_rows"] for step in empty["steps"]
+                    ],
                     "cleanup_status": empty["cleanup_status"],
                 },
             }

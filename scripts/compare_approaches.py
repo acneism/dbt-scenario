@@ -3,6 +3,7 @@ import copy
 import hashlib
 import json
 import os
+import pathlib
 import re
 import shutil
 import subprocess
@@ -10,17 +11,16 @@ import sys
 import tempfile
 import time
 import uuid
-from pathlib import Path
 
 import psycopg
 import yaml
 from psycopg import sql
 
-from dbt_scenario import __version__
-from dbt_scenario.config import load_config
-from dbt_scenario.loader import read_yaml
+import dbt_scenario
+from dbt_scenario import config as scenario_config
+from dbt_scenario import loader
 
-ASSETS = Path(__file__).resolve().parents[1] / "evaluation"
+ASSETS = pathlib.Path(__file__).resolve().parents[1] / "evaluation"
 COLUMNS = {
     "order_id": "bigint",
     "event_at": "timestamp",
@@ -42,7 +42,7 @@ def write_yaml(path, data):
 
 
 def timeline(case):
-    fixtures = read_yaml(ASSETS / "fixtures.yml")
+    fixtures = loader.read_yaml(ASSETS / "fixtures.yml")
     initial, updated = fixtures["initial"], fixtures["updated"]
     incoming, expected = updated, updated
     if case == "duplicate_retry":
@@ -57,7 +57,9 @@ def timeline(case):
 
 def selected_environment(password):
     names = {"PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "LANG", "LC_ALL"}
-    environment = {key: value for key, value in os.environ.items() if key.upper() in names}
+    environment = {
+        key: value for key, value in os.environ.items() if key.upper() in names
+    }
     return {
         **environment,
         "DBT_SEND_ANONYMOUS_USAGE_STATS": "false",
@@ -71,7 +73,12 @@ def selected_environment(password):
 def call(arguments, root, environment):
     try:
         return subprocess.run(
-            arguments, cwd=root, env=environment, capture_output=True, timeout=180
+            arguments,
+            cwd=root,
+            env=environment,
+            capture_output=True,
+            check=False,
+            timeout=180,
         )
     except (OSError, subprocess.SubprocessError):
         raise RuntimeError("EVALUATION_PROCESS_ERROR") from None
@@ -109,7 +116,9 @@ def create_project(root, config, actual_schema, approach, packages):
             ],
         },
     )
-    (root / "models/fct_orders.sql").write_bytes((ASSETS / "model.sql").read_bytes())
+    (root / "models/fct_orders.sql").write_bytes(
+        (ASSETS / "model.sql").read_bytes()
+    )
     database = config.database
     profile = {key: database[key] for key in ["host", "port", "user"]}
     profile.update(
@@ -129,10 +138,14 @@ def create_project(root, config, actual_schema, approach, packages):
         for filename in ["packages.yml", "package-lock.yml"]:
             shutil.copyfile(ASSETS / "dependencies" / filename, root / filename)
         shutil.copytree(
-            packages, root / "dbt_packages", ignore=shutil.ignore_patterns(".git", "target", "logs")
+            packages,
+            root / "dbt_packages",
+            ignore=shutil.ignore_patterns(".git", "target", "logs"),
         )
         (root / "macros").mkdir()
-        shutil.copyfile(ASSETS / "verify_state.sql", root / "macros/verify_state.sql")
+        shutil.copyfile(
+            ASSETS / "verify_state.sql", root / "macros/verify_state.sql"
+        )
 
 
 def replace_table(connection, schema, table, rows):
@@ -142,7 +155,9 @@ def replace_table(connection, schema, table, rows):
         sql.SQL("{} {}").format(sql.Identifier(name), sql.SQL(kind))
         for name, kind in COLUMNS.items()
     )
-    connection.execute(sql.SQL("CREATE TABLE {} ({})").format(relation, definitions))
+    connection.execute(
+        sql.SQL("CREATE TABLE {} ({})").format(relation, definitions)
+    )
     if rows:
         with connection.cursor() as cursor:
             cursor.executemany(
@@ -170,7 +185,9 @@ def manual_gate(connection, actual_schema, expected_schema):
         sql.Identifier(expected_schema, "expected"),
     )
     if connection.execute(
-        sql.SQL("SELECT count(*)<>count(DISTINCT order_id) FROM {}").format(actual)
+        sql.SQL("SELECT count(*)<>count(DISTINCT order_id) FROM {}").format(
+            actual
+        )
     ).fetchone()[0]:
         return "INVALID_KEY"
     query = sql.SQL(
@@ -188,12 +205,17 @@ def package_gate(result):
     gate = json.loads(matches[0])
     if set(gate) != {"status", "reason_code"}:
         raise RuntimeError("AUDIT_HELPER_GATE_INCONSISTENT")
-    if gate["status"] == "PASS" and gate["reason_code"] is None and result.returncode == 0:
+    if (
+        gate["status"] == "PASS"
+        and gate["reason_code"] is None
+        and result.returncode == 0
+    ):
         return None
     if (
         gate["status"] == "FAIL"
         and result.returncode != 0
-        and gate["reason_code"] in {"SCHEMA_MISMATCH", "ROW_COUNT_MISMATCH", "ROWS_MISMATCH"}
+        and gate["reason_code"]
+        in {"SCHEMA_MISMATCH", "ROW_COUNT_MISMATCH", "ROWS_MISMATCH"}
     ):
         return gate["reason_code"]
     raise RuntimeError("AUDIT_HELPER_GATE_INCONSISTENT")
@@ -203,7 +225,8 @@ def cleanup(connection, schemas, marker):
     with connection.transaction():
         for schema in schemas:
             owned = connection.execute(
-                "SELECT obj_description(oid,'pg_namespace'),pg_get_userbyid(nspowner)=current_user "
+                "SELECT obj_description(oid,'pg_namespace'),"
+                "pg_get_userbyid(nspowner)=current_user "
                 "FROM pg_namespace WHERE nspname=%s",
                 [schema],
             ).fetchone()
@@ -215,16 +238,25 @@ def cleanup(connection, schemas, marker):
             ).fetchall()
             for (table,) in tables:
                 connection.execute(
-                    sql.SQL("DROP TABLE {} RESTRICT").format(sql.Identifier(schema, table))
+                    sql.SQL("DROP TABLE {} RESTRICT").format(
+                        sql.Identifier(schema, table)
+                    )
                 )
-            connection.execute(sql.SQL("DROP SCHEMA {} RESTRICT").format(sql.Identifier(schema)))
+            connection.execute(
+                sql.SQL("DROP SCHEMA {} RESTRICT").format(
+                    sql.Identifier(schema)
+                )
+            )
 
 
-def native_dbt_checks(case, connection, actual, root, variables, environment, executable):
+def native_dbt_checks(
+    case, connection, actual, root, variables, environment, executable
+):
     values = connection.execute(
-        sql.SQL("SELECT order_id,event_at,updated_at,amount FROM {} ORDER BY order_id").format(
-            sql.Identifier(actual, "fct_orders")
-        )
+        sql.SQL(
+            "SELECT order_id,event_at,updated_at,amount FROM {} ORDER BY "
+            "order_id"
+        ).format(sql.Identifier(actual, "fct_orders"))
     ).fetchall()
     current_rows = [
         {
@@ -243,16 +275,27 @@ def native_dbt_checks(case, connection, actual, root, variables, environment, ex
             "models": [
                 {
                     "name": "fct_orders",
-                    "columns": [{"name": "order_id", "data_tests": ["unique", "not_null"]}],
+                    "columns": [
+                        {
+                            "name": "order_id",
+                            "data_tests": ["unique", "not_null"],
+                        }
+                    ],
                 }
             ],
             "unit_tests": [
                 {
                     "name": "incremental_select_batch",
                     "model": "fct_orders",
-                    "overrides": {"macros": {"is_incremental": True}, "vars": CASES[case]},
+                    "overrides": {
+                        "macros": {"is_incremental": True},
+                        "vars": CASES[case],
+                    },
                     "given": [
-                        {"input": "source('raw', 'orders')", "rows": copy.deepcopy(incoming)},
+                        {
+                            "input": "source('raw', 'orders')",
+                            "rows": copy.deepcopy(incoming),
+                        },
                         {"input": "this", "rows": current_rows},
                     ],
                     "expect": {"rows": copy.deepcopy(incoming)},
@@ -282,18 +325,25 @@ def native_dbt_checks(case, connection, actual, root, variables, environment, ex
             json.dumps(variables),
         ]
         executed = call(arguments, root, environment)
-        results = json.loads((artifacts / "target/run_results.json").read_text())["results"]
+        results = json.loads(
+            (artifacts / "target/run_results.json").read_text()
+        )["results"]
         if len(results) != expected_count or any(
             result["status"] not in {"pass", "fail"} for result in results
         ):
             raise RuntimeError("NATIVE_DBT_TEST_EXECUTION_ERROR")
-        status = "FAIL" if any(result["status"] == "fail" for result in results) else "PASS"
+        status = (
+            "FAIL"
+            if any(result["status"] == "fail" for result in results)
+            else "PASS"
+        )
         if executed.returncode != (1 if status == "FAIL" else 0):
             raise RuntimeError("NATIVE_DBT_TEST_EXIT_MISMATCH")
         observed[kind] = {
             "status": status,
             "checks": [
-                {"name": result["unique_id"], "status": result["status"]} for result in results
+                {"name": result["unique_id"], "status": result["status"]}
+                for result in results
             ],
         }
     observed["this_fixture_rows"] = len(current_rows)
@@ -302,18 +352,26 @@ def native_dbt_checks(case, connection, actual, root, variables, environment, ex
 
 def native_case(case, approach, config, root, packages):
     run_id = uuid.uuid4().hex
-    actual, inputs, expected = [f"cmp_{run_id}_{kind}" for kind in ["actual", "inputs", "expected"]]
+    actual, inputs, expected = [
+        f"cmp_{run_id}_{kind}" for kind in ["actual", "inputs", "expected"]
+    ]
     schemas, marker = [actual, inputs, expected], "comparison:" + run_id
     create_project(root, config, actual, approach, packages)
     environment = selected_environment(config.database["password"])
-    executable = Path(sys.executable).parent / ("dbt.exe" if os.name == "nt" else "dbt")
+    executable = pathlib.Path(sys.executable).parent / (
+        "dbt.exe" if os.name == "nt" else "dbt"
+    )
     steps = []
     native_observations = None
     native_seconds = 0
     started = time.perf_counter()
-    with psycopg.connect(**config.connection_kwargs(), autocommit=True) as connection:
+    with psycopg.connect(
+        **config.connection_kwargs(), autocommit=True
+    ) as connection:
         for schema in schemas:
-            connection.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema)))
+            connection.execute(
+                sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema))
+            )
             connection.execute(
                 sql.SQL("COMMENT ON SCHEMA {} IS {}").format(
                     sql.Identifier(schema), sql.Literal(marker)
@@ -350,13 +408,14 @@ def native_case(case, approach, config, root, packages):
                 executed = call(arguments, root, environment)
                 if executed.returncode:
                     raise RuntimeError("DBT_MODEL_EXECUTION_ERROR")
-                executed_results = json.loads((artifacts / "target/run_results.json").read_text())[
-                    "results"
-                ]
+                executed_results = json.loads(
+                    (artifacts / "target/run_results.json").read_text()
+                )["results"]
                 if (
                     len(executed_results) != 1
                     or executed_results[0]["status"] != "success"
-                    or executed_results[0]["unique_id"] != "model.comparison.fct_orders"
+                    or executed_results[0]["unique_id"]
+                    != "model.comparison.fct_orders"
                 ):
                     raise RuntimeError("DBT_MODEL_NOT_EXECUTED")
                 if approach == "manual":
@@ -368,10 +427,14 @@ def native_case(case, approach, config, root, packages):
                         "--args",
                         json.dumps({"expected_schema": expected}),
                     ]
-                    arguments.insert(arguments.index("run-operation") + 1, "verify_state")
+                    arguments.insert(
+                        arguments.index("run-operation") + 1, "verify_state"
+                    )
                     reason = package_gate(call(arguments, root, environment))
                 count = connection.execute(
-                    sql.SQL("SELECT count(*) FROM {}").format(sql.Identifier(actual, "fct_orders"))
+                    sql.SQL("SELECT count(*) FROM {}").format(
+                        sql.Identifier(actual, "fct_orders")
+                    )
                 ).fetchone()[0]
                 steps.append(
                     {
@@ -383,19 +446,32 @@ def native_case(case, approach, config, root, packages):
                 )
                 if reason:
                     break
-            if approach == "manual" and case in {"late_arrival_loss", "duplicate_retry"}:
+            if approach == "manual" and case in {
+                "late_arrival_loss",
+                "duplicate_retry",
+            }:
                 native_started = time.perf_counter()
                 native_observations = native_dbt_checks(
-                    case, connection, actual, root, variables, environment, executable
+                    case,
+                    connection,
+                    actual,
+                    root,
+                    variables,
+                    environment,
+                    executable,
                 )
                 native_seconds = time.perf_counter() - native_started
         finally:
             cleanup(connection, schemas, marker)
     return {
-        "status": "FAIL" if any(step["status"] == "FAIL" for step in steps) else "PASS",
+        "status": "FAIL"
+        if any(step["status"] == "FAIL" for step in steps)
+        else "PASS",
         "steps": steps,
         "cleanup_status": "CLEANED",
-        "duration_ms": round((time.perf_counter() - started - native_seconds) * 1000, 3),
+        "duration_ms": round(
+            (time.perf_counter() - started - native_seconds) * 1000, 3
+        ),
         "native_dbt_checks": native_observations,
         "native_dbt_checks_duration_ms": round(native_seconds * 1000, 3),
     }
@@ -408,9 +484,15 @@ def scenario_case(case, config, root):
         "name": case,
         "model": "model.comparison.fct_orders",
         "inputs": {
-            "orders": {"node": "source.comparison.raw.orders", "columns": copy.deepcopy(COLUMNS)}
+            "orders": {
+                "node": "source.comparison.raw.orders",
+                "columns": copy.deepcopy(COLUMNS),
+            }
         },
-        "output": {"columns": copy.deepcopy(COLUMNS), "primary_key": ["order_id"]},
+        "output": {
+            "columns": copy.deepcopy(COLUMNS),
+            "primary_key": ["order_id"],
+        },
         "steps": [],
     }
     for index, (name, incoming, expected) in enumerate(timeline(case)):
@@ -425,13 +507,22 @@ def scenario_case(case, config, root):
             else {"rows": copy.deepcopy(expected)},
         }
         if incoming is not None:
-            step["inputs"] = {"orders": {"replace": {"rows": copy.deepcopy(incoming)}}}
+            step["inputs"] = {
+                "orders": {"replace": {"rows": copy.deepcopy(incoming)}}
+            }
         data["steps"].append(step)
     write_yaml(root / "scenario.yml", data)
-    database = {key: value for key, value in config.database.items() if key != "password"}
+    database = {
+        key: value
+        for key, value in config.database.items()
+        if key != "password"
+    }
     database["password_env"] = "DSC_TEST_PASSWORD"
-    write_yaml(root / "runner.yml", {"version": 1, "project_dir": ".", "database": database})
-    executable = Path(sys.executable).parent / (
+    write_yaml(
+        root / "runner.yml",
+        {"version": 1, "project_dir": ".", "database": database},
+    )
+    executable = pathlib.Path(sys.executable).parent / (
         "dbt-scenario.exe" if os.name == "nt" else "dbt-scenario"
     )
     started = time.perf_counter()
@@ -455,7 +546,8 @@ def scenario_case(case, config, root):
     report = json.loads(reports[0].read_text())
     if (
         report["overall_status"] not in {"PASS", "FAIL"}
-        or executed.returncode != (0 if report["overall_status"] == "PASS" else 1)
+        or executed.returncode
+        != (0 if report["overall_status"] == "PASS" else 1)
         or report["cleanup_status"] != "CLEANED"
     ):
         raise RuntimeError("SCENARIO_EXECUTION_ERROR")
@@ -464,7 +556,10 @@ def scenario_case(case, config, root):
         "cleanup_status": report["cleanup_status"],
         "duration_ms": round((time.perf_counter() - started) * 1000, 3),
         "steps": [
-            {key: step.get(key) for key in ["name", "status", "reason_code", "actual_rows"]}
+            {
+                key: step.get(key)
+                for key in ["name", "status", "reason_code", "actual_rows"]
+            }
             for step in report["steps"]
         ],
     }
@@ -472,20 +567,26 @@ def scenario_case(case, config, root):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=Path, required=True)
-    parser.add_argument("--packages-dir", type=Path, required=True)
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--config", type=pathlib.Path, required=True)
+    parser.add_argument("--packages-dir", type=pathlib.Path, required=True)
+    parser.add_argument("--output", type=pathlib.Path, required=True)
     arguments = parser.parse_args()
     if arguments.output.exists():
         parser.error("output already exists")
-    config = load_config(arguments.config)
+    config = scenario_config.load_config(arguments.config)
     result = {
         "schema_version": 1,
-        "package_version": __version__,
+        "package_version": dbt_scenario.__version__,
         "complete": False,
-        "model_sha256": hashlib.sha256((ASSETS / "model.sql").read_bytes()).hexdigest(),
-        "fixtures_sha256": hashlib.sha256((ASSETS / "fixtures.yml").read_bytes()).hexdigest(),
-        "dependencies": read_yaml(ASSETS / "dependencies/package-lock.yml")["packages"],
+        "model_sha256": hashlib.sha256(
+            (ASSETS / "model.sql").read_bytes()
+        ).hexdigest(),
+        "fixtures_sha256": hashlib.sha256(
+            (ASSETS / "fixtures.yml").read_bytes()
+        ).hexdigest(),
+        "dependencies": loader.read_yaml(
+            ASSETS / "dependencies/package-lock.yml"
+        )["packages"],
         "protocol": {
             "synthetic_project": True,
             "repeats_per_case": 1,
@@ -493,20 +594,28 @@ def main():
             "feature_equivalent_timing": False,
             "case_order": list(CASES),
             "approach_order": ["manual", "audit_helper_ext", "dbt_scenario"],
-            "excludes": ["project_generation", "dependency_installation", "native_dbt_checks"],
+            "excludes": [
+                "project_generation",
+                "dependency_installation",
+                "native_dbt_checks",
+            ],
         },
         "cases": {},
     }
     arguments.output.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="dbt-scenario-comparison-") as temporary:
+    with tempfile.TemporaryDirectory(
+        prefix="dbt-scenario-comparison-"
+    ) as temporary:
         for case in CASES:
             result["cases"][case] = {}
             for approach in ["manual", "audit_helper_ext", "dbt_scenario"]:
-                root = Path(temporary) / f"{case}_{approach}"
+                root = pathlib.Path(temporary) / f"{case}_{approach}"
                 measured = (
                     scenario_case(case, config, root)
                     if approach == "dbt_scenario"
-                    else native_case(case, approach, config, root, arguments.packages_dir)
+                    else native_case(
+                        case, approach, config, root, arguments.packages_dir
+                    )
                 )
                 measured["matches_expected_detection"] = measured["status"] == (
                     "PASS" if case == "correct" else "FAIL"
@@ -521,7 +630,10 @@ def main():
         for approaches in result["cases"].values()
         for method in ["manual", "dbt_scenario"]
     ):
-        raise SystemExit("Required baseline/runner assertions did not match expected outcomes")
+        raise SystemExit(
+            "Required baseline/runner assertions did not match expected "
+            "outcomes"
+        )
 
 
 if __name__ == "__main__":

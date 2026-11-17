@@ -1,20 +1,18 @@
+import decimal
 import json
 import os
+import pathlib
 import uuid
-from decimal import Decimal
-from pathlib import Path
 
 import pytest
 from psycopg import sql
 
-from dbt_scenario.config import load_config
-from dbt_scenario.database import Database
-from dbt_scenario.errors import ScenarioError
-from dbt_scenario.journal import Journal
-from dbt_scenario.lifecycle import finish_run
-from dbt_scenario.loader import converted
+from dbt_scenario import config as scenario_config
+from dbt_scenario import database as scenario_database
+from dbt_scenario import errors, lifecycle, loader
+from dbt_scenario import journal as scenario_journal
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = pathlib.Path(__file__).resolve().parents[1]
 pytestmark = pytest.mark.integration
 
 
@@ -22,18 +20,18 @@ pytestmark = pytest.mark.integration
 def tables(tmp_path):
     if "DSC_TEST_PASSWORD" not in os.environ:
         pytest.skip("DSC_TEST_PASSWORD is required for disposable PostgreSQL")
-    config = load_config(ROOT / "scenario-runner.yml")
+    config = scenario_config.load_config(ROOT / "scenario-runner.yml")
     config.project_dir = tmp_path
-    database = Database(config)
+    database = scenario_database.Database(config)
     run_id = uuid.uuid4().hex
     database.acquire_run_lock(run_id)
-    journal = Journal.create(config, run_id)
+    journal = scenario_journal.Journal.create(config, run_id)
     database.create_schemas(journal)
     actual, _, expected = journal.data["schemas"]
     try:
         yield database, actual, expected
     finally:
-        finish_run(database, journal)
+        lifecycle.finish_run(database, journal)
         database.close()
 
 
@@ -43,7 +41,9 @@ def compare(tables, columns, keys, actual_rows, expected_rows, mutate=None):
     database.replace(expected, "expected", columns, expected_rows)
     if mutate:
         mutate(database, actual)
-    return database.compare(actual, "result", expected, "expected", columns, keys)
+    return database.compare(
+        actual, "result", expected, "expected", columns, keys
+    )
 
 
 @pytest.mark.parametrize(
@@ -60,7 +60,9 @@ def test_empty_tables_are_compared_as_data(tables, actual, expected, counts):
     assert result["status"] == ("PASS" if not any(counts.values()) else "FAIL")
 
 
-@pytest.mark.parametrize("actual,expected,status", [(None, None, "PASS"), (None, 0, "FAIL")])
+@pytest.mark.parametrize(
+    "actual,expected,status", [(None, None, "PASS"), (None, 0, "FAIL")]
+)
 def test_null_payload_is_distinct_from_zero(tables, actual, expected, status):
     result = compare(
         tables,
@@ -84,17 +86,38 @@ def test_false_is_a_valid_key(tables):
     assert result["status"] == "PASS"
 
 
-def test_double_precision_extremes_roundtrip_as_the_expected_binary64_values(tables):
-    values = ["0.1", "0.10000000000000002", "5e-324", "1.7976931348623157e308", "-0.0", None]
+def test_double_precision_extremes_roundtrip_as_the_expected_binary64_values(
+    tables,
+):
+    values = [
+        "0.1",
+        "0.10000000000000002",
+        "5e-324",
+        "1.7976931348623157e308",
+        "-0.0",
+        None,
+    ]
     rows = [{"id": index, "value": value} for index, value in enumerate(values)]
-    result = compare(tables, {"id": "integer", "value": "double precision"}, ["id"], rows, rows)
+    result = compare(
+        tables,
+        {"id": "integer", "value": "double precision"},
+        ["id"],
+        rows,
+        rows,
+    )
     assert result["status"] == "PASS"
     database, actual, _ = tables
     stored = database.execute(
-        sql.SQL("SELECT value FROM {}.result ORDER BY id").format(sql.Identifier(actual))
+        sql.SQL("SELECT value FROM {}.result ORDER BY id").format(
+            sql.Identifier(actual)
+        )
     ).fetchall()
-    assert [value.hex() if value is not None else None for (value,) in stored] == [
-        converted(value, "double precision").hex() if value is not None else None
+    assert [
+        value.hex() if value is not None else None for (value,) in stored
+    ] == [
+        loader.converted(value, "double precision").hex()
+        if value is not None
+        else None
         for value in values
     ]
 
@@ -108,15 +131,19 @@ def test_adjacent_double_precision_values_have_no_comparison_tolerance(tables):
         [{"id": 1, "value": "0.10000000000000002"}],
     )
     assert result["status"] == "FAIL"
-    assert result["diff_counts"] == {"missing": 0, "unexpected": 0, "changed": 1}
+    assert result["diff_counts"] == {
+        "missing": 0,
+        "unexpected": 0,
+        "changed": 1,
+    }
 
 
 def test_double_precision_cannot_silently_match_a_real_column(tables):
     def narrow(database, actual):
         database.execute(
-            sql.SQL("ALTER TABLE {}.result ALTER COLUMN value TYPE real").format(
-                sql.Identifier(actual)
-            )
+            sql.SQL(
+                "ALTER TABLE {}.result ALTER COLUMN value TYPE real"
+            ).format(sql.Identifier(actual))
         )
 
     result = compare(
@@ -127,11 +154,16 @@ def test_double_precision_cannot_silently_match_a_real_column(tables):
         [{"id": 1, "value": "1.5"}],
         narrow,
     )
-    assert result["status"] == "FAIL" and result["reason_code"] == "SCHEMA_MISMATCH"
+    assert (
+        result["status"] == "FAIL"
+        and result["reason_code"] == "SCHEMA_MISMATCH"
+    )
 
 
 @pytest.mark.parametrize("value", ["NaN", "Infinity", "-Infinity"])
-def test_nonfinite_actual_values_fail_and_leave_reports_json_serializable(tables, value):
+def test_nonfinite_actual_values_fail_and_leave_reports_json_serializable(
+    tables, value
+):
     def change(database, actual):
         database.execute(
             sql.SQL("UPDATE {}.result SET value = %s::double precision").format(
@@ -160,15 +192,27 @@ def test_double_precision_duplicate_keys_use_postgresql_values(tables):
         [{"key": "0.1"}, {"key": "0.10000000000000001"}],
         [{"key": "0.1"}],
     )
-    assert result["status"] == "FAIL" and result["reason_code"] == "DUPLICATE_KEY"
+    assert (
+        result["status"] == "FAIL" and result["reason_code"] == "DUPLICATE_KEY"
+    )
 
 
 def test_compound_key_matches_every_component(tables):
     columns = {"tenant": "integer", "id": "bigint", "value": "text"}
-    actual = [{"tenant": 1, "id": 1, "value": "a"}, {"tenant": 2, "id": 1, "value": "b"}]
-    expected = [{"tenant": 1, "id": 1, "value": "a"}, {"tenant": 2, "id": 1, "value": "changed"}]
+    actual = [
+        {"tenant": 1, "id": 1, "value": "a"},
+        {"tenant": 2, "id": 1, "value": "b"},
+    ]
+    expected = [
+        {"tenant": 1, "id": 1, "value": "a"},
+        {"tenant": 2, "id": 1, "value": "changed"},
+    ]
     result = compare(tables, columns, ["tenant", "id"], actual, expected)
-    assert result["diff_counts"] == {"missing": 0, "unexpected": 0, "changed": 1}
+    assert result["diff_counts"] == {
+        "missing": 0,
+        "unexpected": 0,
+        "changed": 1,
+    }
 
 
 @pytest.mark.parametrize(
@@ -210,9 +254,12 @@ def test_numeric_38_roundtrips_without_losing_a_cent(tables, expected, status):
 
 
 @pytest.mark.parametrize(
-    "value", ["9" * 150 + "." + "1" * 150, "1e131071", "1e-16383", "0e1000000000", None]
+    "value",
+    ["9" * 150 + "." + "1" * 150, "1e131071", "1e-16383", "0e1000000000", None],
 )
-def test_unconstrained_numeric_roundtrips_native_extremes_without_rounding(tables, value):
+def test_unconstrained_numeric_roundtrips_native_extremes_without_rounding(
+    tables, value
+):
     database, schema, _ = tables
     result = compare(
         tables,
@@ -225,10 +272,12 @@ def test_unconstrained_numeric_roundtrips_native_extremes_without_rounding(table
     observed = database.execute(
         sql.SQL("SELECT value FROM {}").format(sql.Identifier(schema, "result"))
     ).fetchone()[0]
-    assert observed == (Decimal(value) if value is not None else None)
+    assert observed == (decimal.Decimal(value) if value is not None else None)
 
 
-def test_unconstrained_numeric_detects_a_difference_beyond_default_decimal_precision(tables):
+def test_unconstrained_numeric_detects_differences_beyond_decimal_precision(
+    tables,
+):
     result = compare(
         tables,
         {"id": "integer", "value": "numeric"},
@@ -237,13 +286,20 @@ def test_unconstrained_numeric_detects_a_difference_beyond_default_decimal_preci
         [{"id": 1, "value": "0." + "0" * 120 + "2"}],
     )
     assert result["status"] == "FAIL"
-    assert result["diff_counts"] == {"missing": 0, "unexpected": 0, "changed": 1}
+    assert result["diff_counts"] == {
+        "missing": 0,
+        "unexpected": 0,
+        "changed": 1,
+    }
 
 
 @pytest.mark.parametrize(
-    "expected,actual", [("numeric", "numeric(12,2)"), ("numeric(12,2)", "numeric")]
+    "expected,actual",
+    [("numeric", "numeric(12,2)"), ("numeric(12,2)", "numeric")],
 )
-def test_unconstrained_and_fixed_numeric_schemas_are_distinct(tables, expected, actual):
+def test_unconstrained_and_fixed_numeric_schemas_are_distinct(
+    tables, expected, actual
+):
     def mutate(database, schema):
         database.execute(
             sql.SQL("ALTER TABLE {} ALTER COLUMN value TYPE {}").format(
@@ -267,7 +323,9 @@ def test_unconstrained_and_fixed_numeric_schemas_are_distinct(tables, expected, 
 def test_nonfinite_native_numeric_output_is_a_json_safe_failure(tables, value):
     def mutate(database, schema):
         database.execute(
-            sql.SQL("UPDATE {} SET value=%s::numeric").format(sql.Identifier(schema, "result")),
+            sql.SQL("UPDATE {} SET value=%s::numeric").format(
+                sql.Identifier(schema, "result")
+            ),
             [value],
         )
 
@@ -325,7 +383,9 @@ def test_timestamptz_compares_instants(tables, expected, status):
 def test_schema_changes_fail_before_row_comparison(tables, alter):
     def mutate(database, schema):
         database.execute(
-            sql.SQL("ALTER TABLE {} {}").format(sql.Identifier(schema, "result"), sql.SQL(alter))
+            sql.SQL("ALTER TABLE {} {}").format(
+                sql.Identifier(schema, "result"), sql.SQL(alter)
+            )
         )
 
     result = compare(
@@ -344,8 +404,10 @@ def test_schema_changes_fail_before_row_comparison(tables, alter):
 def test_missing_actual_table_is_not_an_empty_pass(tables):
     database, actual, expected = tables
     database.replace(expected, "expected", {"id": "integer"}, [])
-    with pytest.raises(ScenarioError, match="TARGET_MISSING"):
-        database.compare(actual, "missing", expected, "expected", {"id": "integer"}, ["id"])
+    with pytest.raises(errors.ScenarioError, match="TARGET_MISSING"):
+        database.compare(
+            actual, "missing", expected, "expected", {"id": "integer"}, ["id"]
+        )
 
 
 def test_quoted_identifiers_and_literal_text_are_preserved(tables):
@@ -378,51 +440,66 @@ def test_text_keys_ignore_nondeterministic_collation(
     tables, keys, actual, expected, status, counts
 ):
     database, schema, _ = tables
-    if not database.execute("SELECT 1 FROM pg_collation WHERE collprovider='i' LIMIT 1").fetchone():
+    if not database.execute(
+        "SELECT 1 FROM pg_collation WHERE collprovider='i' LIMIT 1"
+    ).fetchone():
         pytest.skip("PostgreSQL was built without ICU")
     collation = sql.Identifier(schema, "loose")
     database.execute(
         sql.SQL(
-            "CREATE COLLATION {} (provider=icu, locale='und-u-ks-level1', deterministic=false)"
+            "CREATE COLLATION {} (provider=icu, locale='und-u-ks-level1', "
+            "deterministic=false)"
         ).format(collation)
     )
 
     def mutate(db, name):
         db.execute(
-            sql.SQL("ALTER TABLE {} ALTER COLUMN id TYPE text COLLATE {}").format(
-                sql.Identifier(name, "result"), collation
-            )
+            sql.SQL(
+                "ALTER TABLE {} ALTER COLUMN id TYPE text COLLATE {}"
+            ).format(sql.Identifier(name, "result"), collation)
         )
 
     try:
-        result = compare(tables, {"id": "text", "value": "integer"}, keys, actual, expected, mutate)
+        result = compare(
+            tables,
+            {"id": "text", "value": "integer"},
+            keys,
+            actual,
+            expected,
+            mutate,
+        )
         assert result["status"] == status
         assert result["diff_counts"] == counts
     finally:
         database.execute(
-            sql.SQL('ALTER TABLE {} ALTER COLUMN id TYPE text COLLATE "C"').format(
-                sql.Identifier(schema, "result")
-            )
+            sql.SQL(
+                'ALTER TABLE {} ALTER COLUMN id TYPE text COLLATE "C"'
+            ).format(sql.Identifier(schema, "result"))
         )
-        database.execute(sql.SQL("DROP COLLATION {} RESTRICT").format(collation))
+        database.execute(
+            sql.SQL("DROP COLLATION {} RESTRICT").format(collation)
+        )
 
 
 def test_text_payload_uses_exact_equality_even_with_loose_collation(tables):
     database, schema, _ = tables
-    if not database.execute("SELECT 1 FROM pg_collation WHERE collprovider='i' LIMIT 1").fetchone():
+    if not database.execute(
+        "SELECT 1 FROM pg_collation WHERE collprovider='i' LIMIT 1"
+    ).fetchone():
         pytest.skip("PostgreSQL was built without ICU")
     collation = sql.Identifier(schema, "loose")
     database.execute(
         sql.SQL(
-            "CREATE COLLATION {} (provider=icu, locale='und-u-ks-level1', deterministic=false)"
+            "CREATE COLLATION {} (provider=icu, locale='und-u-ks-level1', "
+            "deterministic=false)"
         ).format(collation)
     )
 
     def mutate(db, name):
         db.execute(
-            sql.SQL("ALTER TABLE {} ALTER COLUMN value TYPE text COLLATE {}").format(
-                sql.Identifier(name, "result"), collation
-            )
+            sql.SQL(
+                "ALTER TABLE {} ALTER COLUMN value TYPE text COLLATE {}"
+            ).format(sql.Identifier(name, "result"), collation)
         )
 
     try:
@@ -441,8 +518,10 @@ def test_text_payload_uses_exact_equality_even_with_loose_collation(tables):
         assert result["diff_counts"]["changed"] == 1
     finally:
         database.execute(
-            sql.SQL('ALTER TABLE {} ALTER COLUMN value TYPE text COLLATE "C"').format(
-                sql.Identifier(schema, "result")
-            )
+            sql.SQL(
+                'ALTER TABLE {} ALTER COLUMN value TYPE text COLLATE "C"'
+            ).format(sql.Identifier(schema, "result"))
         )
-        database.execute(sql.SQL("DROP COLLATION {} RESTRICT").format(collation))
+        database.execute(
+            sql.SQL("DROP COLLATION {} RESTRICT").format(collation)
+        )
