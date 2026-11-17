@@ -16,13 +16,19 @@ PROJECT = ROOT / "examples/shop"
 
 
 @pytest.mark.parametrize("precision,scale", [(38, 2), (99, 0), (99, 99)])
-def test_decimal_precision_is_independent_of_the_python_context(precision, scale):
+def test_decimal_precision_is_independent_of_the_python_context(
+    precision, scale
+):
     integral = "9" * (precision - scale) or "0"
     value = integral + ("." + "9" * scale if scale else "")
     with localcontext() as context:
         context.prec = 6
-        assert converted(value, f"numeric({precision},{scale})") == Decimal(value)
-        assert converted("-" + value, f"numeric({precision},{scale})") == Decimal("-" + value)
+        assert converted(value, f"numeric({precision},{scale})") == Decimal(
+            value
+        )
+        assert converted(
+            "-" + value, f"numeric({precision},{scale})"
+        ) == Decimal("-" + value)
 
 
 @pytest.mark.parametrize(
@@ -40,7 +46,9 @@ def test_rejects_values_that_need_rounding_or_truncation(value, kind):
         converted(value, kind)
 
 
-def test_fixture_snapshot_is_cached_without_sharing_mutable_rows(tmp_path, monkeypatch):
+def test_fixture_snapshot_is_cached_without_sharing_mutable_rows(
+    tmp_path, monkeypatch
+):
     from dbt_scenario import loader
 
     reads = []
@@ -65,7 +73,9 @@ def test_fixture_snapshot_is_cached_without_sharing_mutable_rows(tmp_path, monke
 
 
 def test_yaml_numeric_column_name_is_a_validation_error(tmp_path):
-    scenario = copy.deepcopy(load_scenario(PROJECT / "scenarios/orders.yml", PROJECT).data)
+    scenario = copy.deepcopy(
+        load_scenario(PROJECT / "scenarios/orders.yml", PROJECT).data
+    )
     scenario["output"]["columns"] = {True: "integer"}
     path = tmp_path / "invalid.yml"
     path.write_text(yaml.safe_dump(scenario))
@@ -92,7 +102,8 @@ def test_python_yaml_fallback_keeps_validation_rules(tmp_path):
         "yaml.__dict__.pop('CSafeLoader',None); "
         "from dbt_scenario.loader import read_yaml; "
         "from dbt_scenario.errors import ScenarioError\n"
-        "for path,code in zip(sys.argv[1:],['DUPLICATE_YAML_KEY','YAML_ALIAS_UNSUPPORTED']):\n"
+        "for path,code in "
+        "zip(sys.argv[1:],['DUPLICATE_YAML_KEY','YAML_ALIAS_UNSUPPORTED']):\n"
         "    try:\n"
         "        read_yaml(Path(path))\n"
         "    except ScenarioError as error:\n"

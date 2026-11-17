@@ -26,7 +26,9 @@ PROJECT = ROOT / "examples/shop"
         ("1e-320", 1e-320),
     ],
 )
-def test_double_precision_converts_quoted_decimal_values_to_binary64(value, expected):
+def test_double_precision_converts_quoted_decimal_values_to_binary64(
+    value, expected
+):
     assert sql_type("double precision") == "double precision"
     actual = converted(value, "double precision")
     assert type(actual) is float
@@ -65,11 +67,20 @@ def test_double_precision_rejects_nonfinite_lossy_or_unquoted_values(value):
         converted(value, "double precision")
 
 
-def test_distinct_decimal_keys_that_round_to_one_double_are_duplicate_keys(tmp_path):
-    data = copy.deepcopy(load_scenario(PROJECT / "scenarios/orders.yml", PROJECT).data)
-    data["output"] = {"columns": {"key": "double precision"}, "primary_key": ["key"]}
+def test_distinct_decimal_keys_that_round_to_one_double_are_duplicate_keys(
+    tmp_path,
+):
+    data = copy.deepcopy(
+        load_scenario(PROJECT / "scenarios/orders.yml", PROJECT).data
+    )
+    data["output"] = {
+        "columns": {"key": "double precision"},
+        "primary_key": ["key"],
+    }
     data["steps"] = [data["steps"][0]]
-    data["steps"][0]["expect"] = {"rows": [{"key": "0.1"}, {"key": "0.10000000000000001"}]}
+    data["steps"][0]["expect"] = {
+        "rows": [{"key": "0.1"}, {"key": "0.10000000000000001"}]
+    }
     path = tmp_path / "scenario.yml"
     path.write_text(yaml.safe_dump(data))
     with pytest.raises(ScenarioError, match="INVALID_EXPECTED_KEY"):

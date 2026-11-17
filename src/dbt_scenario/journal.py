@@ -15,8 +15,12 @@ STATES = {"RUNNING", "KEPT", "CLEANUP_FAILED", "CLEANED"}
 
 
 def database_fingerprint(config: Config) -> str:
-    identity = {key: config.database[key] for key in ["host", "port", "dbname", "user"]}
-    return hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+    identity = {
+        key: config.database[key] for key in ["host", "port", "dbname", "user"]
+    }
+    return hashlib.sha256(
+        json.dumps(identity, sort_keys=True).encode()
+    ).hexdigest()
 
 
 def schema_names(run_id: str) -> list[str]:
@@ -29,7 +33,8 @@ def journal_path(config: Config, run_id: str) -> Path:
     schema_names(run_id)
     directory = config.project_dir / ".dbt-scenario" / "runs"
     if any(
-        path.is_symlink() for path in [directory.parent, directory, directory / f"{run_id}.json"]
+        path.is_symlink()
+        for path in [directory.parent, directory, directory / f"{run_id}.json"]
     ):
         raise ScenarioError("JOURNAL_SYMLINK_UNSUPPORTED")
     return directory / f"{run_id}.json"
@@ -113,7 +118,9 @@ class Journal:
 
     def save(self):
         self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-        descriptor, name = tempfile.mkstemp(prefix=".journal-", dir=self.path.parent)
+        descriptor, name = tempfile.mkstemp(
+            prefix=".journal-", dir=self.path.parent
+        )
         temporary = Path(name)
         try:
             with os.fdopen(descriptor, "w", encoding="utf-8") as output:

@@ -38,7 +38,9 @@ def test_journal_is_durable_and_does_not_store_passwords(config):
     assert config.database["password"] not in recovered.path.read_text()
 
 
-@pytest.mark.parametrize("run_id", ["../other", "A" * 32, "a" * 31, "", "a" * 33])
+@pytest.mark.parametrize(
+    "run_id", ["../other", "A" * 32, "a" * 31, "", "a" * 33]
+)
 def test_cleanup_run_id_cannot_escape_journal_directory(config, run_id):
     with pytest.raises(ScenarioError, match="INVALID_RUN_ID"):
         Journal.load(config, run_id)
@@ -78,7 +80,9 @@ def test_failed_atomic_update_preserves_previous_journal(config, monkeypatch):
 
 def test_parent_deadline_cannot_be_extended(monkeypatch):
     clock = [100.0]
-    monkeypatch.setattr("dbt_scenario.deadline.time.monotonic", lambda: clock[0])
+    monkeypatch.setattr(
+        "dbt_scenario.deadline.time.monotonic", lambda: clock[0]
+    )
     parent = Deadline(5, "SCENARIO_TIMEOUT")
     child = Deadline(20, "STEP_TIMEOUT", parent)
     assert child.remaining() == 5
@@ -108,12 +112,16 @@ def test_timeout_kills_a_child_ignoring_sigterm(tmp_path):
         f"Path({str(pid_path)!r}).write_text(str(os.getpid())); time.sleep(60)"
     )
     parent = (
-        f"import subprocess,sys,time; subprocess.Popen([sys.executable,'-c',{child!r}]); "
+        "import subprocess,sys,time; "
+        f"subprocess.Popen([sys.executable,'-c',{child!r}]); "
         "time.sleep(60)"
     )
     with pytest.raises(ScenarioError, match="STEP_TIMEOUT"):
         run_process(
-            [sys.executable, "-c", parent], dict(os.environ), tmp_path, Deadline(1, "STEP_TIMEOUT")
+            [sys.executable, "-c", parent],
+            dict(os.environ),
+            tmp_path,
+            Deadline(1, "STEP_TIMEOUT"),
         )
     pid = int(pid_path.read_text())
     status = Path(f"/proc/{pid}/stat")

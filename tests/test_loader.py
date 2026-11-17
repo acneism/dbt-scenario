@@ -45,8 +45,12 @@ def test_rejects_lossy_or_ambiguous_values(value, kind):
 
 
 def test_preserves_decimal_and_timezone():
-    assert converted("9999999999.99", "numeric(12,2)") == Decimal("9999999999.99")
-    assert converted("2026-01-01T03:00:00+03:00", "timestamptz") == datetime(2026, 1, 1, tzinfo=UTC)
+    assert converted("9999999999.99", "numeric(12,2)") == Decimal(
+        "9999999999.99"
+    )
+    assert converted("2026-01-01T03:00:00+03:00", "timestamptz") == datetime(
+        2026, 1, 1, tzinfo=UTC
+    )
 
 
 @pytest.mark.parametrize(
@@ -68,11 +72,19 @@ def test_rejects_unsafe_yaml(tmp_path, text, reason):
     "mutation,reason",
     [
         (lambda d: d.update(unknown=True), "INVALID_SCENARIO_SCHEMA"),
-        (lambda d: d["steps"][0]["run"].update(mode="incremental"), "INVALID_STEP_ORDER"),
-        (lambda d: d["steps"][2]["expect"].update(same_as="future"), "INVALID_SAME_AS_REFERENCE"),
+        (
+            lambda d: d["steps"][0]["run"].update(mode="incremental"),
+            "INVALID_STEP_ORDER",
+        ),
+        (
+            lambda d: d["steps"][2]["expect"].update(same_as="future"),
+            "INVALID_SAME_AS_REFERENCE",
+        ),
         (lambda d: d["steps"][0].pop("inputs"), "UNINITIALIZED_INPUT"),
         (
-            lambda d: d["output"]["columns"].update(amount="text; drop schema public"),
+            lambda d: d["output"]["columns"].update(
+                amount="text; drop schema public"
+            ),
             "UNSUPPORTED_COLUMN_TYPE",
         ),
         (
@@ -107,7 +119,9 @@ def test_prepared_rows_require_unchanged_values_and_column_order():
     values = batch.batch(rows[:1], 0, columns)
     assert values is not None
     assert values[0][0] == 1
-    assert batch.batch(rows[:1], 0, dict(reversed(list(columns.items())))) is None
+    assert (
+        batch.batch(rows[:1], 0, dict(reversed(list(columns.items())))) is None
+    )
     rows[0]["order_id"] = True
     assert batch.batch(rows[:1], 0, columns) is None
 
@@ -123,6 +137,8 @@ def test_var_change_changes_fingerprint(tmp_path):
 
 def test_cli_empty_selection_is_error(monkeypatch):
     monkeypatch.setenv("DSC_TEST_PASSWORD", "disposable-test-password")
-    result = CliRunner().invoke(main, ["test", "--config", str(ROOT / "scenario-runner.yml")])
+    result = CliRunner().invoke(
+        main, ["test", "--config", str(ROOT / "scenario-runner.yml")]
+    )
     assert result.exit_code == 2
     assert "NO_SCENARIOS_SELECTED" in result.output

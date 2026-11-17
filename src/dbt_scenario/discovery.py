@@ -9,7 +9,9 @@ from dbt_scenario.scaffold import (
 
 def discover_models(project_dir, manifest_path, catalog_path=None):
     settings = project_settings(project_dir)
-    manifest, catalog = load_scaffold_metadata(settings, manifest_path, catalog_path)
+    manifest, catalog = load_scaffold_metadata(
+        settings, manifest_path, catalog_path
+    )
     models = []
     actionable = {
         "INIT_PRIMARY_KEY_REQUIRED": "NEEDS_PRIMARY_KEY",
@@ -36,9 +38,15 @@ def discover_models(project_dir, manifest_path, catalog_path=None):
             or node["config"].get("materialized") != "incremental"
         ):
             continue
-        entry = {"model": identity, "status": "TEMPLATE_READY", "reason_code": None}
+        entry = {
+            "model": identity,
+            "status": "TEMPLATE_READY",
+            "reason_code": None,
+        }
         try:
-            name, scenario = scaffold_from_metadata(settings, identity, manifest, catalog)
+            name, scenario = scaffold_from_metadata(
+                settings, identity, manifest, catalog
+            )
             scenario_filename(name)
             entry["input_count"] = len(scenario["inputs"])
         except ScenarioError as error:

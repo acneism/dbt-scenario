@@ -40,13 +40,22 @@ def main():
                 }
             )
         )
-        database = {key: value for key, value in config.database.items() if key != "password"}
+        database = {
+            key: value
+            for key, value in config.database.items()
+            if key != "password"
+        }
         database["password_env"] = "DSC_TEST_PASSWORD"
         configuration = root / "runner.yml"
         configuration.write_text(
-            yaml.safe_dump({"version": 1, "project_dir": ".", "database": database})
+            yaml.safe_dump(
+                {"version": 1, "project_dir": ".", "database": database}
+            )
         )
-        environment = {**os.environ, "DSC_TEST_PASSWORD": config.database["password"]}
+        environment = {
+            **os.environ,
+            "DSC_TEST_PASSWORD": config.database["password"],
+        }
         command = [sys.executable]
         if arguments.mode == "performance":
             command += [
@@ -63,7 +72,12 @@ def main():
                 "--packages-dir",
                 str(scripts.parent / "evaluation/dependencies/dbt_packages"),
             ]
-        command += ["--config", str(configuration), "--output", str(arguments.output)]
+        command += [
+            "--config",
+            str(configuration),
+            "--output",
+            str(arguments.output),
+        ]
         subprocess.run(command, env=environment, check=True, timeout=3300)
         result = json.loads(arguments.output.read_text())
         if result["complete"] is not True:
@@ -85,20 +99,36 @@ def main():
         platform=platform.platform(),
         dependencies={
             name: version(name)
-            for name in ["dbt-core", "dbt-postgres", "psycopg", "PyYAML", "sqlglot"]
+            for name in [
+                "dbt-core",
+                "dbt-postgres",
+                "psycopg",
+                "PyYAML",
+                "sqlglot",
+            ]
         },
     )
-    result["evaluation_script_sha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+    result["evaluation_script_sha256"] = hashlib.sha256(
+        Path(__file__).read_bytes()
+    ).hexdigest()
     commit = os.environ.get("EVALUATION_COMMIT", "")
-    result["source_commit"] = commit if re.fullmatch("[0-9a-f]{40}", commit) else None
+    result["source_commit"] = (
+        commit if re.fullmatch("[0-9a-f]{40}", commit) else None
+    )
     result["database_cleanup_verified"] = True
     peak = Path("/sys/fs/cgroup/memory.peak")
     result["environment"]["container_peak_memory_bytes"] = (
         int(peak.read_text()) if peak.exists() else None
     )
     arguments.output.write_text(json.dumps(result, indent=2) + "\n")
-    print("EVALUATION_RESULT=" + json.dumps(result, separators=(",", ":")), flush=True)
-    if arguments.mode == "performance" and result["performance_target"]["met"] is not True:
+    print(
+        "EVALUATION_RESULT=" + json.dumps(result, separators=(",", ":")),
+        flush=True,
+    )
+    if (
+        arguments.mode == "performance"
+        and result["performance_target"]["met"] is not True
+    ):
         raise RuntimeError("PERFORMANCE_TARGET_MISSED")
     print(
         json.dumps(

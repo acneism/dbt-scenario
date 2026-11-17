@@ -23,9 +23,14 @@ from dbt_scenario.runner import execution_node, initialize_report, run_scenario
 ROOT = Path(__file__).resolve().parents[1]
 
 
-@pytest.mark.parametrize("setting", ["sql_header", "incremental_predicates", "predicates"])
+@pytest.mark.parametrize(
+    "setting", ["sql_header", "incremental_predicates", "predicates"]
+)
 def test_unexamined_model_sql_is_refused_in_preflight_and_later_steps(setting):
-    config = {"materialized": "incremental", setting: ["select 1 from pg_catalog.pg_class"]}
+    config = {
+        "materialized": "incremental",
+        setting: ["select 1 from pg_catalog.pg_class"],
+    }
     with pytest.raises(ScenarioError, match="MODEL_SQL_CONFIG_UNSUPPORTED"):
         check_model_config(config)
     node = {
@@ -38,12 +43,21 @@ def test_unexamined_model_sql_is_refused_in_preflight_and_later_steps(setting):
     changed = copy.deepcopy(node)
     changed["config"] = config
     with pytest.raises(ScenarioError, match="MODEL_CONFIGURATION_CHANGED"):
-        execution_node({"nodes": {node["unique_id"]: changed}}, node, "isolated", "disposable")
+        execution_node(
+            {"nodes": {node["unique_id"]: changed}},
+            node,
+            "isolated",
+            "disposable",
+        )
 
 
 def test_empty_sql_configuration_remains_supported():
     check_model_config(
-        {"materialized": "incremental", "sql_header": "", "incremental_predicates": []}
+        {
+            "materialized": "incremental",
+            "sql_header": "",
+            "incremental_predicates": [],
+        }
     )
 
 
@@ -51,14 +65,20 @@ def test_project_fingerprint_frames_path_and_content(tmp_path):
     first, second = tmp_path / "first", tmp_path / "second"
     for root in [first, second]:
         (root / "models").mkdir(parents=True)
-        (root / "dbt_project.yml").write_text("name: collision\nconfig-version: 2\n")
-    (first / "models/a.sql").write_text("select 1 as id\n-- models/b.sqlselect 2 as id\n")
+        (root / "dbt_project.yml").write_text(
+            "name: collision\nconfig-version: 2\n"
+        )
+    (first / "models/a.sql").write_text(
+        "select 1 as id\n-- models/b.sqlselect 2 as id\n"
+    )
     (second / "models/a.sql").write_text("select 1 as id\n-- ")
     (second / "models/b.sql").write_text("select 2 as id\n")
     assert fingerprint(first) != fingerprint(second)
 
 
-def test_project_uses_the_copied_sql_and_settings_for_its_fingerprint(tmp_path, monkeypatch):
+def test_project_uses_the_copied_sql_and_settings_for_its_fingerprint(
+    tmp_path, monkeypatch
+):
     source = tmp_path / "shop"
     shutil.copytree(ROOT / "examples/shop", source)
     model = source / "models/fct_orders.sql"
@@ -76,28 +96,46 @@ def test_project_uses_the_copied_sql_and_settings_for_its_fingerprint(tmp_path, 
     monkeypatch.setattr(shutil, "copytree", update_before_copy)
     config = Config(
         source,
-        {"host": "unused", "port": 1, "dbname": "unused", "user": "unused", "password": "unused"},
+        {
+            "host": "unused",
+            "port": 1,
+            "dbname": "unused",
+            "user": "unused",
+            "password": "unused",
+        },
     )
     project = Project(config, tmp_path / "workspace", "isolated")
 
     assert project.project_hash != original_hash
     assert project.project_hash == fingerprint(source)
-    assert (project.root / model.relative_to(source)).read_bytes() == model.read_bytes()
+    assert (
+        project.root / model.relative_to(source)
+    ).read_bytes() == model.read_bytes()
     assert project.settings["vars"]["copy_marker"] == "staged"
 
 
 @pytest.mark.parametrize("excluded", [".venv", ".git", "target", "logs"])
-def test_excluded_directory_symlink_is_not_scanned_or_copied(tmp_path, monkeypatch, excluded):
+def test_excluded_directory_symlink_is_not_scanned_or_copied(
+    tmp_path, monkeypatch, excluded
+):
     project = tmp_path / "shop"
     shutil.copytree(ROOT / "examples/shop", project)
     link = project / excluded / "bin/python"
     link.parent.mkdir(parents=True)
     link.write_text("excluded environment file")
     original = Path.is_symlink
-    monkeypatch.setattr(Path, "is_symlink", lambda path: path == link or original(path))
+    monkeypatch.setattr(
+        Path, "is_symlink", lambda path: path == link or original(path)
+    )
     config = Config(
         project,
-        {"host": "unused", "port": 1, "dbname": "unused", "user": "unused", "password": "unused"},
+        {
+            "host": "unused",
+            "port": 1,
+            "dbname": "unused",
+            "user": "unused",
+            "password": "unused",
+        },
     )
     before = fingerprint(project)
     copied = Project(config, tmp_path / "workspace", "isolated")
@@ -116,7 +154,13 @@ def test_real_venv_symlink_is_excluded_but_model_symlink_is_refused(tmp_path):
         pytest.skip("symlink creation is unavailable")
     config = Config(
         project,
-        {"host": "unused", "port": 1, "dbname": "unused", "user": "unused", "password": "unused"},
+        {
+            "host": "unused",
+            "port": 1,
+            "dbname": "unused",
+            "user": "unused",
+            "password": "unused",
+        },
     )
     copied = Project(config, tmp_path / "accepted", "isolated")
     assert not (copied.root / ".venv").exists()
@@ -140,7 +184,9 @@ def test_real_venv_symlink_is_excluded_but_model_symlink_is_refused(tmp_path):
 def test_workflow_accepts_versioned_reports_and_preserves_results(
     tmp_path, status, cleanup, step_status, exit_code, valid
 ):
-    workflow = yaml.safe_load((ROOT / ".github/workflows/scenarios.yml").read_text())
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/scenarios.yml").read_text()
+    )
     step = next(
         item
         for item in workflow["jobs"]["scenarios"]["steps"]
@@ -161,7 +207,9 @@ def test_workflow_accepts_versioned_reports_and_preserves_results(
                 "name": "initial",
                 "status": step_status,
                 "duration_ms": 50,
-                "reason_code": "STEP_FAILURE" if step_status in {"ERROR", "FAIL"} else None,
+                "reason_code": "STEP_FAILURE"
+                if step_status in {"ERROR", "FAIL"}
+                else None,
             }
         ],
     )
@@ -172,7 +220,9 @@ def test_workflow_accepts_versioned_reports_and_preserves_results(
     assert junit.get("failures") == str(int(status == "FAIL"))
     assert junit.get("errors") == str(int(status == "ERROR"))
     if not valid:
-        report_path.write_text(json.dumps({**report, "schema_version": 2}), encoding="utf-8")
+        report_path.write_text(
+            json.dumps({**report, "schema_version": 2}), encoding="utf-8"
+        )
     summary = tmp_path / "github-summary"
     environment = dict(
         os.environ,
@@ -182,7 +232,10 @@ def test_workflow_accepts_versioned_reports_and_preserves_results(
         GITHUB_STEP_SUMMARY=str(summary),
     )
     result = subprocess.run(
-        [sys.executable, "-I", "-c", code], env=environment, capture_output=True, timeout=10
+        [sys.executable, "-I", "-c", code],
+        env=environment,
+        capture_output=True,
+        timeout=10,
     )
     assert result.returncode == (0 if valid else 1), result.stderr
     aggregate = json.loads((tmp_path / "reports/ci-summary.json").read_text())
@@ -209,20 +262,28 @@ def test_unexpected_setup_error_reports_a_safe_stage(tmp_path, monkeypatch):
     assert all(step["status"] == "NOT_RUN" for step in report["steps"])
     for filename in ["summary.json", "summary.md", "junit.xml"]:
         path = tmp_path / report["run_id"] / filename
-        assert "private internal details" not in path.read_text(encoding="utf-8")
+        assert "private internal details" not in path.read_text(
+            encoding="utf-8"
+        )
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows Job Object semantics")
 @pytest.mark.parametrize("parent_waits", [False, True])
-def test_windows_timeout_terminates_descendants_even_after_parent_exit(tmp_path, parent_waits):
+def test_windows_timeout_terminates_descendants_even_after_parent_exit(
+    tmp_path, parent_waits
+):
     pid_path = tmp_path / "child.pid"
     marker = tmp_path / "survived"
     child = (
         "import os,time; from pathlib import Path; "
         f"Path({str(pid_path)!r}).write_text(str(os.getpid())); "
-        f"time.sleep(3); Path({str(marker)!r}).write_text('survived'); time.sleep(30)"
+        f"time.sleep(3); Path({str(marker)!r}).write_text('survived'); "
+        "time.sleep(30)"
     )
-    parent = f"import subprocess,sys,time; subprocess.Popen([sys.executable,'-c',{child!r}]); "
+    parent = (
+        "import subprocess,sys,time; "
+        f"subprocess.Popen([sys.executable,'-c',{child!r}]); "
+    )
     parent += "time.sleep(30)" if parent_waits else "time.sleep(0.1)"
     with pytest.raises(ScenarioError, match="STEP_TIMEOUT"):
         run_process(

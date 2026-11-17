@@ -19,19 +19,27 @@ from dbt_scenario.config import load_config
 from dbt_scenario.loader import load_scenario, read_yaml
 from dbt_scenario.runner import run_scenario
 
-ASSETS = Path(__file__).resolve().parents[1] / "investigations/watermark-boundary"
+ASSETS = (
+    Path(__file__).resolve().parents[1] / "investigations/watermark-boundary"
+)
 VARIANTS = ["current", "boundary_candidate", "initial_snapshot"]
 
 
 def build_scenario(case, specification, initial_only=False):
     scenario = read_yaml(HISTORY / "scenario.yml")
-    scenario["name"] = case + ("_initial_snapshot" if initial_only else "_incremental")
-    initial = copy.deepcopy(scenario["steps"][1]["inputs"]["activity"]["replace"]["rows"][0])
+    scenario["name"] = case + (
+        "_initial_snapshot" if initial_only else "_incremental"
+    )
+    initial = copy.deepcopy(
+        scenario["steps"][1]["inputs"]["activity"]["replace"]["rows"][0]
+    )
     initial["useractivity_timestamp"] = specification["initial_timestamp"]
     incoming = copy.deepcopy(initial)
     incoming["user_username"] = "synthetic_second_student"
     incoming["user_id"] = 2
-    incoming["useractivity_timestamp"] = specification["cases"][case]["incoming_timestamp"]
+    incoming["useractivity_timestamp"] = specification["cases"][case][
+        "incoming_timestamp"
+    ]
 
     def expected(rows):
         result = copy.deepcopy(rows)
@@ -39,10 +47,18 @@ def build_scenario(case, specification, initial_only=False):
             row["courserun_readable_id"] = "Example/Demo/2026"
         return result
 
-    snapshots = [[initial, incoming]] if initial_only else [[initial], [initial, incoming]]
+    snapshots = (
+        [[initial, incoming]]
+        if initial_only
+        else [[initial], [initial, incoming]]
+    )
     scenario["steps"] = [
         {
-            "name": "initial_snapshot" if initial_only else "initial" if index == 0 else "arrival",
+            "name": "initial_snapshot"
+            if initial_only
+            else "initial"
+            if index == 0
+            else "arrival",
             "inputs": {"activity": {"replace": {"rows": copy.deepcopy(rows)}}},
             "run": {"mode": "initial" if index == 0 else "incremental"},
             "expect": {"rows": expected(rows)},
@@ -70,14 +86,21 @@ def make_candidate(sources):
     return {
         "current_sha256": hashlib.sha256(original).hexdigest(),
         "boundary_candidate_sha256": hashlib.sha256(candidate).hexdigest(),
-        "replacement": {"before": predicate.decode(), "after": "and useractivity_timestamp >= ("},
+        "replacement": {
+            "before": predicate.decode(),
+            "after": "and useractivity_timestamp >= (",
+        },
     }
 
 
 def execute(root, config, sources, case, variant, specification):
-    revision = "boundary_candidate" if variant == "boundary_candidate" else "current"
+    revision = (
+        "boundary_candidate" if variant == "boundary_candidate" else "current"
+    )
     create_project(root, sources, revision, config, "unused")
-    scenario = build_scenario(case, specification, variant == "initial_snapshot")
+    scenario = build_scenario(
+        case, specification, variant == "initial_snapshot"
+    )
     write_yaml(root / "scenario.yml", scenario)
     report = run_scenario(
         load_scenario(root / "scenario.yml", root),
@@ -113,7 +136,10 @@ def validate(result, specification):
     for case, variants in result["cases"].items():
         if set(variants) != set(VARIANTS):
             raise RuntimeError("WATERMARK_VARIANTS_MISSING")
-        if variants["current"]["scenario_hash"] != variants["boundary_candidate"]["scenario_hash"]:
+        if (
+            variants["current"]["scenario_hash"]
+            != variants["boundary_candidate"]["scenario_hash"]
+        ):
             raise RuntimeError("WATERMARK_FIXTURES_DIFFER")
         for variant, report in variants.items():
             expected = specification["cases"][case]["expected"][variant]
@@ -146,7 +172,8 @@ def owned_schemas(config):
     with psycopg.connect(**config.connection_kwargs()) as connection:
         return set(
             connection.execute(
-                "SELECT nspname FROM pg_namespace WHERE pg_get_userbyid(nspowner)=current_user"
+                "SELECT nspname FROM pg_namespace WHERE "
+                "pg_get_userbyid(nspowner)=current_user"
             ).fetchall()
         )
 
@@ -157,14 +184,22 @@ def main():
     parser.add_argument("--fetch-only", action="store_true")
     parser.add_argument("--config", type=Path)
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--case", choices=["newer_event", "same_timestamp", "older_event"])
+    parser.add_argument(
+        "--case", choices=["newer_event", "same_timestamp", "older_event"]
+    )
     arguments = parser.parse_args()
     sources = arguments.sources_dir.resolve()
-    provenance = verified_sources(sources, arguments.fetch_only, ASSETS / "sources.json")
+    provenance = verified_sources(
+        sources, arguments.fetch_only, ASSETS / "sources.json"
+    )
     if arguments.fetch_only:
         print("Verified pinned current upstream model, macro and license")
         return
-    if not arguments.config or not arguments.output or arguments.output.exists():
+    if (
+        not arguments.config
+        or not arguments.output
+        or arguments.output.exists()
+    ):
         parser.error("execution requires --config and a new --output file")
     config = load_config(arguments.config)
     specification = read_yaml(ASSETS / "cases.yml")
@@ -200,7 +235,9 @@ def main():
     }
     arguments.output.parent.mkdir(parents=True, exist_ok=True)
     baseline = owned_schemas(config)
-    with tempfile.TemporaryDirectory(prefix="dbt-scenario-watermark-") as temporary:
+    with tempfile.TemporaryDirectory(
+        prefix="dbt-scenario-watermark-"
+    ) as temporary:
         temporary = Path(temporary)
         prepared = temporary / "sources"
         shutil.copytree(sources, prepared)
@@ -217,14 +254,20 @@ def main():
                     specification,
                 )
                 result["cases"][case][variant] = report
-                arguments.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
-                print(case + "/" + variant + ": " + report["status"], flush=True)
+                arguments.output.write_text(
+                    json.dumps(result, indent=2) + "\n", encoding="utf-8"
+                )
+                print(
+                    case + "/" + variant + ": " + report["status"], flush=True
+                )
     validate(result, specification)
     if owned_schemas(config) != baseline:
         raise RuntimeError("WATERMARK_SCHEMA_CLEANUP_MISMATCH")
     result["owned_schemas_unchanged"] = True
     result["complete"] = True
-    arguments.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    arguments.output.write_text(
+        json.dumps(result, indent=2) + "\n", encoding="utf-8"
+    )
 
 
 if __name__ == "__main__":
@@ -233,4 +276,6 @@ if __name__ == "__main__":
     except RuntimeError as error:
         raise SystemExit(str(error)) from None
     except Exception as error:
-        raise SystemExit("WATERMARK_EXECUTION_FAILED_" + type(error).__name__) from None
+        raise SystemExit(
+            "WATERMARK_EXECUTION_FAILED_" + type(error).__name__
+        ) from None

@@ -32,19 +32,31 @@ def invocation(tmp_path, monkeypatch):
             "invocation_started_at": now,
             "dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v12.json",
         }
-        manifest = {"metadata": metadata, "nodes": {}, "macros": {}, "sources": {}}
+        manifest = {
+            "metadata": metadata,
+            "nodes": {},
+            "macros": {},
+            "sources": {},
+        }
         results = {
             "metadata": {
                 **metadata,
                 "dbt_schema_version": "https://schemas.getdbt.com/dbt/run-results/v6.json",
             },
             "args": {"which": "run", "full_refresh": False},
-            "results": [{"unique_id": "model.shop.orders", "status": "success"}],
+            "results": [
+                {"unique_id": "model.shop.orders", "status": "success"}
+            ],
         }
         change["mutate"](manifest, results)
-        for name, payload in [("manifest.json", manifest), ("run_results.json", results)]:
+        for name, payload in [
+            ("manifest.json", manifest),
+            ("run_results.json", results),
+        ]:
             if payload is not None:
-                (directory / name).write_text(json.dumps(payload), encoding="utf-8")
+                (directory / name).write_text(
+                    json.dumps(payload), encoding="utf-8"
+                )
         for name in change.get("missing", []):
             (directory / name).unlink()
         for name in change.get("malformed", []):
@@ -59,7 +71,10 @@ def test_current_invocation_binds_manifest_and_results(invocation):
     project, _ = invocation
     manifest, directory = project.invoke("run", 10)
     results = project.read_run_results(directory)
-    assert results["metadata"]["invocation_id"] == manifest["metadata"]["invocation_id"]
+    assert (
+        results["metadata"]["invocation_id"]
+        == manifest["metadata"]["invocation_id"]
+    )
     successful_model_result(results, "model.shop.orders")
 
 
@@ -81,7 +96,9 @@ def test_broken_json_is_redacted(invocation, name):
 
 
 @pytest.mark.parametrize("kind", ["manifest", "results"])
-@pytest.mark.parametrize("field", ["invocation_id", "generated_at", "invocation_started_at"])
+@pytest.mark.parametrize(
+    "field", ["invocation_id", "generated_at", "invocation_started_at"]
+)
 def test_missing_metadata_cannot_verify_execution(invocation, kind, field):
     project, change = invocation
 
@@ -96,13 +113,17 @@ def test_missing_metadata_cannot_verify_execution(invocation, kind, field):
 
 @pytest.mark.parametrize("offset", [-86400, 86400])
 @pytest.mark.parametrize("kind", ["manifest", "results"])
-def test_artifact_times_must_belong_to_current_process(invocation, offset, kind):
+def test_artifact_times_must_belong_to_current_process(
+    invocation, offset, kind
+):
     project, change = invocation
 
     def mutate(manifest, results):
         payload = manifest if kind == "manifest" else results
         shifted = (datetime.now(UTC) + timedelta(seconds=offset)).isoformat()
-        payload["metadata"].update(generated_at=shifted, invocation_started_at=shifted)
+        payload["metadata"].update(
+            generated_at=shifted, invocation_started_at=shifted
+        )
 
     change["mutate"] = mutate
     with pytest.raises(ScenarioError, match="DBT_ARTIFACT_STALE"):
@@ -122,7 +143,9 @@ def test_replayed_invocation_is_rejected_even_with_rewritten_times(invocation):
     project, change = invocation
     manifest, _ = project.invoke("parse", 10)
     original = manifest["metadata"]["invocation_id"]
-    change["mutate"] = lambda manifest, results: manifest["metadata"].update(invocation_id=original)
+    change["mutate"] = lambda manifest, results: manifest["metadata"].update(
+        invocation_id=original
+    )
     with pytest.raises(ScenarioError, match="DBT_ARTIFACT_STALE"):
         project.invoke("parse", 10)
 
@@ -139,22 +162,30 @@ def test_artifacts_are_rechecked_before_assertions(invocation):
 
 
 @pytest.mark.parametrize("full_refresh", [True, 0, "false"])
-def test_unknown_or_forced_refresh_cannot_verify_incremental_run(invocation, full_refresh):
+def test_unknown_or_forced_refresh_cannot_verify_incremental_run(
+    invocation, full_refresh
+):
     project, change = invocation
-    change["mutate"] = lambda manifest, results: results["args"].update(full_refresh=full_refresh)
+    change["mutate"] = lambda manifest, results: results["args"].update(
+        full_refresh=full_refresh
+    )
     with pytest.raises(ScenarioError, match="EXECUTION_MODE_UNVERIFIED"):
         project.invoke("run", 10)
 
 
 def test_dbt_default_null_refresh_flag_is_supported(invocation):
     project, change = invocation
-    change["mutate"] = lambda manifest, results: results["args"].update(full_refresh=None)
+    change["mutate"] = lambda manifest, results: results["args"].update(
+        full_refresh=None
+    )
     project.invoke("run", 10)
 
 
 def test_dbt_omitted_default_refresh_flag_is_supported(invocation):
     project, change = invocation
-    change["mutate"] = lambda manifest, results: results["args"].pop("full_refresh")
+    change["mutate"] = lambda manifest, results: results["args"].pop(
+        "full_refresh"
+    )
     project.invoke("run", 10)
 
 
@@ -189,4 +220,6 @@ def test_nonzero_dbt_exit_overrides_successful_artifacts(invocation):
 )
 def test_exactly_one_successful_selected_model_is_required(results):
     with pytest.raises(ScenarioError, match="DBT_MODEL_NOT_SUCCESSFUL"):
-        successful_model_result({"results": copy.deepcopy(results)}, "model.shop.orders")
+        successful_model_result(
+            {"results": copy.deepcopy(results)}, "model.shop.orders"
+        )

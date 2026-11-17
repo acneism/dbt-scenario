@@ -12,7 +12,9 @@ def resource_limits(root=Path("/sys/fs/cgroup")):
     except (OSError, ValueError, ZeroDivisionError):
         return {"verified": False, "mechanism": "unavailable"}
     return {
-        "verified": cpu_limit == 2 and memory_limit == 8 * 1024**3 and swap_limit == 0,
+        "verified": cpu_limit == 2
+        and memory_limit == 8 * 1024**3
+        and swap_limit == 0,
         "mechanism": "linux_cgroup_v2",
         "cpu_max": f"{quota} {period}",
         "cpu_limit": cpu_limit,

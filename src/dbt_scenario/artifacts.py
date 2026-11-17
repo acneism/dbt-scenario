@@ -8,7 +8,9 @@ from dbt_scenario.errors import ScenarioError
 
 def read_artifact(artifact_dir: Path, name: str) -> dict:
     try:
-        payload = json.loads((artifact_dir / "target" / name).read_text(encoding="utf-8"))
+        payload = json.loads(
+            (artifact_dir / "target" / name).read_text(encoding="utf-8")
+        )
     except OSError:
         raise ScenarioError("DBT_ARTIFACT_MISSING") from None
     except (ValueError, UnicodeError):
@@ -48,7 +50,9 @@ def validate_metadata(payload, kind, started, finished, expected_id=None):
 
 def successful_model_result(payload, model_id):
     results = payload.get("results")
-    if not isinstance(results, list) or any(not isinstance(entry, dict) for entry in results):
+    if not isinstance(results, list) or any(
+        not isinstance(entry, dict) for entry in results
+    ):
         raise ScenarioError("DBT_ARTIFACT_INVALID")
     if (
         len(results) != 1

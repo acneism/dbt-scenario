@@ -11,7 +11,9 @@ class Deadline:
         self.parent = parent
 
     def remaining(self) -> float:
-        parent_remaining = self.parent.remaining() if self.parent else float("inf")
+        parent_remaining = (
+            self.parent.remaining() if self.parent else float("inf")
+        )
         remaining = self.expires - time.monotonic()
         if remaining <= 0:
             raise ScenarioError(self.reason)

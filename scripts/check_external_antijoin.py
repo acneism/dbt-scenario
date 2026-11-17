@@ -42,8 +42,12 @@ def build_scenario(template, case, fixtures):
     else:
         arrival = [*initial, fixtures["late_lower_key"]]
     expected = initial if case == "existing_key_immutable" else arrival
-    for index, (rows, target) in enumerate([(initial, initial), (arrival, expected)]):
-        scenario["steps"][index]["inputs"]["input_1"]["replace"]["rows"] = copy.deepcopy(rows)
+    for index, (rows, target) in enumerate(
+        [(initial, initial), (arrival, expected)]
+    ):
+        scenario["steps"][index]["inputs"]["input_1"]["replace"]["rows"] = (
+            copy.deepcopy(rows)
+        )
         scenario["steps"][index]["expect"]["rows"] = copy.deepcopy(target)
     return scenario
 
@@ -63,7 +67,10 @@ def prepare_project(root, sources, config, fixtures):
     }
     for name, relative in destinations.items():
         shutil.copyfile(sources / name, project / relative)
-    declarations = [{"name": name, "data_type": kind} for name, kind in fixtures["columns"].items()]
+    declarations = [
+        {"name": name, "data_type": kind}
+        for name, kind in fixtures["columns"].items()
+    ]
     write_yaml(
         project / "models/scenario_columns.yml",
         {
@@ -105,7 +112,9 @@ def prepare_project(root, sources, config, fixtures):
             load_scenario(template_path, project)
         except ScenarioError as error:
             if error.code != "UNFILLED_TEMPLATE_ROWS":
-                raise RuntimeError("ANTIJOIN_TEMPLATE_DIAGNOSTIC_MISMATCH") from None
+                raise RuntimeError(
+                    "ANTIJOIN_TEMPLATE_DIAGNOSTIC_MISMATCH"
+                ) from None
         else:
             raise RuntimeError("ANTIJOIN_TEMPLATE_MUST_REQUIRE_ROWS")
         paths = {}
@@ -119,7 +128,9 @@ def prepare_project(root, sources, config, fixtures):
 
 def validate_report(report, case):
     status, counts = CASES[case]
-    expected_statuses = ["PASS", "FAIL", "NOT_RUN"] if status == "FAIL" else ["PASS"] * 3
+    expected_statuses = (
+        ["PASS", "FAIL", "NOT_RUN"] if status == "FAIL" else ["PASS"] * 3
+    )
     if (
         report["overall_status"] != status
         or report["reason_code"] is not None
@@ -134,7 +145,9 @@ def validate_report(report, case):
                 raise RuntimeError("ANTIJOIN_RETRY_NOT_SKIPPED")
             continue
         failed = step["status"] == "FAIL"
-        if step["reason_code"] != ("ROWS_MISMATCH" if failed else None) or step["diff_counts"] != {
+        if step["reason_code"] != ("ROWS_MISMATCH" if failed else None) or step[
+            "diff_counts"
+        ] != {
             "missing": 0,
             "unexpected": 0,
             "changed": int(failed),
@@ -143,7 +156,8 @@ def validate_report(report, case):
         evidence = step.get("observed_mode_evidence", {})
         if (
             step["sql_audit"]["status"] != "PASS"
-            or evidence.get("operation") != ("create_table" if index == 0 else "delete+insert")
+            or evidence.get("operation")
+            != ("create_table" if index == 0 else "delete+insert")
             or len(evidence.get("statement_sha256", "")) != 64
         ):
             raise RuntimeError("ANTIJOIN_EXECUTION_EVIDENCE_MISSING")
@@ -163,7 +177,11 @@ def main():
     if arguments.fetch_only:
         print("Verified pinned anti-join model and MIT license", flush=True)
         return
-    if not arguments.config or not arguments.output or arguments.output.exists():
+    if (
+        not arguments.config
+        or not arguments.output
+        or arguments.output.exists()
+    ):
         parser.error("execution requires --config and a new --output file")
     config = load_config(arguments.config)
     fixtures = read_yaml(ASSETS / "fixtures.yml")
@@ -175,7 +193,9 @@ def main():
         "package_version": __version__,
         "python_version": sys.version.split()[0],
         "started_at": datetime.now(UTC).isoformat(),
-        "check_script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "check_script_sha256": hashlib.sha256(
+            Path(__file__).read_bytes()
+        ).hexdigest(),
         "upstream": provenance,
         "fixture_specification_sha256": hashlib.sha256(
             (ASSETS / "fixtures.yml").read_bytes()
@@ -190,7 +210,10 @@ def main():
             "upstream_staging_and_enrichment_executed": False,
             "schema_declarations_added": True,
             "fixture_schema_verified_against_upstream_catalog": False,
-            "metadata_and_definition_checks_without_password_database_or_subprocess": True,
+            (
+                "metadata_and_definition_checks_without_password_database_or_"
+                "subprocess"
+            ): True,
             "update_required_is_a_conditional_business_expectation": True,
             "upstream_mutability_contract_verified": False,
             "native_upstream_tests_executed": False,
@@ -199,7 +222,9 @@ def main():
     }
     arguments.output.parent.mkdir(parents=True, exist_ok=True)
     baseline = owned_schemas(config)
-    with tempfile.TemporaryDirectory(prefix="dbt-scenario-antijoin-") as temporary:
+    with tempfile.TemporaryDirectory(
+        prefix="dbt-scenario-antijoin-"
+    ) as temporary:
         root = Path(temporary)
         prepared, paths, destinations, parse_invocation = prepare_project(
             root, arguments.sources_dir, config, fixtures
@@ -207,7 +232,9 @@ def main():
         result["metadata_parse_invocation_id"] = parse_invocation
         for case, path in paths.items():
             report = run_scenario(
-                load_scenario(path, prepared.project_dir), prepared, root / "reports"
+                load_scenario(path, prepared.project_dir),
+                prepared,
+                root / "reports",
             )
             result["cases"][case] = {
                 key: report[key]
@@ -220,7 +247,9 @@ def main():
                     "steps",
                 ]
             }
-            arguments.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+            arguments.output.write_text(
+                json.dumps(result, indent=2) + "\n", encoding="utf-8"
+            )
             validate_report(result["cases"][case], case)
             print(case + ": " + report["overall_status"], flush=True)
         for name, relative in destinations.items():
@@ -234,10 +263,16 @@ def main():
         for step in report["steps"]
         if step["status"] != "NOT_RUN"
     ]
-    if len(identifiers) != 11 or len(set(identifiers)) != 11 or owned_schemas(config) != baseline:
+    if (
+        len(identifiers) != 11
+        or len(set(identifiers)) != 11
+        or owned_schemas(config) != baseline
+    ):
         raise RuntimeError("ANTIJOIN_INVOCATION_OR_CLEANUP_MISMATCH")
     result.update(status="PASS", complete=True, owned_schemas_unchanged=True)
-    arguments.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    arguments.output.write_text(
+        json.dumps(result, indent=2) + "\n", encoding="utf-8"
+    )
 
 
 if __name__ == "__main__":
@@ -246,4 +281,6 @@ if __name__ == "__main__":
     except RuntimeError as error:
         raise SystemExit(str(error)) from None
     except Exception as error:
-        raise SystemExit("EXTERNAL_ANTIJOIN_CHECK_FAILED_" + type(error).__name__) from None
+        raise SystemExit(
+            "EXTERNAL_ANTIJOIN_CHECK_FAILED_" + type(error).__name__
+        ) from None

@@ -26,7 +26,9 @@ PROJECT = ROOT / "examples/shop"
         "+.125e2",
     ],
 )
-def test_native_numeric_preserves_exact_finite_values_without_context_rounding(value):
+def test_native_numeric_preserves_exact_finite_values_without_context_rounding(
+    value,
+):
     with localcontext() as context:
         context.prec = 2
         context.Emax = 9
@@ -66,16 +68,24 @@ def test_native_numeric_preserves_exact_finite_values_without_context_rounding(v
         "synthetic.private@example.invalid",
     ],
 )
-def test_native_numeric_rejects_ambiguous_nonfinite_or_out_of_range_values(value):
+def test_native_numeric_rejects_ambiguous_nonfinite_or_out_of_range_values(
+    value,
+):
     with pytest.raises(ScenarioError, match="INVALID_TYPED_VALUE"):
         converted(value, "numeric")
 
 
-def test_native_numeric_expected_keys_use_value_equality_not_decimal_spelling(tmp_path):
-    data = copy.deepcopy(load_scenario(PROJECT / "scenarios/orders.yml", PROJECT).data)
+def test_native_numeric_expected_keys_use_value_equality_not_decimal_spelling(
+    tmp_path,
+):
+    data = copy.deepcopy(
+        load_scenario(PROJECT / "scenarios/orders.yml", PROJECT).data
+    )
     data["output"] = {"columns": {"key": "numeric"}, "primary_key": ["key"]}
     data["steps"] = [data["steps"][0]]
-    data["steps"][0]["expect"] = {"rows": [{"key": "1e-100"}, {"key": "10e-101"}]}
+    data["steps"][0]["expect"] = {
+        "rows": [{"key": "1e-100"}, {"key": "10e-101"}]
+    }
     path = tmp_path / "scenario.yml"
     path.write_text(yaml.safe_dump(data), encoding="utf-8")
     with pytest.raises(ScenarioError, match="INVALID_EXPECTED_KEY"):

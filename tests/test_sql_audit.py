@@ -14,9 +14,11 @@ ALLOWED = {("fixtures", "input_0"), ("actual", "result")}
         "select * from fixtures.input_0",
         'select * from "test_db"."fixtures"."input_0"',
         "select * from FIXTURES.INPUT_0",
-        "with input_0 as (select * from fixtures.input_0) select * from input_0",
+        "with input_0 as (select * from fixtures.input_0) select * from "
+        "input_0",
         "with i as (select * from fixtures.input_0) select * from I",
-        "with recursive i as (select 1 n union all select n+1 from i where n<3) select * from i",
+        "with recursive i as (select 1 n union all select n+1 from i where "
+        "n<3) select * from i",
         "select * from fixtures.input_0 a where exists "
         "(select 1 from actual.result b where a.id=b.id)",
         "select * from fixtures.input_0 union all select * from actual.result",
@@ -39,9 +41,12 @@ def test_audit_allows_fixture_target_and_scoped_queries(query):
         "select * from production",
         "select * from other_db.fixtures.input_0",
         "with i as (select * from external.events) select * from i",
-        "with unused as (select * from external.events) select * from fixtures.input_0",
-        "select * from fixtures.input_0 where exists (select 1 from external.events)",
-        "select * from fixtures.input_0 union all select * from external.events",
+        "with unused as (select * from external.events) select * from "
+        "fixtures.input_0",
+        "select * from fixtures.input_0 where exists (select 1 from "
+        "external.events)",
+        "select * from fixtures.input_0 union all select * from "
+        "external.events",
         "with input_0 as (select 1) select * from external.input_0",
         'select * from "Fixtures"."input_0"',
         'select * from fixtures."INPUT_0"',
@@ -76,7 +81,8 @@ def test_unknown_writing_locking_or_dynamic_table_sql_is_rejected(query):
 
 
 @pytest.mark.parametrize(
-    "query", ["vacuum synthetic_private_data", "select 'synthetic_private_data' ("]
+    "query",
+    ["vacuum synthetic_private_data", "select 'synthetic_private_data' ("],
 )
 def test_parser_errors_do_not_log_sql(query, caplog, capsys):
     with pytest.raises(ScenarioError) as error:
@@ -89,4 +95,6 @@ def test_parser_errors_do_not_log_sql(query, caplog, capsys):
 
 def test_target_is_not_an_initial_input():
     with pytest.raises(ScenarioError, match="SQL_EXTERNAL_RELATION"):
-        audit_sql("select * from actual.result", "test_db", {("fixtures", "input_0")})
+        audit_sql(
+            "select * from actual.result", "test_db", {("fixtures", "input_0")}
+        )

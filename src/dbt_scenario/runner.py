@@ -57,25 +57,39 @@ def observe_mode(
         raise ScenarioError("TARGET_REBUILT")
     results = project.read_run_results(artifact_dir)
     successful_model_result(results, node["unique_id"])
-    run_path = artifact_dir / "target" / "run" / node["package_name"] / node["original_file_path"]
+    run_path = (
+        artifact_dir
+        / "target"
+        / "run"
+        / node["package_name"]
+        / node["original_file_path"]
+    )
     try:
         statement = run_path.read_text(encoding="utf-8")
     except OSError:
         raise ScenarioError("EXECUTION_MODE_UNVERIFIED") from None
-    normalized = re.sub(r"\s+", " ", sqlparse.format(statement, strip_comments=True)).lower()
+    normalized = re.sub(
+        r"\s+", " ", sqlparse.format(statement, strip_comments=True)
+    ).lower()
     if mode == "initial":
         operation = "create_table"
-        verified = bool(re.search(r"\bcreate\s+(?:unlogged\s+)?table\b", normalized))
+        verified = bool(
+            re.search(r"\bcreate\s+(?:unlogged\s+)?table\b", normalized)
+        )
     else:
         strategy = node["config"].get("incremental_strategy")
-        strategy = strategy or ("delete+insert" if node["config"].get("unique_key") else "append")
+        strategy = strategy or (
+            "delete+insert" if node["config"].get("unique_key") else "append"
+        )
         patterns = {
             "append": [r"\binsert\s+into\b"],
             "delete+insert": [r"\bdelete\s+from\b", r"\binsert\s+into\b"],
             "merge": [r"\bmerge\s+into\b"],
         }
         operation = strategy
-        verified = all(re.search(pattern, normalized) for pattern in patterns[strategy])
+        verified = all(
+            re.search(pattern, normalized) for pattern in patterns[strategy]
+        )
     if not verified:
         raise ScenarioError("EXECUTION_MODE_UNVERIFIED")
     return {
@@ -237,7 +251,9 @@ def initialize_report(
         "project_env_names": sorted(config.project_env),
         "started_at": datetime.now(UTC).isoformat(),
         "duration_ms": 0,
-        "engine_versions": {name: version(name) for name in ["dbt-core", "dbt-postgres"]},
+        "engine_versions": {
+            name: version(name) for name in ["dbt-core", "dbt-postgres"]
+        },
         "overall_status": "ERROR",
         "cleanup_status": "NOT_NEEDED",
         "cleanup_reason_code": None,
@@ -305,7 +321,9 @@ def run_scenario(
     try:
         with tempfile.TemporaryDirectory(prefix="dbt-scenario-") as temporary:
             database = Database(config, scenario_budget)
-            report["engine_versions"]["postgresql"] = database.connection.info.server_version
+            report["engine_versions"]["postgresql"] = (
+                database.connection.info.server_version
+            )
             with database.budget(scenario_budget):
                 project = Project(config, Path(temporary), actual_schema)
                 report["project_hash"] = project.project_hash
@@ -333,14 +351,19 @@ def run_scenario(
                 )
                 report["steps"].append(current_step)
                 step_started = time.monotonic()
-                step_budget = Deadline(config.step_timeout, "STEP_TIMEOUT", scenario_budget)
+                step_budget = Deadline(
+                    config.step_timeout, "STEP_TIMEOUT", scenario_budget
+                )
                 execution.execute(index, step, step_budget, current_step)
-                current_step["duration_ms"] = round((time.monotonic() - step_started) * 1000)
+                current_step["duration_ms"] = round(
+                    (time.monotonic() - step_started) * 1000
+                )
                 if current_step["status"] != "PASS":
                     break
             report["overall_status"] = (
                 "PASS"
-                if report["steps"] and all(s["status"] == "PASS" for s in report["steps"])
+                if report["steps"]
+                and all(s["status"] == "PASS" for s in report["steps"])
                 else "FAIL"
             )
             stage = "workspace_cleanup"
@@ -357,8 +380,12 @@ def run_scenario(
         if report["reason_code"]:
             report["overall_status"] = "ERROR"
             if current_step:
-                current_step.update(status="ERROR", reason_code=report["reason_code"])
-                current_step["duration_ms"] = round((time.monotonic() - step_started) * 1000)
+                current_step.update(
+                    status="ERROR", reason_code=report["reason_code"]
+                )
+                current_step["duration_ms"] = round(
+                    (time.monotonic() - step_started) * 1000
+                )
         if database:
             try:
                 if journal:

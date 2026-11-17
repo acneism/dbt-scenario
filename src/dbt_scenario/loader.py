@@ -15,10 +15,13 @@ from jsonschema import Draft202012Validator
 from dbt_scenario.errors import ScenarioError
 
 TYPE_PATTERN = re.compile(
-    r"^(bigint|integer|text|boolean|date|timestamp|timestamptz|double precision|"
+    r"^(bigint|integer|text|boolean|date|timestamp|timestamptz|double "
+    r"precision|"
     r"numeric(?:\(([1-9]\d?),([0-9]\d?)\))?)$"
 )
-DECIMAL_PATTERN = re.compile(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
+DECIMAL_PATTERN = re.compile(
+    r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?"
+)
 YAML_BASE = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
 
 
@@ -27,7 +30,9 @@ class StrictLoader(YAML_BASE):
         if self.check_event(yaml.AliasEvent):
             mark = self.peek_event().start_mark
             raise ScenarioError(
-                "YAML_ALIAS_UNSUPPORTED", line=mark.line + 1, column=mark.column + 1
+                "YAML_ALIAS_UNSUPPORTED",
+                line=mark.line + 1,
+                column=mark.column + 1,
             )
         return super().compose_node(parent, index)
 
@@ -40,7 +45,9 @@ class StrictLoader(YAML_BASE):
                     if key in seen:
                         mark = key_node.start_mark
                         raise ScenarioError(
-                            "DUPLICATE_YAML_KEY", line=mark.line + 1, column=mark.column + 1
+                            "DUPLICATE_YAML_KEY",
+                            line=mark.line + 1,
+                            column=mark.column + 1,
                         )
                     seen.add(key)
         except TypeError:
@@ -49,7 +56,11 @@ class StrictLoader(YAML_BASE):
 
 
 StrictLoader.yaml_implicit_resolvers = {
-    key: [(tag, rx) for tag, rx in resolvers if tag != "tag:yaml.org,2002:timestamp"]
+    key: [
+        (tag, rx)
+        for tag, rx in resolvers
+        if tag != "tag:yaml.org,2002:timestamp"
+    ]
     for key, resolvers in YAML_BASE.yaml_implicit_resolvers.items()
 }
 
@@ -67,13 +78,19 @@ def read_yaml_document(path: Path):
             if isinstance(event, yaml.AliasEvent):
                 mark = event.start_mark
                 raise ScenarioError(
-                    "YAML_ALIAS_UNSUPPORTED", line=mark.line + 1, column=mark.column + 1
+                    "YAML_ALIAS_UNSUPPORTED",
+                    line=mark.line + 1,
+                    column=mark.column + 1,
                 )
-            if isinstance(event, (yaml.MappingStartEvent, yaml.SequenceStartEvent)):
+            if isinstance(
+                event, (yaml.MappingStartEvent, yaml.SequenceStartEvent)
+            ):
                 depth += 1
                 if depth > 128:
                     raise ScenarioError("YAML_NESTING_LIMIT")
-            elif isinstance(event, (yaml.MappingEndEvent, yaml.SequenceEndEvent)):
+            elif isinstance(
+                event, (yaml.MappingEndEvent, yaml.SequenceEndEvent)
+            ):
                 depth -= 1
         payload = yaml.load(text, Loader=StrictLoader)
     except (yaml.YAMLError, UnicodeError, RecursionError) as error:
@@ -115,7 +132,9 @@ def converted(value, kind: str):
             if DECIMAL_PATTERN.fullmatch(value):
                 number = Decimal(value)
                 floating = float(value)
-                if math.isfinite(floating) and (floating != 0.0 or number.is_zero()):
+                if math.isfinite(floating) and (
+                    floating != 0.0 or number.is_zero()
+                ):
                     return floating
         elif kind == "numeric" and isinstance(value, str):
             if DECIMAL_PATTERN.fullmatch(value):
@@ -129,7 +148,9 @@ def converted(value, kind: str):
         elif kind.startswith("numeric") and isinstance(value, str):
             number = Decimal(value)
             precision, scale = map(int, re.findall(r"\d+", kind))
-            if number.is_finite() and number.copy_abs() < 10 ** (precision - scale):
+            if number.is_finite() and number.copy_abs() < 10 ** (
+                precision - scale
+            ):
                 with localcontext(Context(prec=precision + 2)):
                     quantum = Decimal(1).scaleb(-scale)
                     if number == number.quantize(quantum):
@@ -178,13 +199,17 @@ def typed_rows(rows: list, columns: dict, location=()) -> list[tuple]:
     result = []
     for index, row in enumerate(rows):
         if not isinstance(row, dict) or row.keys() != columns.keys():
-            raise ScenarioError("FIXTURE_COLUMNS_MISMATCH", location=(*location, index))
+            raise ScenarioError(
+                "FIXTURE_COLUMNS_MISMATCH", location=(*location, index)
+            )
         values = []
         for name, kind in columns.items():
             try:
                 values.append(converted(row[name], kind))
             except ScenarioError as error:
-                raise ScenarioError(error.code, location=(*location, index, name)) from None
+                raise ScenarioError(
+                    error.code, location=(*location, index, name)
+                ) from None
         result.append(tuple(values))
     return result
 
@@ -230,7 +255,9 @@ class Scenario:
 
 
 def validate_scenario_schema(data) -> None:
-    schema = json.loads(files("dbt_scenario").joinpath("scenario.schema.json").read_text())
+    schema = json.loads(
+        files("dbt_scenario").joinpath("scenario.schema.json").read_text()
+    )
     error = next(Draft202012Validator(schema).iter_errors(data), None)
     if error:
         unfinished = unfinished_rows_error(error)
@@ -238,7 +265,11 @@ def validate_scenario_schema(data) -> None:
             raise ScenarioError("UNFILLED_TEMPLATE_ROWS", location=unfinished)
         location = tuple(error.absolute_path)
         if error.validator == "required" and isinstance(error.instance, dict):
-            missing = next(key for key in error.validator_value if key not in error.instance)
+            missing = next(
+                key
+                for key in error.validator_value
+                if key not in error.instance
+            )
             location = (*location, missing)
         raise ScenarioError("INVALID_SCENARIO_SCHEMA", location=location)
 
@@ -266,7 +297,9 @@ class FixtureReader:
                 if not isinstance(payload, dict) or set(payload) != {"rows"}:
                     raise ScenarioError("INVALID_FIXTURE_FILE")
                 self.cache[target] = payload
-                self.hashes[target.relative_to(self.root).as_posix()] = fingerprint
+                self.hashes[target.relative_to(self.root).as_posix()] = (
+                    fingerprint
+                )
             fixture["rows"] = copy.deepcopy(self.cache[target]["rows"])
             del fixture["fixture"]
         rows = fixture["rows"]
@@ -281,16 +314,28 @@ class FixtureReader:
 
 
 def validate_columns(data: dict) -> None:
-    definitions = [("inputs", name, definition) for name, definition in data["inputs"].items()]
+    definitions = [
+        ("inputs", name, definition)
+        for name, definition in data["inputs"].items()
+    ]
     definitions.append(("output", data["output"]))
     for *prefix, definition in definitions:
         for name, kind in definition["columns"].items():
-            if not isinstance(name, str) or not name or "\x00" in name or len(name.encode()) > 63:
-                raise ScenarioError("INVALID_COLUMN_NAME", location=(*prefix, "columns"))
+            if (
+                not isinstance(name, str)
+                or not name
+                or "\x00" in name
+                or len(name.encode()) > 63
+            ):
+                raise ScenarioError(
+                    "INVALID_COLUMN_NAME", location=(*prefix, "columns")
+                )
             try:
                 sql_type(kind)
             except ScenarioError as error:
-                raise ScenarioError(error.code, location=(*prefix, "columns", name)) from None
+                raise ScenarioError(
+                    error.code, location=(*prefix, "columns", name)
+                ) from None
 
 
 def validate_steps(data: dict, fixtures: FixtureReader) -> None:
@@ -312,7 +357,9 @@ def validate_steps(data: dict, fixtures: FixtureReader) -> None:
         if step["name"] in seen:
             raise ScenarioError("DUPLICATE_STEP_NAME")
         if step["run"]["mode"] != ("initial" if index == 0 else "incremental"):
-            raise ScenarioError("INVALID_STEP_ORDER", location=("steps", index, "run", "mode"))
+            raise ScenarioError(
+                "INVALID_STEP_ORDER", location=("steps", index, "run", "mode")
+            )
         for name, update in step.get("inputs", {}).items():
             if name not in data["inputs"]:
                 raise ScenarioError("UNKNOWN_INPUT")
@@ -323,12 +370,15 @@ def validate_steps(data: dict, fixtures: FixtureReader) -> None:
             )
             initialized.add(name)
         if initialized != data["inputs"].keys():
-            raise ScenarioError("UNINITIALIZED_INPUT", location=("steps", index, "inputs"))
+            raise ScenarioError(
+                "UNINITIALIZED_INPUT", location=("steps", index, "inputs")
+            )
         expected = step["expect"]
         if "same_as" in expected:
             if expected["same_as"] not in seen:
                 raise ScenarioError(
-                    "INVALID_SAME_AS_REFERENCE", location=("steps", index, "expect", "same_as")
+                    "INVALID_SAME_AS_REFERENCE",
+                    location=("steps", index, "expect", "same_as"),
                 )
         else:
             rows = fixtures.prepare(
@@ -337,9 +387,12 @@ def validate_steps(data: dict, fixtures: FixtureReader) -> None:
                 ("steps", index, "expect", "rows"),
             )
             identities = [tuple(row[i] for i in key_indexes) for row in rows]
-            if any(None in key for key in identities) or len(set(identities)) != len(identities):
+            if any(None in key for key in identities) or len(
+                set(identities)
+            ) != len(identities):
                 raise ScenarioError(
-                    "INVALID_EXPECTED_KEY", location=("steps", index, "expect", "rows")
+                    "INVALID_EXPECTED_KEY",
+                    location=("steps", index, "expect", "rows"),
                 )
         seen.add(step["name"])
 
@@ -358,7 +411,9 @@ def load_scenario(path: Path, project_dir: Path) -> Scenario:
         raise ScenarioError("INVALID_PRIMARY_KEY")
     fixtures = FixtureReader(path, root)
     validate_steps(data, fixtures)
-    canonical = json.dumps(data, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    canonical = json.dumps(
+        data, sort_keys=True, separators=(",", ":"), allow_nan=False
+    )
     return Scenario(
         data,
         path,

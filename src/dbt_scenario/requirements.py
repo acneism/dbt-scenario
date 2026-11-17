@@ -26,7 +26,8 @@ def check_project_macros(macros):
         if macro["package_name"] in {"dbt", "dbt_postgres"}:
             continue
         if macro["name"] in reserved or any(
-            text in macro["name"] for text in ["get_incremental_", "materialization_"]
+            text in macro["name"]
+            for text in ["get_incremental_", "materialization_"]
         ):
             raise ScenarioError("CUSTOM_MACRO_UNSUPPORTED")
 
@@ -34,19 +35,30 @@ def check_project_macros(macros):
 def check_model_config(config):
     if not isinstance(config, dict):
         raise ScenarioError("MODEL_CONFIG_UNSUPPORTED")
-    if config.get("materialized") != "incremental" or config.get("full_refresh") is True:
+    if (
+        config.get("materialized") != "incremental"
+        or config.get("full_refresh") is True
+    ):
         raise ScenarioError("UNSUPPORTED_MATERIALIZATION")
     strategy = config.get("incremental_strategy")
-    if (strategy is not None and not isinstance(strategy, str)) or strategy not in {
+    if (
+        strategy is not None and not isinstance(strategy, str)
+    ) or strategy not in {
         None,
         "append",
         "merge",
         "delete+insert",
     }:
         raise ScenarioError("UNSUPPORTED_INCREMENTAL_STRATEGY")
-    if any(config.get(name) for name in ["pre-hook", "post-hook", "grants", "persist_docs"]):
+    if any(
+        config.get(name)
+        for name in ["pre-hook", "post-hook", "grants", "persist_docs"]
+    ):
         raise ScenarioError("MODEL_HOOKS_UNSUPPORTED")
-    if any(config.get(name) for name in ["incremental_predicates", "predicates", "sql_header"]):
+    if any(
+        config.get(name)
+        for name in ["incremental_predicates", "predicates", "sql_header"]
+    ):
         raise ScenarioError("MODEL_SQL_CONFIG_UNSUPPORTED")
     contract = config.get("contract", {})
     if (
@@ -74,7 +86,10 @@ def project_settings(project_dir: Path) -> dict:
 def check_dependencies(project_dir: Path, settings: dict):
     declarations = [
         path
-        for path in [project_dir / "packages.yml", project_dir / "dependencies.yml"]
+        for path in [
+            project_dir / "packages.yml",
+            project_dir / "dependencies.yml",
+        ]
         if path.is_file()
     ]
     if len(declarations) > 1:
@@ -85,7 +100,9 @@ def check_dependencies(project_dir: Path, settings: dict):
     if not isinstance(document, dict) or document.get("projects"):
         raise ScenarioError("INVALID_DEPENDENCIES_CONFIG")
     packages = document.get("packages", [])
-    if not isinstance(packages, list) or any(not isinstance(item, dict) for item in packages):
+    if not isinstance(packages, list) or any(
+        not isinstance(item, dict) for item in packages
+    ):
         raise ScenarioError("INVALID_DEPENDENCIES_CONFIG")
     if not packages:
         return
@@ -120,5 +137,8 @@ def check_dependencies(project_dir: Path, settings: dict):
         raise ScenarioError("DEPENDENCIES_NOT_INSTALLED")
     for item in packages:
         package = item.get("package")
-        if isinstance(package, str) and package.rsplit("/", 1)[-1] not in installed:
+        if (
+            isinstance(package, str)
+            and package.rsplit("/", 1)[-1] not in installed
+        ):
             raise ScenarioError("DEPENDENCIES_NOT_INSTALLED")

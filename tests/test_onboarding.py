@@ -20,7 +20,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @pytest.fixture
 def existing_project(tmp_path):
-    (tmp_path / "dbt_project.yml").write_text("name: analytics\nconfig-version: 2\n")
+    (tmp_path / "dbt_project.yml").write_text(
+        "name: analytics\nconfig-version: 2\n"
+    )
     (tmp_path / "models").mkdir()
     (tmp_path / "models" / "untouched.sql").write_text("select 1 as id\n")
     return tmp_path
@@ -41,7 +43,9 @@ def save_config(project, document):
 def test_demo_initializes_without_passwords_or_database(tmp_path, monkeypatch):
     monkeypatch.delenv("DSC_TEST_PASSWORD", raising=False)
     target = tmp_path / "demo"
-    result = CliRunner().invoke(main, ["init", "--demo", "--project-dir", str(target)])
+    result = CliRunner().invoke(
+        main, ["init", "--demo", "--project-dir", str(target)]
+    )
     assert result.exit_code == 0, result.output
     scenario = load_scenario(
         target / "examples/shop/scenarios/orders.yml", target / "examples/shop"
@@ -56,11 +60,18 @@ def test_initializing_existing_project_keeps_model_sql(existing_project):
     before = (existing_project / "models" / "untouched.sql").read_bytes()
     created = initialize(existing_project)
     assert created == ["scenario-runner.yml", "scenarios/example.yml"]
-    scenario = load_scenario(existing_project / "scenarios/example.yml", existing_project)
+    scenario = load_scenario(
+        existing_project / "scenarios/example.yml", existing_project
+    )
     assert scenario.data["model"] == "model.analytics.replace_with_your_model"
-    assert (existing_project / "models" / "untouched.sql").read_bytes() == before
     assert (
-        yaml.safe_load((existing_project / "scenario-runner.yml").read_text())["project_dir"] == "."
+        existing_project / "models" / "untouched.sql"
+    ).read_bytes() == before
+    assert (
+        yaml.safe_load((existing_project / "scenario-runner.yml").read_text())[
+            "project_dir"
+        ]
+        == "."
     )
 
 
@@ -83,7 +94,9 @@ def test_init_checks_all_collisions_before_writing(existing_project):
     assert (directory / "example.yml").read_text() == "user scenario"
 
 
-def test_init_rolls_back_files_created_before_an_io_error(existing_project, monkeypatch):
+def test_init_rolls_back_files_created_before_an_io_error(
+    existing_project, monkeypatch
+):
     original = Path.open
 
     def fail_second_file(path, mode="r", *args, **kwargs):
@@ -96,14 +109,18 @@ def test_init_rolls_back_files_created_before_an_io_error(existing_project, monk
         initialize(existing_project)
     assert not (existing_project / "scenario-runner.yml").exists()
     assert not (existing_project / "scenarios").exists()
-    assert (existing_project / "models/untouched.sql").read_text() == "select 1 as id\n"
+    assert (
+        existing_project / "models/untouched.sql"
+    ).read_text() == "select 1 as id\n"
 
 
 def test_init_rejects_symlinked_output(existing_project, tmp_path):
     outside = tmp_path / "outside"
     outside.mkdir()
     try:
-        (existing_project / "scenarios").symlink_to(outside, target_is_directory=True)
+        (existing_project / "scenarios").symlink_to(
+            outside, target_is_directory=True
+        )
     except OSError:
         pytest.skip("symlink creation is unavailable")
     with pytest.raises(ScenarioError, match="INIT_UNSAFE_PATH"):
@@ -127,7 +144,9 @@ def test_init_rejects_symlinked_output(existing_project, tmp_path):
         "bad-name",
     ],
 )
-def test_config_rejects_runtime_control_variables(existing_project, monkeypatch, name):
+def test_config_rejects_runtime_control_variables(
+    existing_project, monkeypatch, name
+):
     monkeypatch.setenv("DSC_TEST_PASSWORD", "test-only-password")
     document = example_config(existing_project)
     document["env_allowlist"] = [name]
@@ -135,14 +154,18 @@ def test_config_rejects_runtime_control_variables(existing_project, monkeypatch,
         load_config(save_config(existing_project, document))
 
 
-def test_environment_only_forwards_explicit_project_variables(existing_project, monkeypatch):
+def test_environment_only_forwards_explicit_project_variables(
+    existing_project, monkeypatch
+):
     monkeypatch.setenv("DSC_TEST_PASSWORD", "private-db-password")
     monkeypatch.setenv("PROJECT_REGION", "synthetic-region-value")
     monkeypatch.setenv("UNLISTED_PRIVATE_VALUE", "never-forward-me")
     document = example_config(existing_project)
     document["env_allowlist"] = ["PROJECT_REGION"]
     config = load_config(save_config(existing_project, document))
-    environment = process_environment(config.project_env, config.database["password"])
+    environment = process_environment(
+        config.project_env, config.database["password"]
+    )
     assert environment["PROJECT_REGION"] == "synthetic-region-value"
     assert "UNLISTED_PRIVATE_VALUE" not in environment
     assert "DSC_TEST_PASSWORD" not in environment
@@ -160,7 +183,9 @@ def test_environment_only_forwards_explicit_project_variables(existing_project, 
         [None],
     ],
 )
-def test_config_rejects_ambiguous_allowlists(existing_project, monkeypatch, names):
+def test_config_rejects_ambiguous_allowlists(
+    existing_project, monkeypatch, names
+):
     monkeypatch.setenv("DSC_TEST_PASSWORD", "test-only-password")
     document = example_config(existing_project)
     document["env_allowlist"] = names
@@ -168,13 +193,16 @@ def test_config_rejects_ambiguous_allowlists(existing_project, monkeypatch, name
         load_config(save_config(existing_project, document))
 
 
-def test_missing_project_env_has_actionable_redacted_error(existing_project, monkeypatch):
+def test_missing_project_env_has_actionable_redacted_error(
+    existing_project, monkeypatch
+):
     monkeypatch.setenv("DSC_TEST_PASSWORD", "private-db-password")
     monkeypatch.delenv("PROJECT_REGION", raising=False)
     document = example_config(existing_project)
     document["env_allowlist"] = ["PROJECT_REGION"]
     result = CliRunner().invoke(
-        main, ["doctor", "--config", str(save_config(existing_project, document))]
+        main,
+        ["doctor", "--config", str(save_config(existing_project, document))],
     )
     assert result.exit_code == 2
     assert "MISSING_PROJECT_ENV at $.env_allowlist[0]" in result.output
@@ -182,7 +210,9 @@ def test_missing_project_env_has_actionable_redacted_error(existing_project, mon
     assert "private-db-password" not in result.output
 
 
-def test_completed_cleanup_does_not_require_project_environment(existing_project, monkeypatch):
+def test_completed_cleanup_does_not_require_project_environment(
+    existing_project, monkeypatch
+):
     monkeypatch.setenv("DSC_TEST_PASSWORD", "test-only-password")
     monkeypatch.delenv("PROJECT_REGION", raising=False)
     document = example_config(existing_project)
@@ -208,16 +238,23 @@ def test_completed_cleanup_does_not_require_project_environment(existing_project
 def test_diagnostics_point_to_a_bad_row_without_printing_values(tmp_path):
     original_project = ROOT / "examples/shop"
     scenario = copy.deepcopy(
-        load_scenario(original_project / "scenarios/orders.yml", original_project).data
+        load_scenario(
+            original_project / "scenarios/orders.yml", original_project
+        ).data
     )
     secret = "synthetic.private@example.invalid"
-    scenario["steps"][0]["inputs"]["orders"]["replace"]["rows"][0]["amount"] = secret
+    scenario["steps"][0]["inputs"]["orders"]["replace"]["rows"][0]["amount"] = (
+        secret
+    )
     path = tmp_path / "bad.yml"
     path.write_text(yaml.safe_dump(scenario, sort_keys=False))
     with pytest.raises(ScenarioError) as error:
         load_scenario(path, tmp_path)
     rendered = display_error(error.value)
-    assert "INVALID_TYPED_VALUE at $.steps[0].inputs[*].replace.rows[0][*]" in rendered
+    assert (
+        "INVALID_TYPED_VALUE at $.steps[0].inputs[*].replace.rows[0][*]"
+        in rendered
+    )
     assert "quote decimals" in rendered
     assert secret not in rendered
 
@@ -234,7 +271,9 @@ def test_schema_diagnostic_locates_a_missing_field(tmp_path):
 def test_non_json_vars_have_a_located_error(tmp_path):
     original_project = ROOT / "examples/shop"
     scenario = copy.deepcopy(
-        load_scenario(original_project / "scenarios/orders.yml", original_project).data
+        load_scenario(
+            original_project / "scenarios/orders.yml", original_project
+        ).data
     )
     scenario["steps"][0]["run"]["vars"] = {"not_json": float("nan")}
     path = tmp_path / "bad.yml"
@@ -257,14 +296,17 @@ def test_duplicate_yaml_reports_line_without_its_value(tmp_path):
     assert "synthetic.private" not in rendered
 
 
-def test_missing_dependencies_are_found_without_database_access(existing_project, monkeypatch):
+def test_missing_dependencies_are_found_without_database_access(
+    existing_project, monkeypatch
+):
     monkeypatch.setenv("DSC_TEST_PASSWORD", "private-db-password")
     (existing_project / "packages.yml").write_text(
         "packages:\n  - package: dbt-labs/dbt_utils\n    version: '1.3.0'\n"
     )
     document = example_config(existing_project)
     result = CliRunner().invoke(
-        main, ["doctor", "--config", str(save_config(existing_project, document))]
+        main,
+        ["doctor", "--config", str(save_config(existing_project, document))],
     )
     assert result.exit_code == 2
     assert "DEPENDENCIES_NOT_INSTALLED" in result.output
@@ -278,7 +320,9 @@ def test_installed_hub_dependency_uses_project_metadata(existing_project):
     )
     installed = existing_project / "dbt_packages/dbt_utils"
     installed.mkdir(parents=True)
-    (installed / "dbt_project.yml").write_text("name: dbt_utils\nconfig-version: 2\n")
+    (installed / "dbt_project.yml").write_text(
+        "name: dbt_utils\nconfig-version: 2\n"
+    )
     check_dependencies(existing_project, project_settings(existing_project))
 
 

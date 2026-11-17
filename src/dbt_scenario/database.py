@@ -29,7 +29,9 @@ class Database:
     def __init__(self, config: Config, deadline: Deadline | None = None):
         kwargs = config.connection_kwargs()
         if deadline:
-            kwargs["connect_timeout"] = max(2, min(10, math.ceil(deadline.remaining())))
+            kwargs["connect_timeout"] = max(
+                2, min(10, math.ceil(deadline.remaining()))
+            )
         self.connection = psycopg.connect(**kwargs, autocommit=True)
         self.deadline = deadline
         self.locked_run = None
@@ -39,7 +41,9 @@ class Database:
                 "SELECT set_config('statement_timeout', %s, false)",
                 [str(config.step_timeout * 1000)],
             )
-            self.execute("SELECT set_config('lock_timeout', %s, false)", ["10000"])
+            self.execute(
+                "SELECT set_config('lock_timeout', %s, false)", ["10000"]
+            )
             version, privileged = self.execute(
                 "SELECT current_setting('server_version_num')::int, "
                 "(SELECT rolsuper OR rolcreaterole OR rolcreatedb "
@@ -95,8 +99,12 @@ class Database:
             return
         if self.locked_run:
             raise ScenarioError("DATABASE_ALREADY_LOCKED")
-        lock_key = int.from_bytes(hashlib.sha256(run_id.encode()).digest()[:8], signed=True)
-        if not self.execute("SELECT pg_try_advisory_lock(%s)", [lock_key]).fetchone()[0]:
+        lock_key = int.from_bytes(
+            hashlib.sha256(run_id.encode()).digest()[:8], signed=True
+        )
+        if not self.execute(
+            "SELECT pg_try_advisory_lock(%s)", [lock_key]
+        ).fetchone()[0]:
             raise ScenarioError("RUN_STILL_ACTIVE")
         self.locked_run = run_id
 
@@ -104,7 +112,9 @@ class Database:
         self.acquire_run_lock(journal.data["run_id"])
         with self.connection.transaction():
             for name in journal.data["schemas"]:
-                self.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(name)))
+                self.execute(
+                    sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(name))
+                )
                 self.execute(
                     sql.SQL("COMMENT ON SCHEMA {} IS {}").format(
                         sql.Identifier(name), sql.Literal(journal.marker())
@@ -114,7 +124,8 @@ class Database:
     def cancel_model_queries(self, application_name: str):
         self.execute(
             "SELECT pg_cancel_backend(pid) FROM pg_stat_activity "
-            "WHERE application_name=%s AND usename=current_user AND pid<>pg_backend_pid()",
+            "WHERE application_name=%s AND usename=current_user AND "
+            "pid<>pg_backend_pid()",
             [application_name],
         )
 
@@ -125,7 +136,8 @@ class Database:
             for name in journal.data["schemas"]:
                 record = self.execute(
                     "SELECT obj_description(oid, 'pg_namespace'), "
-                    "pg_get_userbyid(nspowner)=current_user FROM pg_namespace WHERE nspname=%s",
+                    "pg_get_userbyid(nspowner)=current_user FROM pg_namespace "
+                    "WHERE nspname=%s",
                     [name],
                 ).fetchone()
                 if record is None:
@@ -137,13 +149,22 @@ class Database:
                 tables = self.execute(
                     "SELECT c.relname FROM pg_class c "
                     "JOIN pg_namespace n ON n.oid=c.relnamespace "
-                    "WHERE n.nspname=%s AND c.relkind IN ('r','p') ORDER BY c.relname",
+                    "WHERE n.nspname=%s AND c.relkind IN ('r','p') ORDER BY "
+                    "c.relname",
                     [name],
                 ).fetchall()
                 for (table,) in tables:
-                    self.execute(sql.SQL("DROP TABLE {} RESTRICT").format(relation(name, table)))
+                    self.execute(
+                        sql.SQL("DROP TABLE {} RESTRICT").format(
+                            relation(name, table)
+                        )
+                    )
             for name in reversed(existing):
-                self.execute(sql.SQL("DROP SCHEMA {} RESTRICT").format(sql.Identifier(name)))
+                self.execute(
+                    sql.SQL("DROP SCHEMA {} RESTRICT").format(
+                        sql.Identifier(name)
+                    )
+                )
 
     def close(self):
         self.connection.close()
@@ -172,7 +193,11 @@ class Database:
                 for offset in range(0, len(rows), 1000):
                     self.check_deadline()
                     batch = rows[offset : offset + 1000]
-                    values = prepared.batch(batch, offset, columns) if prepared else None
+                    values = (
+                        prepared.batch(batch, offset, columns)
+                        if prepared
+                        else None
+                    )
                     if values is None:
                         values = typed_rows(batch, columns)
                     cursor.executemany(statement, values)
@@ -180,16 +205,24 @@ class Database:
 
     def oid(self, schema: str, table: str):
         record = self.execute(
-            "SELECT c.oid FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
+            "SELECT c.oid FROM pg_class c JOIN pg_namespace n ON "
+            "n.oid=c.relnamespace "
             "WHERE n.nspname=%s AND c.relname=%s AND c.relkind='r'",
             [schema, table],
         ).fetchone()
         return record[0] if record else None
 
-    def snapshot(self, source_schema: str, table: str, expected_schema: str, snapshot: str):
+    def snapshot(
+        self,
+        source_schema: str,
+        table: str,
+        expected_schema: str,
+        snapshot: str,
+    ):
         self.execute(
             sql.SQL("CREATE TABLE {} AS TABLE {}").format(
-                relation(expected_schema, snapshot), relation(source_schema, table)
+                relation(expected_schema, snapshot),
+                relation(source_schema, table),
             )
         )
 
@@ -204,7 +237,8 @@ class Database:
                 "SELECT a.attname, format_type(a.atttypid,a.atttypmod) "
                 "FROM pg_attribute a JOIN pg_class c ON c.oid=a.attrelid "
                 "JOIN pg_namespace n ON n.oid=c.relnamespace "
-                "WHERE n.nspname=%s AND c.relname=%s AND a.attnum>0 AND NOT a.attisdropped",
+                "WHERE n.nspname=%s AND c.relname=%s AND a.attnum>0 AND NOT "
+                "a.attisdropped",
                 [actual_schema, table],
             ).fetchall()
         )
@@ -212,7 +246,9 @@ class Database:
             "timestamp": "timestamp without time zone",
             "timestamptz": "timestamp with time zone",
         }
-        expected_types = {key: aliases.get(kind, kind) for key, kind in columns.items()}
+        expected_types = {
+            key: aliases.get(kind, kind) for key, kind in columns.items()
+        }
         return actual_types == expected_types
 
     def key_problem(
@@ -222,14 +258,18 @@ class Database:
             sql.SQL("{} IS NULL").format(sql.Identifier(key)) for key in keys
         )
         if self.execute(
-            sql.SQL("SELECT EXISTS(SELECT 1 FROM {} WHERE {})").format(actual, nulls)
+            sql.SQL("SELECT EXISTS(SELECT 1 FROM {} WHERE {})").format(
+                actual, nulls
+            )
         ).fetchone()[0]:
             return "NULL_KEY"
-        key_columns = sql.SQL(", ").join(value_column(key, columns[key]) for key in keys)
+        key_columns = sql.SQL(", ").join(
+            value_column(key, columns[key]) for key in keys
+        )
         if self.execute(
-            sql.SQL("SELECT EXISTS(SELECT 1 FROM {} GROUP BY {} HAVING count(*)>1)").format(
-                actual, key_columns
-            )
+            sql.SQL(
+                "SELECT EXISTS(SELECT 1 FROM {} GROUP BY {} HAVING count(*)>1)"
+            ).format(actual, key_columns)
         ).fetchone()[0]:
             return "DUPLICATE_KEY"
         return None
@@ -243,7 +283,8 @@ class Database:
     ) -> tuple[DiffCounts, list[str]]:
         join = sql.SQL(" AND ").join(
             sql.SQL("{} = {}").format(
-                value_column(key, columns[key], "a"), value_column(key, columns[key], "e")
+                value_column(key, columns[key], "a"),
+                value_column(key, columns[key], "e"),
             )
             for key in keys
         )
@@ -266,7 +307,8 @@ class Database:
         query = sql.SQL(
             "SELECT count(*) FILTER(WHERE a.{key} IS NULL), "
             "count(*) FILTER(WHERE e.{key} IS NULL), "
-            "count(*) FILTER(WHERE a.{key} IS NOT NULL AND e.{key} IS NOT NULL AND ({changed})) "
+            "count(*) FILTER(WHERE a.{key} IS NOT NULL AND e.{key} IS NOT NULL "
+            "AND ({changed})) "
             "FROM {actual} a FULL JOIN {expected} e ON {join}"
         ).format(
             key=sql.Identifier(keys[0]),
@@ -280,9 +322,10 @@ class Database:
         if modified:
             for name, expression in differences:
                 exists = self.execute(
-                    sql.SQL("SELECT EXISTS(SELECT 1 FROM {} a JOIN {} e ON {} WHERE {})").format(
-                        actual, expected, join, expression
-                    )
+                    sql.SQL(
+                        "SELECT EXISTS(SELECT 1 FROM {} a JOIN {} e ON {} "
+                        "WHERE {})"
+                    ).format(actual, expected, join, expression)
                 ).fetchone()[0]
                 if exists:
                     changed_columns.append(name)

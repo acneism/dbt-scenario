@@ -22,17 +22,27 @@ def identifier(part):
     return part.this if part.args.get("quoted") else part.this.lower()
 
 
-def audit_sql(statement: str, database: str, allowed: set[tuple[str, str]]) -> dict:
-    if not isinstance(statement, str) or not statement.strip() or len(statement.encode()) > 1048576:
+def audit_sql(
+    statement: str, database: str, allowed: set[tuple[str, str]]
+) -> dict:
+    if (
+        not isinstance(statement, str)
+        or not statement.strip()
+        or len(statement.encode()) > 1048576
+    ):
         raise ScenarioError("SQL_AUDIT_UNSUPPORTED")
     try:
-        statements = sqlglot.parse(statement, dialect=AuditedPostgres, error_level=ErrorLevel.RAISE)
+        statements = sqlglot.parse(
+            statement, dialect=AuditedPostgres, error_level=ErrorLevel.RAISE
+        )
         if len(statements) != 1 or not isinstance(statements[0], exp.Query):
             raise ScenarioError("SQL_AUDIT_UNSUPPORTED")
         query = statements[0]
         normalize_identifiers(query, dialect="postgres")
         if any(
-            isinstance(node, (exp.DML, exp.DDL, exp.Command, exp.Into, exp.Lock))
+            isinstance(
+                node, (exp.DML, exp.DDL, exp.Command, exp.Into, exp.Lock)
+            )
             for node in query.walk()
         ):
             raise ScenarioError("SQL_AUDIT_UNSUPPORTED")
@@ -51,7 +61,9 @@ def audit_sql(statement: str, database: str, allowed: set[tuple[str, str]]) -> d
                 if not isinstance(source, exp.Table):
                     raise ScenarioError("SQL_AUDIT_UNSUPPORTED")
                 parts = [identifier(part) for part in source.parts]
-                if len(parts) not in {2, 3} or (len(parts) == 3 and parts[0] != database):
+                if len(parts) not in {2, 3} or (
+                    len(parts) == 3 and parts[0] != database
+                ):
                     raise ScenarioError("SQL_EXTERNAL_RELATION")
                 if tuple(parts[-2:]) not in allowed:
                     raise ScenarioError("SQL_EXTERNAL_RELATION")

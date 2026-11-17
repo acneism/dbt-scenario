@@ -40,8 +40,15 @@ def compare_archives(wheel, sdist):
     package_root = Path(dbt_scenario.__file__).resolve().parent
     if not package_root.is_relative_to(Path(sys.prefix).resolve()):
         raise RuntimeError("INSTALLED_WHEEL_REQUIRED")
-    with zipfile.ZipFile(wheel) as binary, tarfile.open(sdist, "r:gz") as source:
-        metadata = [name for name in binary.namelist() if name.endswith(".dist-info/METADATA")]
+    with (
+        zipfile.ZipFile(wheel) as binary,
+        tarfile.open(sdist, "r:gz") as source,
+    ):
+        metadata = [
+            name
+            for name in binary.namelist()
+            if name.endswith(".dist-info/METADATA")
+        ]
         if len(metadata) != 1:
             raise RuntimeError("WHEEL_METADATA_INVALID")
         fields = BytesParser().parsebytes(binary.read(metadata[0]))
@@ -72,15 +79,26 @@ def compare_archives(wheel, sdist):
                 raise RuntimeError("WHEEL_PATH_INVALID")
             data = binary.read(name)
             archived = source.extractfile(root + "/src/" + name)
-            if archived is None or archived.read() != data or installed.read_bytes() != data:
+            if (
+                archived is None
+                or archived.read() != data
+                or installed.read_bytes() != data
+            ):
                 raise RuntimeError("PACKAGE_CONTENT_MISMATCH")
             digest.update(name.encode())
             digest.update(data)
-        demo_files = ["examples/shop/models/fct_orders.sql", "scripts/init-test-db.sh"]
+        demo_files = [
+            "examples/shop/models/fct_orders.sql",
+            "scripts/init-test-db.sh",
+        ]
         for name in demo_files:
             example = source.extractfile(f"{root}/{name}")
             mirror = f"dbt_scenario/templates/demo/{name}"
-            if example is None or mirror not in names or example.read() != binary.read(mirror):
+            if (
+                example is None
+                or mirror not in names
+                or example.read() != binary.read(mirror)
+            ):
                 raise RuntimeError("DEMO_MIRROR_MISMATCH")
         return {
             "files_checked": len(names),
@@ -95,7 +113,8 @@ def owned_schemas(config):
     with psycopg.connect(**config.connection_kwargs()) as connection:
         return set(
             connection.execute(
-                "SELECT nspname FROM pg_namespace WHERE pg_get_userbyid(nspowner)=current_user"
+                "SELECT nspname FROM pg_namespace WHERE "
+                "pg_get_userbyid(nspowner)=current_user"
             ).fetchall()
         )
 
@@ -105,18 +124,27 @@ def check_metadata_template(executable, project, root, static_environment):
     scenario_path = config.project_dir / "scenarios/orders.yml"
     definition = read_yaml(scenario_path)
     columns = definition["output"]["columns"]
-    declarations = [{"name": name, "data_type": kind} for name, kind in columns.items()]
+    declarations = [
+        {"name": name, "data_type": kind} for name, kind in columns.items()
+    ]
     source_path = config.project_dir / "models/sources.yml"
     sources = read_yaml(source_path)
     sources["sources"][0]["tables"][0]["columns"] = declarations
     source_path.write_text(yaml.safe_dump(sources), encoding="utf-8")
     (config.project_dir / "models/distribution_columns.yml").write_text(
-        yaml.safe_dump({"version": 2, "models": [{"name": "fct_orders", "columns": declarations}]}),
+        yaml.safe_dump(
+            {
+                "version": 2,
+                "models": [{"name": "fct_orders", "columns": declarations}],
+            }
+        ),
         encoding="utf-8",
     )
     model = config.project_dir / "models/fct_orders.sql"
     before = model.read_bytes()
-    parsed = Project(config, root / "metadata_parse", "dsc_distribution_metadata")
+    parsed = Project(
+        config, root / "metadata_parse", "dsc_distribution_metadata"
+    )
     _, artifacts = parsed.invoke("parse", config.step_timeout)
     inventory = json.loads(
         command(
@@ -132,7 +160,9 @@ def check_metadata_template(executable, project, root, static_environment):
             static_environment,
         )
     )
-    if inventory.get("execution_checked") is not False or inventory.get("models") != [
+    if inventory.get("execution_checked") is not False or inventory.get(
+        "models"
+    ) != [
         {
             "model": "model.shop.fct_orders",
             "status": "TEMPLATE_READY",
@@ -169,7 +199,9 @@ def check_metadata_template(executable, project, root, static_environment):
         load_scenario(path, config.project_dir)
     except ScenarioError as error:
         if error.code != "UNFILLED_TEMPLATE_ROWS":
-            raise RuntimeError("DISTRIBUTION_TEMPLATE_VALIDATION_FAILED") from None
+            raise RuntimeError(
+                "DISTRIBUTION_TEMPLATE_VALIDATION_FAILED"
+            ) from None
     else:
         raise RuntimeError("DISTRIBUTION_TEMPLATE_MUST_REQUIRE_ROWS")
     return {
@@ -203,11 +235,15 @@ def main():
                 "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
                 "bytes": path.stat().st_size,
             }
-            for kind, path in [("wheel", arguments.wheel), ("sdist", arguments.sdist)]
+            for kind, path in [
+                ("wheel", arguments.wheel),
+                ("sdist", arguments.sdist),
+            ]
         },
         "archive_checks": compare_archives(arguments.wheel, arguments.sdist),
         "dependencies": {
-            name: version(name) for name in ["dbt-core", "dbt-postgres", "psycopg", "PyYAML"]
+            name: version(name)
+            for name in ["dbt-core", "dbt-postgres", "psycopg", "PyYAML"]
         },
     }
     config = load_config(arguments.config.resolve())
@@ -215,15 +251,24 @@ def main():
     executable = Path(sys.executable).parent / (
         "dbt-scenario.exe" if os.name == "nt" else "dbt-scenario"
     )
-    with tempfile.TemporaryDirectory(prefix="dbt-scenario-distribution-") as temporary:
+    with tempfile.TemporaryDirectory(
+        prefix="dbt-scenario-distribution-"
+    ) as temporary:
         root = Path(temporary)
-        result["cli_version"] = command([str(executable), "--version"], root).strip()
-        if not result["cli_version"].endswith("version " + result["package_version"]):
+        result["cli_version"] = command(
+            [str(executable), "--version"], root
+        ).strip()
+        if not result["cli_version"].endswith(
+            "version " + result["package_version"]
+        ):
             raise RuntimeError("CLI_VERSION_MISMATCH")
         command([sys.executable, "-I", "-m", "pip", "check"], root)
         result["dependency_check"] = "PASS"
         project = root / "demo"
-        command([str(executable), "init", "--demo", "--project-dir", str(project)], root)
+        command(
+            [str(executable), "init", "--demo", "--project-dir", str(project)],
+            root,
+        )
         static_environment = {
             key: value
             for key, value in os.environ.items()
@@ -243,7 +288,10 @@ def main():
         )
         if not output.startswith("VALID definition:"):
             raise RuntimeError("DISTRIBUTION_STATIC_VALIDATION_FAILED")
-        result["static_validation"] = {"status": "PASS", "without_password_env": True}
+        result["static_validation"] = {
+            "status": "PASS",
+            "without_password_env": True,
+        }
         result["metadata_initialization"] = check_metadata_template(
             executable, project, root, static_environment
         )
@@ -277,7 +325,10 @@ def main():
             for path in summaries
             for report in [json.loads(path.read_text(encoding="utf-8"))]
         }
-        if set(indexed) != {"orders_update_late_arrival_retry", "orders_empty_start"}:
+        if set(indexed) != {
+            "orders_update_late_arrival_retry",
+            "orders_empty_start",
+        }:
             raise RuntimeError("DISTRIBUTION_REPORT_MISMATCH")
         for name, expected in [
             ("orders_update_late_arrival_retry", [2, 3, 3]),
@@ -287,8 +338,12 @@ def main():
             if (
                 report["overall_status"] != "PASS"
                 or report["cleanup_status"] != "CLEANED"
-                or [step.get("actual_rows") for step in report["steps"]] != expected
-                or any(step["sql_audit"]["status"] != "PASS" for step in report["steps"])
+                or [step.get("actual_rows") for step in report["steps"]]
+                != expected
+                or any(
+                    step["sql_audit"]["status"] != "PASS"
+                    for step in report["steps"]
+                )
             ):
                 raise RuntimeError("DISTRIBUTION_SCENARIO_FAILED")
         report = indexed["orders_update_late_arrival_retry"]
@@ -311,7 +366,9 @@ def main():
     result["owned_schemas_unchanged"] = True
     result["status"] = "PASS"
     arguments.output.parent.mkdir(parents=True, exist_ok=True)
-    arguments.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    arguments.output.write_text(
+        json.dumps(result, indent=2) + "\n", encoding="utf-8"
+    )
     print("Installed wheel, sdist contents and generated PostgreSQL demo: PASS")
 
 
@@ -321,4 +378,6 @@ if __name__ == "__main__":
     except RuntimeError as error:
         raise SystemExit(str(error)) from None
     except Exception as error:
-        raise SystemExit("DISTRIBUTION_CHECK_FAILED_" + type(error).__name__) from None
+        raise SystemExit(
+            "DISTRIBUTION_CHECK_FAILED_" + type(error).__name__
+        ) from None

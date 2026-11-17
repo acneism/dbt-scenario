@@ -28,8 +28,12 @@ PROJECT = ROOT / "examples/shop"
         ("null_key", "INVALID_EXPECTED_KEY"),
     ],
 )
-def test_malformed_expected_fixture_is_rejected_before_execution(tmp_path, fault, reason):
-    scenario = copy.deepcopy(load_scenario(PROJECT / "scenarios/orders.yml", PROJECT).data)
+def test_malformed_expected_fixture_is_rejected_before_execution(
+    tmp_path, fault, reason
+):
+    scenario = copy.deepcopy(
+        load_scenario(PROJECT / "scenarios/orders.yml", PROJECT).data
+    )
     rows = scenario["steps"][0]["expect"]["rows"]
     payload = {"rows": rows}
     if fault == "missing_rows":
@@ -56,7 +60,9 @@ def test_malformed_expected_fixture_is_rejected_before_execution(tmp_path, fault
     path.write_text(yaml.safe_dump(scenario))
     with pytest.raises(ScenarioError, match=reason) as error:
         load_scenario(path, tmp_path)
-    assert "synthetic.private@example.invalid" not in str(error.value.diagnostic())
+    assert "synthetic.private@example.invalid" not in str(
+        error.value.diagnostic()
+    )
 
 
 @pytest.mark.parametrize(
@@ -68,9 +74,13 @@ def test_malformed_expected_fixture_is_rejected_before_execution(tmp_path, fault
         ("package-lock.yml", "packages: []\nsha1_hash: changed\n"),
     ],
 )
-def test_project_fingerprint_changes_for_each_execution_input(tmp_path, relative, content):
+def test_project_fingerprint_changes_for_each_execution_input(
+    tmp_path, relative, content
+):
     copied = tmp_path / "shop"
-    shutil.copytree(PROJECT, copied, ignore=shutil.ignore_patterns(".dbt-scenario"))
+    shutil.copytree(
+        PROJECT, copied, ignore=shutil.ignore_patterns(".dbt-scenario")
+    )
     before = fingerprint(copied)
     path = copied / relative
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -78,9 +88,13 @@ def test_project_fingerprint_changes_for_each_execution_input(tmp_path, relative
     assert fingerprint(copied) != before
 
 
-def test_fixture_change_updates_both_fixture_and_scenario_fingerprints(tmp_path):
+def test_fixture_change_updates_both_fixture_and_scenario_fingerprints(
+    tmp_path,
+):
     copied = tmp_path / "shop"
-    shutil.copytree(PROJECT, copied, ignore=shutil.ignore_patterns(".dbt-scenario"))
+    shutil.copytree(
+        PROJECT, copied, ignore=shutil.ignore_patterns(".dbt-scenario")
+    )
     scenario_path = copied / "scenarios/orders.yml"
     before = load_scenario(scenario_path, copied)
     fixture_path = copied / "scenarios/fixtures/initial.yml"
@@ -94,9 +108,13 @@ def test_fixture_change_updates_both_fixture_and_scenario_fingerprints(tmp_path)
 
 def test_project_copy_and_mapping_do_not_modify_original_files(tmp_path):
     copied = tmp_path / "shop"
-    shutil.copytree(PROJECT, copied, ignore=shutil.ignore_patterns(".dbt-scenario"))
+    shutil.copytree(
+        PROJECT, copied, ignore=shutil.ignore_patterns(".dbt-scenario")
+    )
     original = {
-        path.relative_to(copied): path.read_bytes() for path in copied.rglob("*") if path.is_file()
+        path.relative_to(copied): path.read_bytes()
+        for path in copied.rglob("*")
+        if path.is_file()
     }
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -114,5 +132,7 @@ def test_project_copy_and_mapping_do_not_modify_original_files(tmp_path):
     scenario = load_scenario(copied / "scenarios/orders.yml", copied)
     project.install_mapping(scenario.data, "dsc_inputs")
     assert original == {
-        path.relative_to(copied): path.read_bytes() for path in copied.rglob("*") if path.is_file()
+        path.relative_to(copied): path.read_bytes()
+        for path in copied.rglob("*")
+        if path.is_file()
     }

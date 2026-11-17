@@ -48,14 +48,26 @@ def load_config(path: Path, *, load_project_env: bool = True) -> Config:
     allowed = {"host", "port", "dbname", "user", "password_env", "sslmode"}
     if (
         set(database) - allowed
-        or not {"host", "port", "dbname", "user", "password_env"} <= database.keys()
+        or not {"host", "port", "dbname", "user", "password_env"}
+        <= database.keys()
     ):
         raise ScenarioError("INVALID_DATABASE_CONFIG")
     if type(database["port"]) is not int or not 1 <= database["port"] <= 65535:
-        raise ScenarioError("INVALID_DATABASE_CONFIG", location=("database", "port"))
-    if any(not isinstance(v, str) or not v for k, v in database.items() if k != "port"):
+        raise ScenarioError(
+            "INVALID_DATABASE_CONFIG", location=("database", "port")
+        )
+    if any(
+        not isinstance(v, str) or not v
+        for k, v in database.items()
+        if k != "port"
+    ):
         raise ScenarioError("INVALID_DATABASE_CONFIG")
-    if database.get("sslmode", "prefer") not in {"disable", "prefer", "require", "verify-full"}:
+    if database.get("sslmode", "prefer") not in {
+        "disable",
+        "prefer",
+        "require",
+        "verify-full",
+    }:
         raise ScenarioError("INVALID_DATABASE_CONFIG")
     password_env = database.pop("password_env")
     if password_env not in os.environ:

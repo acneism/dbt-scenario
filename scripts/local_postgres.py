@@ -19,8 +19,12 @@ def command(arguments):
 
 @contextmanager
 def local_postgres():
-    admin_password, test_password = [secrets.token_urlsafe(24) for _ in range(2)]
-    with tempfile.TemporaryDirectory(prefix="dbt-scenario-evaluation-") as temporary:
+    admin_password, test_password = [
+        secrets.token_urlsafe(24) for _ in range(2)
+    ]
+    with tempfile.TemporaryDirectory(
+        prefix="dbt-scenario-evaluation-"
+    ) as temporary:
         root = Path(temporary)
         data = root / "pgdata"
         password_file = root / "admin-password"
@@ -52,7 +56,8 @@ def local_postgres():
                     "-w",
                     "start",
                     "-o",
-                    f"-h 127.0.0.1 -p 55432 -k {root} -c unix_socket_permissions=0700",
+                    f"-h 127.0.0.1 -p 55432 -k {root} "
+                    "-c unix_socket_permissions=0700",
                 ]
             )
             started = True
@@ -73,7 +78,8 @@ def local_postgres():
                 )
                 connection.execute("CREATE DATABASE dbt_scenario_test")
                 connection.execute(
-                    "GRANT CONNECT, CREATE ON DATABASE dbt_scenario_test TO dbt_scenario"
+                    "GRANT CONNECT, CREATE ON DATABASE dbt_scenario_test TO "
+                    "dbt_scenario"
                 )
             administrator["dbname"] = "dbt_scenario_test"
             with psycopg.connect(**administrator) as connection:

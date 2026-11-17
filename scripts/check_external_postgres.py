@@ -39,10 +39,15 @@ def build_scenario(template, case, fixtures):
     arrival = (
         [fixtures["newer"]]
         if case == "empty_start"
-        else [*initial, fixtures["late_sensor" if case == "late_sensor" else "newer"]]
+        else [
+            *initial,
+            fixtures["late_sensor" if case == "late_sensor" else "newer"],
+        ]
     )
     for index, rows in enumerate([initial, arrival]):
-        scenario["steps"][index]["inputs"]["input_1"]["replace"]["rows"] = copy.deepcopy(rows)
+        scenario["steps"][index]["inputs"]["input_1"]["replace"]["rows"] = (
+            copy.deepcopy(rows)
+        )
         scenario["steps"][index]["expect"]["rows"] = copy.deepcopy(rows)
     return scenario
 
@@ -51,7 +56,8 @@ def owned_schemas(config):
     with psycopg.connect(**config.connection_kwargs()) as connection:
         return set(
             connection.execute(
-                "SELECT nspname FROM pg_namespace WHERE pg_get_userbyid(nspowner)=current_user"
+                "SELECT nspname FROM pg_namespace WHERE "
+                "pg_get_userbyid(nspowner)=current_user"
             ).fetchall()
         )
 
@@ -68,7 +74,10 @@ def prepare_project(root, sources, config, fixtures):
     }
     for name, relative in destinations.items():
         shutil.copyfile(sources / name, project / relative)
-    declarations = [{"name": name, "data_type": kind} for name, kind in fixtures["columns"].items()]
+    declarations = [
+        {"name": name, "data_type": kind}
+        for name, kind in fixtures["columns"].items()
+    ]
     write_yaml(
         project / "models/scenario_columns.yml",
         {
@@ -98,19 +107,26 @@ def prepare_project(root, sources, config, fixtures):
         if (
             template["output"]["columns"] != fixtures["columns"]
             or template["output"]["primary_key"] != ["sensor_id", "ts_utc"]
-            or template["inputs"]["input_1"]["node"] != "model.aqw.stg_air_quality_hourly"
+            or template["inputs"]["input_1"]["node"]
+            != "model.aqw.stg_air_quality_hourly"
         ):
             raise RuntimeError("EXTERNAL_METADATA_SCHEMA_MISMATCH")
         try:
             load_scenario(template_path, project)
         except ScenarioError as error:
             if error.code != "UNFILLED_TEMPLATE_ROWS":
-                raise RuntimeError("EXTERNAL_TEMPLATE_DIAGNOSTIC_MISMATCH") from None
+                raise RuntimeError(
+                    "EXTERNAL_TEMPLATE_DIAGNOSTIC_MISMATCH"
+                ) from None
         else:
             raise RuntimeError("EXTERNAL_TEMPLATE_MUST_REQUIRE_ROWS")
         paths = {}
         for case in CASES:
-            path = template_path if case == "normal" else project / f"scenarios/aqw_{case}.yml"
+            path = (
+                template_path
+                if case == "normal"
+                else project / f"scenarios/aqw_{case}.yml"
+            )
             write_yaml(path, build_scenario(template, case, fixtures))
             load_scenario(path, project)
             paths[case] = path
@@ -128,7 +144,8 @@ def validate_report(report, case):
         raise RuntimeError("EXTERNAL_SCENARIO_OUTCOME_MISMATCH")
     if case == "late_sensor" and (
         report["steps"][1]["reason_code"] != "ROWS_MISMATCH"
-        or report["steps"][1]["diff_counts"] != {"missing": 1, "unexpected": 0, "changed": 0}
+        or report["steps"][1]["diff_counts"]
+        != {"missing": 1, "unexpected": 0, "changed": 0}
         or report["steps"][2]["status"] != "NOT_RUN"
     ):
         raise RuntimeError("EXTERNAL_COUNTEREXAMPLE_MISMATCH")
@@ -138,7 +155,8 @@ def validate_report(report, case):
         evidence = step.get("observed_mode_evidence", {})
         if (
             step["sql_audit"]["status"] != "PASS"
-            or evidence.get("operation") != ("create_table" if index == 0 else "delete+insert")
+            or evidence.get("operation")
+            != ("create_table" if index == 0 else "delete+insert")
             or len(evidence.get("statement_sha256", "")) != 64
         ):
             raise RuntimeError("EXTERNAL_EXECUTION_EVIDENCE_MISSING")
@@ -158,7 +176,11 @@ def main():
     if arguments.fetch_only:
         print("Verified pinned PostgreSQL project and MIT license", flush=True)
         return
-    if not arguments.config or not arguments.output or arguments.output.exists():
+    if (
+        not arguments.config
+        or not arguments.output
+        or arguments.output.exists()
+    ):
         parser.error("execution requires --config and a new --output file")
     config = load_config(arguments.config)
     fixtures = read_yaml(ASSETS / "fixtures.yml")
@@ -170,7 +192,9 @@ def main():
         "package_version": __version__,
         "python_version": sys.version.split()[0],
         "started_at": datetime.now(UTC).isoformat(),
-        "check_script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "check_script_sha256": hashlib.sha256(
+            Path(__file__).read_bytes()
+        ).hexdigest(),
         "upstream": provenance,
         "fixture_specification_sha256": hashlib.sha256(
             (ASSETS / "fixtures.yml").read_bytes()
@@ -185,7 +209,10 @@ def main():
             "upstream_staging_executed": False,
             "upstream_sql_and_project_config_unchanged": True,
             "schema_declarations_added": True,
-            "metadata_and_definition_checks_without_password_database_or_subprocess": True,
+            (
+                "metadata_and_definition_checks_without_password_database_or_"
+                "subprocess"
+            ): True,
             "comparison_tolerance": 0,
             "source_delivery_assumption_verified": False,
             "native_upstream_tests_executed": False,
@@ -201,7 +228,9 @@ def main():
         )
         for case, path in paths.items():
             report = run_scenario(
-                load_scenario(path, prepared.project_dir), prepared, root / "reports"
+                load_scenario(path, prepared.project_dir),
+                prepared,
+                root / "reports",
             )
             result["cases"][case] = {
                 key: report[key]
@@ -214,7 +243,9 @@ def main():
                     "steps",
                 ]
             }
-            arguments.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+            arguments.output.write_text(
+                json.dumps(result, indent=2) + "\n", encoding="utf-8"
+            )
             validate_report(result["cases"][case], case)
             print(case + ": " + report["overall_status"], flush=True)
         for name, relative in destinations.items():
@@ -228,10 +259,16 @@ def main():
         for step in report["steps"]
         if step["status"] != "NOT_RUN"
     ]
-    if len(identifiers) != 8 or len(set(identifiers)) != 8 or owned_schemas(config) != baseline:
+    if (
+        len(identifiers) != 8
+        or len(set(identifiers)) != 8
+        or owned_schemas(config) != baseline
+    ):
         raise RuntimeError("EXTERNAL_INVOCATION_OR_CLEANUP_MISMATCH")
     result.update(status="PASS", complete=True, owned_schemas_unchanged=True)
-    arguments.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    arguments.output.write_text(
+        json.dumps(result, indent=2) + "\n", encoding="utf-8"
+    )
 
 
 if __name__ == "__main__":
@@ -240,4 +277,6 @@ if __name__ == "__main__":
     except RuntimeError as error:
         raise SystemExit(str(error)) from None
     except Exception as error:
-        raise SystemExit("EXTERNAL_POSTGRES_CHECK_FAILED_" + type(error).__name__) from None
+        raise SystemExit(
+            "EXTERNAL_POSTGRES_CHECK_FAILED_" + type(error).__name__
+        ) from None

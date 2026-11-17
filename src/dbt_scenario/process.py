@@ -34,13 +34,17 @@ def stop_process(process: subprocess.Popen):
             pass
 
 
-def run_process(argv: list[str], environment: dict, directory, deadline: Deadline) -> int:
+def run_process(
+    argv: list[str], environment: dict, directory, deadline: Deadline
+) -> int:
     deadline.check()
     job = WindowsJob() if os.name == "nt" else None
     process = None
     try:
         process = subprocess.Popen(
-            [sys.executable, "-I", "-c", WINDOWS_LAUNCHER, *argv] if job else argv,
+            [sys.executable, "-I", "-c", WINDOWS_LAUNCHER, *argv]
+            if job
+            else argv,
             env=environment,
             cwd=directory,
             stdin=subprocess.PIPE if job else subprocess.DEVNULL,
@@ -51,7 +55,9 @@ def run_process(argv: list[str], environment: dict, directory, deadline: Deadlin
         )
         if job:
             job.assign(process.pid)
-        process.communicate(input=b"1" if job else None, timeout=deadline.remaining())
+        process.communicate(
+            input=b"1" if job else None, timeout=deadline.remaining()
+        )
     except subprocess.TimeoutExpired:
         raise ScenarioError(deadline.expired_reason()) from None
     finally:

@@ -11,7 +11,9 @@ def finish_run(
 ) -> Literal["KEPT", "CLEANED"]:
     with database.budget(Deadline(10, "CLEANUP_TIMEOUT")):
         database.acquire_run_lock(journal.data["run_id"])
-        database.cancel_model_queries(f"dbt-scenario:{journal.data['schemas'][0]}")
+        database.cancel_model_queries(
+            f"dbt-scenario:{journal.data['schemas'][0]}"
+        )
         if keep:
             journal.transition("KEPT")
             return "KEPT"

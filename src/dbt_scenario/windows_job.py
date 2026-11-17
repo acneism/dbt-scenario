@@ -52,9 +52,16 @@ class WindowsJob:
             wintypes.DWORD,
         ]
         self.api.SetInformationJobObject.restype = wintypes.BOOL
-        self.api.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        self.api.OpenProcess.argtypes = [
+            wintypes.DWORD,
+            wintypes.BOOL,
+            wintypes.DWORD,
+        ]
         self.api.OpenProcess.restype = wintypes.HANDLE
-        self.api.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
+        self.api.AssignProcessToJobObject.argtypes = [
+            wintypes.HANDLE,
+            wintypes.HANDLE,
+        ]
         self.api.AssignProcessToJobObject.restype = wintypes.BOOL
         self.api.CloseHandle.argtypes = [wintypes.HANDLE]
         self.api.CloseHandle.restype = wintypes.BOOL
@@ -74,7 +81,9 @@ class WindowsJob:
         if not process_handle:
             raise ScenarioError("PROCESS_ISOLATION_FAILED")
         try:
-            if not self.api.AssignProcessToJobObject(self.handle, process_handle):
+            if not self.api.AssignProcessToJobObject(
+                self.handle, process_handle
+            ):
                 raise ScenarioError("PROCESS_ISOLATION_FAILED")
         finally:
             self.api.CloseHandle(process_handle)

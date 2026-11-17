@@ -14,11 +14,16 @@ ROOT = Path(__file__).resolve().parents[1]
 @pytest.fixture
 def selection(tmp_path, monkeypatch):
     project = tmp_path / "shop"
-    shutil.copytree(ROOT / "examples/shop", project, ignore=shutil.ignore_patterns(".dbt-scenario"))
+    shutil.copytree(
+        ROOT / "examples/shop",
+        project,
+        ignore=shutil.ignore_patterns(".dbt-scenario"),
+    )
     config = tmp_path / "scenario-runner.yml"
     config.write_text("configuration is supplied by the selection test")
     monkeypatch.setattr(
-        "dbt_scenario.cli.load_config", lambda path: SimpleNamespace(project_dir=project)
+        "dbt_scenario.cli.load_config",
+        lambda path: SimpleNamespace(project_dir=project),
     )
     executed = []
 
@@ -37,7 +42,9 @@ def selection(tmp_path, monkeypatch):
     return project, config, executed
 
 
-def test_file_passed_as_scenario_directory_never_runs_other_selected_scenarios(selection):
+def test_file_passed_as_scenario_directory_never_runs_other_selected_scenarios(
+    selection,
+):
     project, config, executed = selection
     result = CliRunner().invoke(
         main,
@@ -56,7 +63,9 @@ def test_file_passed_as_scenario_directory_never_runs_other_selected_scenarios(s
     assert not executed
 
 
-def test_mixed_selection_deduplicates_paths_and_keeps_fixture_subdirectories_out(selection):
+def test_mixed_selection_deduplicates_paths_and_ignores_fixture_dirs(
+    selection,
+):
     project, config, executed = selection
     scenarios = project / "scenarios"
     extra = scenarios / "extra.yaml"
@@ -92,7 +101,13 @@ def test_mixed_selection_deduplicates_paths_and_keeps_fixture_subdirectories_out
     ],
 )
 def test_cli_and_markdown_show_scenario_and_cleanup_errors(
-    selection, tmp_path, monkeypatch, reason, cleanup_reason, step_status, exit_code
+    selection,
+    tmp_path,
+    monkeypatch,
+    reason,
+    cleanup_reason,
+    step_status,
+    exit_code,
 ):
     project, config, _ = selection
     report_dir = tmp_path / "reports"
@@ -101,7 +116,9 @@ def test_cli_and_markdown_show_scenario_and_cleanup_errors(
         report = {
             "overall_status": "ERROR",
             "scenario": scenario.data["name"],
-            "steps": [{"name": "initial", "status": step_status, "reason_code": None}],
+            "steps": [
+                {"name": "initial", "status": step_status, "reason_code": None}
+            ],
             "run_id": "run",
             "cleanup_status": "ERROR" if cleanup_reason else "NOT_NEEDED",
             "reason_code": reason,
@@ -136,10 +153,13 @@ def test_cli_and_markdown_show_scenario_and_cleanup_errors(
 
 
 @pytest.mark.parametrize("command", ["test", "plan", "validate"])
-def test_directory_cannot_be_supplied_as_a_scenario_file(selection, monkeypatch, command):
+def test_directory_cannot_be_supplied_as_a_scenario_file(
+    selection, monkeypatch, command
+):
     project, config, executed = selection
     monkeypatch.setattr(
-        "dbt_scenario.cli.load_config", lambda *a: pytest.fail("configuration was loaded")
+        "dbt_scenario.cli.load_config",
+        lambda *a: pytest.fail("configuration was loaded"),
     )
     arguments = [command, "--scenario", str(project / "scenarios")]
     if command == "validate":
@@ -152,10 +172,13 @@ def test_directory_cannot_be_supplied_as_a_scenario_file(selection, monkeypatch,
     assert not executed
 
 
-def test_directory_cannot_be_supplied_as_a_configuration_file(selection, monkeypatch):
+def test_directory_cannot_be_supplied_as_a_configuration_file(
+    selection, monkeypatch
+):
     project, _, executed = selection
     monkeypatch.setattr(
-        "dbt_scenario.cli.load_config", lambda *a: pytest.fail("configuration was loaded")
+        "dbt_scenario.cli.load_config",
+        lambda *a: pytest.fail("configuration was loaded"),
     )
     result = CliRunner().invoke(main, ["doctor", "--config", str(project)])
     assert result.exit_code == 2, result.output

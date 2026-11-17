@@ -85,7 +85,9 @@ def generate_project(directory, rows):
         row.update(
             event_id=index,
             event_at="2025-12-31T00:00:00",
-            updated_at=(epoch + timedelta(days=1, seconds=index - rows)).isoformat(),
+            updated_at=(
+                epoch + timedelta(days=1, seconds=index - rows)
+            ).isoformat(),
         )
         updated.append(row)
     write_yaml(
@@ -101,7 +103,9 @@ def generate_project(directory, rows):
         directory / "models/sources.yml",
         {
             "version": 2,
-            "sources": [{"name": "raw", "schema": "raw", "tables": [{"name": "events"}]}],
+            "sources": [
+                {"name": "raw", "schema": "raw", "tables": [{"name": "events"}]}
+            ],
         },
     )
     (directory / "models/fct_events.sql").write_text(
@@ -120,19 +124,29 @@ def generate_project(directory, rows):
         "name": "incremental_10_columns",
         "model": "model.benchmark.fct_events",
         "inputs": {
-            "events": {"node": "source.benchmark.raw.events", "columns": copy.deepcopy(COLUMNS)}
+            "events": {
+                "node": "source.benchmark.raw.events",
+                "columns": copy.deepcopy(COLUMNS),
+            }
         },
-        "output": {"columns": copy.deepcopy(COLUMNS), "primary_key": ["event_id"]},
+        "output": {
+            "columns": copy.deepcopy(COLUMNS),
+            "primary_key": ["event_id"],
+        },
         "steps": [
             {
                 "name": "initial",
-                "inputs": {"events": {"replace": {"fixture": "fixtures/initial.yml"}}},
+                "inputs": {
+                    "events": {"replace": {"fixture": "fixtures/initial.yml"}}
+                },
                 "run": {"mode": "initial"},
                 "expect": {"fixture": "fixtures/initial.yml"},
             },
             {
                 "name": "updates_and_late_events",
-                "inputs": {"events": {"replace": {"fixture": "fixtures/updated.yml"}}},
+                "inputs": {
+                    "events": {"replace": {"fixture": "fixtures/updated.yml"}}
+                },
                 "run": {"mode": "incremental"},
                 "expect": {"fixture": "fixtures/updated.yml"},
             },
@@ -162,20 +176,29 @@ def save_result(path, result):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Measure complete synthetic dbt scenario runs.")
+    parser = argparse.ArgumentParser(
+        description="Measure complete synthetic dbt scenario runs."
+    )
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--samples", type=int, default=20)
     parser.add_argument("--rows", type=int, default=10000)
-    parser.add_argument("--output", type=Path, default=Path("artifacts/benchmark/result.json"))
+    parser.add_argument(
+        "--output", type=Path, default=Path("artifacts/benchmark/result.json")
+    )
     parser.add_argument("--require-limits", action="store_true")
     arguments = parser.parse_args()
     if arguments.samples < 1 or not 100 <= arguments.rows <= 20000:
-        parser.error("samples must be positive; rows must be between 100 and 20000")
+        parser.error(
+            "samples must be positive; rows must be between 100 and 20000"
+        )
     if arguments.output.exists():
         parser.error("output already exists; choose a new path")
     limits = resource_limits()
     if arguments.require_limits and not limits["verified"]:
-        parser.error("requires cgroup v2 limits of 2 CPUs, 8 GiB memory and no extra swap")
+        parser.error(
+            "requires cgroup v2 limits of 2 CPUs, 8 GiB memory and no extra "
+            "swap"
+        )
     config = load_config(arguments.config, load_project_env=False)
     arguments.output.parent.mkdir(parents=True, exist_ok=True)
     benchmark_id = uuid.uuid4().hex
@@ -191,7 +214,9 @@ def main():
         "benchmark_id": benchmark_id,
         "started_at": datetime.now(UTC).isoformat(),
         "package_version": __version__,
-        "benchmark_script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "benchmark_script_sha256": hashlib.sha256(
+            Path(__file__).read_bytes()
+        ).hexdigest(),
         "implementation_sha256": implementation_hash(),
         "environment": {
             "os": platform.system(),
@@ -204,7 +229,13 @@ def main():
             "yaml_parser": YAML_BASE.__name__,
             "dependencies": {
                 name: version(name)
-                for name in ["dbt-core", "dbt-postgres", "psycopg", "PyYAML", "sqlglot"]
+                for name in [
+                    "dbt-core",
+                    "dbt-postgres",
+                    "psycopg",
+                    "PyYAML",
+                    "sqlglot",
+                ]
             },
         },
         "protocol": {
@@ -225,7 +256,11 @@ def main():
                 "database_cleanup",
                 "report_writing",
             ],
-            "excludes": ["dependency_installation", "postgres_startup", "fixture_generation"],
+            "excludes": [
+                "dependency_installation",
+                "postgres_startup",
+                "fixture_generation",
+            ],
             "caches_flushed": False,
             "unmeasured_warmup_runs": 0,
             "percentile_method": "nearest-rank for p95; median for p50",
@@ -248,9 +283,14 @@ def main():
             report["overall_status"] == "PASS"
             and report["cleanup_status"] == "CLEANED"
             and counts == expected_counts
-            and all(not any(step["diff_counts"].values()) for step in report["steps"])
+            and all(
+                not any(step["diff_counts"].values())
+                for step in report["steps"]
+            )
         )
-        result["environment"]["postgresql"] = report["engine_versions"].get("postgresql")
+        result["environment"]["postgresql"] = report["engine_versions"].get(
+            "postgresql"
+        )
         result["samples"].append(
             {
                 "index": index + 1,
@@ -273,7 +313,8 @@ def main():
         )
         if not passed:
             raise SystemExit(
-                "Benchmark validation failed; result and recovery journal were retained."
+                "Benchmark validation failed; result and recovery journal were "
+                "retained."
             )
     durations = sorted(sample["wall_ms"] for sample in result["samples"])
     result["complete"] = True
@@ -284,7 +325,11 @@ def main():
         "min_ms": durations[0],
         "max_ms": durations[-1],
     }
-    eligible = limits["verified"] and arguments.rows == 10000 and arguments.samples == 20
+    eligible = (
+        limits["verified"]
+        and arguments.rows == 10000
+        and arguments.samples == 20
+    )
     result["performance_target"] = {
         "eligible": eligible,
         "p95_limit_ms": 60000,
