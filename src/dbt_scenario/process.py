@@ -1,11 +1,11 @@
 import os
+import pathlib
 import signal
 import subprocess
 import sys
 
-from dbt_scenario.deadline import Deadline
-from dbt_scenario.errors import ScenarioError
-from dbt_scenario.windows_job import WindowsJob
+from dbt_scenario import deadline as scenario_deadline
+from dbt_scenario import errors, windows_job
 
 WINDOWS_LAUNCHER = (
     "import subprocess\n"
@@ -17,7 +17,7 @@ WINDOWS_LAUNCHER = (
 )
 
 
-def stop_process(process: subprocess.Popen):
+def stop_process(process: subprocess.Popen) -> None:
     try:
         os.killpg(process.pid, signal.SIGTERM)
     except ProcessLookupError:
@@ -35,10 +35,13 @@ def stop_process(process: subprocess.Popen):
 
 
 def run_process(
-    argv: list[str], environment: dict, directory, deadline: Deadline
+    argv: list[str],
+    environment: dict,
+    directory: pathlib.Path,
+    deadline: scenario_deadline.Deadline,
 ) -> int:
     deadline.check()
-    job = WindowsJob() if os.name == "nt" else None
+    job = windows_job.WindowsJob() if os.name == "nt" else None
     process = None
     try:
         process = subprocess.Popen(
@@ -59,7 +62,7 @@ def run_process(
             input=b"1" if job else None, timeout=deadline.remaining()
         )
     except subprocess.TimeoutExpired:
-        raise ScenarioError(deadline.expired_reason()) from None
+        raise errors.ScenarioError(deadline.expired_reason()) from None
     finally:
         if job:
             job.close()

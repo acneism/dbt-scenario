@@ -1,11 +1,11 @@
 import importlib.util
-from pathlib import Path
+import pathlib
 
 import pytest
 
 SPEC = importlib.util.spec_from_file_location(
     "resource_limits",
-    Path(__file__).resolve().parents[1] / "scripts/resource_limits.py",
+    pathlib.Path(__file__).resolve().parents[1] / "scripts/resource_limits.py",
 )
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)

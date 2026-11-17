@@ -1,7 +1,7 @@
 import copy
 import importlib
+import pathlib
 import uuid
-from pathlib import Path
 
 import pytest
 
@@ -9,7 +9,7 @@ import pytest
 @pytest.fixture
 def antijoin_gate(monkeypatch):
     monkeypatch.syspath_prepend(
-        str(Path(__file__).resolve().parents[1] / "scripts")
+        str(pathlib.Path(__file__).resolve().parents[1] / "scripts")
     )
     return importlib.import_module("check_external_antijoin")
 

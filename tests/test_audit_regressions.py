@@ -1,26 +1,22 @@
 import copy
 import json
 import os
+import pathlib
 import shutil
 import subprocess
 import sys
-from pathlib import Path
-from xml.etree.ElementTree import parse
+from xml.etree import ElementTree
 
 import pytest
 import yaml
 
-from dbt_scenario.config import Config
-from dbt_scenario.deadline import Deadline
-from dbt_scenario.errors import ScenarioError
-from dbt_scenario.loader import load_scenario
-from dbt_scenario.process import run_process
-from dbt_scenario.project import Project, fingerprint
-from dbt_scenario.report import write_report
-from dbt_scenario.requirements import check_model_config
-from dbt_scenario.runner import execution_node, initialize_report, run_scenario
+from dbt_scenario import config as scenario_config
+from dbt_scenario import deadline as scenario_deadline
+from dbt_scenario import errors, loader, process, requirements, runner
+from dbt_scenario import project as scenario_project
+from dbt_scenario import report as scenario_report
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 @pytest.mark.parametrize(
@@ -31,8 +27,10 @@ def test_unexamined_model_sql_is_refused_in_preflight_and_later_steps(setting):
         "materialized": "incremental",
         setting: ["select 1 from pg_catalog.pg_class"],
     }
-    with pytest.raises(ScenarioError, match="MODEL_SQL_CONFIG_UNSUPPORTED"):
-        check_model_config(config)
+    with pytest.raises(
+        errors.ScenarioError, match="MODEL_SQL_CONFIG_UNSUPPORTED"
+    ):
+        requirements.check_model_config(config)
     node = {
         "unique_id": "model.shop.fct_orders",
         "alias": "fct_orders",
@@ -42,8 +40,10 @@ def test_unexamined_model_sql_is_refused_in_preflight_and_later_steps(setting):
     }
     changed = copy.deepcopy(node)
     changed["config"] = config
-    with pytest.raises(ScenarioError, match="MODEL_CONFIGURATION_CHANGED"):
-        execution_node(
+    with pytest.raises(
+        errors.ScenarioError, match="MODEL_CONFIGURATION_CHANGED"
+    ):
+        runner.execution_node(
             {"nodes": {node["unique_id"]: changed}},
             node,
             "isolated",
@@ -52,7 +52,7 @@ def test_unexamined_model_sql_is_refused_in_preflight_and_later_steps(setting):
 
 
 def test_empty_sql_configuration_remains_supported():
-    check_model_config(
+    requirements.check_model_config(
         {
             "materialized": "incremental",
             "sql_header": "",
@@ -73,7 +73,9 @@ def test_project_fingerprint_frames_path_and_content(tmp_path):
     )
     (second / "models/a.sql").write_text("select 1 as id\n-- ")
     (second / "models/b.sql").write_text("select 2 as id\n")
-    assert fingerprint(first) != fingerprint(second)
+    assert scenario_project.fingerprint(first) != scenario_project.fingerprint(
+        second
+    )
 
 
 def test_project_uses_the_copied_sql_and_settings_for_its_fingerprint(
@@ -83,18 +85,18 @@ def test_project_uses_the_copied_sql_and_settings_for_its_fingerprint(
     shutil.copytree(ROOT / "examples/shop", source)
     model = source / "models/fct_orders.sql"
     settings = source / "dbt_project.yml"
-    original_hash = fingerprint(source)
+    original_hash = scenario_project.fingerprint(source)
     original_copy = shutil.copytree
 
     def update_before_copy(project_dir, destination, *args, **options):
-        if Path(project_dir) == source:
+        if pathlib.Path(project_dir) == source:
             model.write_text("select 2 as id\n", encoding="utf-8")
             with settings.open("a", encoding="utf-8") as stream:
                 stream.write("\nvars:\n  copy_marker: staged\n")
         return original_copy(project_dir, destination, *args, **options)
 
     monkeypatch.setattr(shutil, "copytree", update_before_copy)
-    config = Config(
+    config = scenario_config.Config(
         source,
         {
             "host": "unused",
@@ -104,10 +106,12 @@ def test_project_uses_the_copied_sql_and_settings_for_its_fingerprint(
             "password": "unused",
         },
     )
-    project = Project(config, tmp_path / "workspace", "isolated")
+    project = scenario_project.Project(
+        config, tmp_path / "workspace", "isolated"
+    )
 
     assert project.project_hash != original_hash
-    assert project.project_hash == fingerprint(source)
+    assert project.project_hash == scenario_project.fingerprint(source)
     assert (
         project.root / model.relative_to(source)
     ).read_bytes() == model.read_bytes()
@@ -123,11 +127,11 @@ def test_excluded_directory_symlink_is_not_scanned_or_copied(
     link = project / excluded / "bin/python"
     link.parent.mkdir(parents=True)
     link.write_text("excluded environment file")
-    original = Path.is_symlink
+    original = pathlib.Path.is_symlink
     monkeypatch.setattr(
-        Path, "is_symlink", lambda path: path == link or original(path)
+        pathlib.Path, "is_symlink", lambda path: path == link or original(path)
     )
-    config = Config(
+    config = scenario_config.Config(
         project,
         {
             "host": "unused",
@@ -137,10 +141,12 @@ def test_excluded_directory_symlink_is_not_scanned_or_copied(
             "password": "unused",
         },
     )
-    before = fingerprint(project)
-    copied = Project(config, tmp_path / "workspace", "isolated")
+    before = scenario_project.fingerprint(project)
+    copied = scenario_project.Project(
+        config, tmp_path / "workspace", "isolated"
+    )
     assert not (copied.root / excluded).exists()
-    assert fingerprint(project) == before
+    assert scenario_project.fingerprint(project) == before
 
 
 def test_real_venv_symlink_is_excluded_but_model_symlink_is_refused(tmp_path):
@@ -152,7 +158,7 @@ def test_real_venv_symlink_is_excluded_but_model_symlink_is_refused(tmp_path):
         (project / ".venv/bin/python").symlink_to(sys.executable)
     except OSError:
         pytest.skip("symlink creation is unavailable")
-    config = Config(
+    config = scenario_config.Config(
         project,
         {
             "host": "unused",
@@ -162,11 +168,13 @@ def test_real_venv_symlink_is_excluded_but_model_symlink_is_refused(tmp_path):
             "password": "unused",
         },
     )
-    copied = Project(config, tmp_path / "accepted", "isolated")
+    copied = scenario_project.Project(config, tmp_path / "accepted", "isolated")
     assert not (copied.root / ".venv").exists()
     (project / "models/external.sql").symlink_to(project / "dbt_project.yml")
-    with pytest.raises(ScenarioError, match="PROJECT_SYMLINK_UNSUPPORTED"):
-        Project(config, tmp_path / "refused", "isolated")
+    with pytest.raises(
+        errors.ScenarioError, match="PROJECT_SYMLINK_UNSUPPORTED"
+    ):
+        scenario_project.Project(config, tmp_path / "refused", "isolated")
 
 
 @pytest.mark.parametrize(
@@ -196,8 +204,10 @@ def test_workflow_accepts_versioned_reports_and_preserves_results(
     directory = tmp_path / "reports" / ("a" * 32)
     directory.mkdir(parents=True)
     project = ROOT / "examples/shop"
-    scenario = load_scenario(project / "scenarios/orders.yml", project)
-    report = initialize_report(scenario, Config(project, {}), directory.name)
+    scenario = loader.load_scenario(project / "scenarios/orders.yml", project)
+    report = runner.initialize_report(
+        scenario, scenario_config.Config(project, {}), directory.name
+    )
     report.update(
         overall_status=status,
         cleanup_status=cleanup,
@@ -213,10 +223,10 @@ def test_workflow_accepts_versioned_reports_and_preserves_results(
             }
         ],
     )
-    write_report(report, directory)
+    scenario_report.write_report(report, directory)
     report_path = directory / "summary.json"
     assert json.loads(report_path.read_text(encoding="utf-8")) == report
-    junit = parse(directory / "junit.xml").getroot()
+    junit = ElementTree.parse(directory / "junit.xml").getroot()
     assert junit.get("failures") == str(int(status == "FAIL"))
     assert junit.get("errors") == str(int(status == "ERROR"))
     if not valid:
@@ -248,13 +258,15 @@ def test_workflow_accepts_versioned_reports_and_preserves_results(
 
 def test_unexpected_setup_error_reports_a_safe_stage(tmp_path, monkeypatch):
     project = ROOT / "examples/shop"
-    scenario = load_scenario(project / "scenarios/orders.yml", project)
+    scenario = loader.load_scenario(project / "scenarios/orders.yml", project)
 
     def fail_to_connect(config, deadline):
         raise RuntimeError("private internal details")
 
-    monkeypatch.setattr("dbt_scenario.runner.Database", fail_to_connect)
-    report = run_scenario(scenario, Config(project, {}), tmp_path)
+    monkeypatch.setattr("dbt_scenario.database.Database", fail_to_connect)
+    report = runner.run_scenario(
+        scenario, scenario_config.Config(project, {}), tmp_path
+    )
 
     assert report["overall_status"] == "ERROR"
     assert report["reason_code"] == "INTERNAL_ERROR"
@@ -285,12 +297,12 @@ def test_windows_timeout_terminates_descendants_even_after_parent_exit(
         f"subprocess.Popen([sys.executable,'-c',{child!r}]); "
     )
     parent += "time.sleep(30)" if parent_waits else "time.sleep(0.1)"
-    with pytest.raises(ScenarioError, match="STEP_TIMEOUT"):
-        run_process(
+    with pytest.raises(errors.ScenarioError, match="STEP_TIMEOUT"):
+        process.run_process(
             [sys.executable, "-c", parent],
             dict(os.environ),
             tmp_path,
-            Deadline(1.5, "STEP_TIMEOUT"),
+            scenario_deadline.Deadline(1.5, "STEP_TIMEOUT"),
         )
     assert pid_path.exists()
     import ctypes
@@ -313,11 +325,11 @@ def test_windows_timeout_terminates_descendants_even_after_parent_exit(
 
 def test_process_exit_code_is_preserved(tmp_path):
     assert (
-        run_process(
+        process.run_process(
             [sys.executable, "-c", "raise SystemExit(7)"],
             dict(os.environ),
             tmp_path,
-            Deadline(10, "STEP_TIMEOUT"),
+            scenario_deadline.Deadline(10, "STEP_TIMEOUT"),
         )
         == 7
     )

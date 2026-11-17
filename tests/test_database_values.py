@@ -1,20 +1,18 @@
+import decimal
 import json
 import os
+import pathlib
 import uuid
-from decimal import Decimal
-from pathlib import Path
 
 import pytest
 from psycopg import sql
 
-from dbt_scenario.config import load_config
-from dbt_scenario.database import Database
-from dbt_scenario.errors import ScenarioError
-from dbt_scenario.journal import Journal
-from dbt_scenario.lifecycle import finish_run
-from dbt_scenario.loader import converted
+from dbt_scenario import config as scenario_config
+from dbt_scenario import database as scenario_database
+from dbt_scenario import errors, lifecycle, loader
+from dbt_scenario import journal as scenario_journal
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = pathlib.Path(__file__).resolve().parents[1]
 pytestmark = pytest.mark.integration
 
 
@@ -22,18 +20,18 @@ pytestmark = pytest.mark.integration
 def tables(tmp_path):
     if "DSC_TEST_PASSWORD" not in os.environ:
         pytest.skip("DSC_TEST_PASSWORD is required for disposable PostgreSQL")
-    config = load_config(ROOT / "scenario-runner.yml")
+    config = scenario_config.load_config(ROOT / "scenario-runner.yml")
     config.project_dir = tmp_path
-    database = Database(config)
+    database = scenario_database.Database(config)
     run_id = uuid.uuid4().hex
     database.acquire_run_lock(run_id)
-    journal = Journal.create(config, run_id)
+    journal = scenario_journal.Journal.create(config, run_id)
     database.create_schemas(journal)
     actual, _, expected = journal.data["schemas"]
     try:
         yield database, actual, expected
     finally:
-        finish_run(database, journal)
+        lifecycle.finish_run(database, journal)
         database.close()
 
 
@@ -117,7 +115,7 @@ def test_double_precision_extremes_roundtrip_as_the_expected_binary64_values(
     assert [
         value.hex() if value is not None else None for (value,) in stored
     ] == [
-        converted(value, "double precision").hex()
+        loader.converted(value, "double precision").hex()
         if value is not None
         else None
         for value in values
@@ -274,7 +272,7 @@ def test_unconstrained_numeric_roundtrips_native_extremes_without_rounding(
     observed = database.execute(
         sql.SQL("SELECT value FROM {}").format(sql.Identifier(schema, "result"))
     ).fetchone()[0]
-    assert observed == (Decimal(value) if value is not None else None)
+    assert observed == (decimal.Decimal(value) if value is not None else None)
 
 
 def test_unconstrained_numeric_detects_differences_beyond_decimal_precision(
@@ -406,7 +404,7 @@ def test_schema_changes_fail_before_row_comparison(tables, alter):
 def test_missing_actual_table_is_not_an_empty_pass(tables):
     database, actual, expected = tables
     database.replace(expected, "expected", {"id": "integer"}, [])
-    with pytest.raises(ScenarioError, match="TARGET_MISSING"):
+    with pytest.raises(errors.ScenarioError, match="TARGET_MISSING"):
         database.compare(
             actual, "missing", expected, "expected", {"id": "integer"}, ["id"]
         )

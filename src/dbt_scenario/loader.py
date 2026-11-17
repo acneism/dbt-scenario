@@ -1,18 +1,19 @@
 import copy
+import dataclasses
+import datetime
+import decimal
 import hashlib
 import json
 import math
+import pathlib
 import re
-from dataclasses import dataclass, field
-from datetime import date, datetime
-from decimal import Context, Decimal, InvalidOperation, localcontext
-from importlib.resources import files
-from pathlib import Path
+from importlib import resources
+from typing import Any
 
+import jsonschema
 import yaml
-from jsonschema import Draft202012Validator
 
-from dbt_scenario.errors import ScenarioError
+from dbt_scenario import errors
 
 TYPE_PATTERN = re.compile(
     r"^(bigint|integer|text|boolean|date|timestamp|timestamptz|double "
@@ -26,17 +27,23 @@ YAML_BASE = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
 
 
 class StrictLoader(YAML_BASE):
-    def compose_node(self, parent, index):
+    def compose_node(
+        self,
+        parent: yaml.nodes.Node | None,
+        index: int | yaml.nodes.Node | None,
+    ) -> yaml.nodes.Node:
         if self.check_event(yaml.AliasEvent):
             mark = self.peek_event().start_mark
-            raise ScenarioError(
+            raise errors.ScenarioError(
                 "YAML_ALIAS_UNSUPPORTED",
                 line=mark.line + 1,
                 column=mark.column + 1,
             )
         return super().compose_node(parent, index)
 
-    def construct_mapping(self, node, deep=False):
+    def construct_mapping(
+        self, node: yaml.nodes.MappingNode, deep: bool = False
+    ) -> dict:
         keys = [self.construct_object(key, deep=deep) for key, _ in node.value]
         try:
             if len(set(keys)) != len(keys):
@@ -44,14 +51,14 @@ class StrictLoader(YAML_BASE):
                 for key, (key_node, _) in zip(keys, node.value, strict=True):
                     if key in seen:
                         mark = key_node.start_mark
-                        raise ScenarioError(
+                        raise errors.ScenarioError(
                             "DUPLICATE_YAML_KEY",
                             line=mark.line + 1,
                             column=mark.column + 1,
                         )
                     seen.add(key)
         except TypeError:
-            raise ScenarioError("INVALID_YAML_KEY") from None
+            raise errors.ScenarioError("INVALID_YAML_KEY") from None
         return super().construct_mapping(node, deep=deep)
 
 
@@ -65,19 +72,19 @@ StrictLoader.yaml_implicit_resolvers = {
 }
 
 
-def read_yaml_document(path: Path):
+def read_yaml_document(path: pathlib.Path) -> tuple[Any, str]:
     limit = 10 * 1024 * 1024
     with path.open("rb") as source:
         content = source.read(limit + 1)
     if len(content) > limit:
-        raise ScenarioError("FILE_TOO_LARGE")
+        raise errors.ScenarioError("FILE_TOO_LARGE")
     try:
         text = content.decode("utf-8")
         depth = 0
         for event in yaml.parse(text, Loader=YAML_BASE):
             if isinstance(event, yaml.AliasEvent):
                 mark = event.start_mark
-                raise ScenarioError(
+                raise errors.ScenarioError(
                     "YAML_ALIAS_UNSUPPORTED",
                     line=mark.line + 1,
                     column=mark.column + 1,
@@ -87,7 +94,7 @@ def read_yaml_document(path: Path):
             ):
                 depth += 1
                 if depth > 128:
-                    raise ScenarioError("YAML_NESTING_LIMIT")
+                    raise errors.ScenarioError("YAML_NESTING_LIMIT")
             elif isinstance(
                 event, (yaml.MappingEndEvent, yaml.SequenceEndEvent)
             ):
@@ -95,7 +102,7 @@ def read_yaml_document(path: Path):
         payload = yaml.load(text, Loader=StrictLoader)
     except (yaml.YAMLError, UnicodeError, RecursionError) as error:
         mark = getattr(error, "problem_mark", None)
-        raise ScenarioError(
+        raise errors.ScenarioError(
             "INVALID_YAML",
             line=mark.line + 1 if mark else None,
             column=mark.column + 1 if mark else None,
@@ -103,18 +110,20 @@ def read_yaml_document(path: Path):
     return payload, hashlib.sha256(content).hexdigest()
 
 
-def read_yaml(path: Path):
+def read_yaml(path: pathlib.Path) -> Any:
     return read_yaml_document(path)[0]
 
 
 def sql_type(value: str) -> str:
     match = TYPE_PATTERN.fullmatch(value)
     if not match or (match[2] is not None and int(match[3]) > int(match[2])):
-        raise ScenarioError("UNSUPPORTED_COLUMN_TYPE")
+        raise errors.ScenarioError("UNSUPPORTED_COLUMN_TYPE")
     return value
 
 
-def converted(value, kind: str):
+def converted(
+    value: object, kind: str
+) -> bool | int | float | str | decimal.Decimal | datetime.date | None:
     if value is None:
         return None
     try:
@@ -130,7 +139,7 @@ def converted(value, kind: str):
                 return value
         elif kind == "double precision" and isinstance(value, str):
             if DECIMAL_PATTERN.fullmatch(value):
-                number = Decimal(value)
+                number = decimal.Decimal(value)
                 floating = float(value)
                 if math.isfinite(floating) and (
                     floating != 0.0 or number.is_zero()
@@ -138,44 +147,46 @@ def converted(value, kind: str):
                     return floating
         elif kind == "numeric" and isinstance(value, str):
             if DECIMAL_PATTERN.fullmatch(value):
-                number = Decimal(value)
+                number = decimal.Decimal(value)
                 if (
                     number.is_finite()
                     and number.as_tuple().exponent >= -16383
                     and (number.is_zero() or number.adjusted() < 131072)
                 ):
-                    return Decimal(0) if number.is_zero() else number
+                    return decimal.Decimal(0) if number.is_zero() else number
         elif kind.startswith("numeric") and isinstance(value, str):
-            number = Decimal(value)
+            number = decimal.Decimal(value)
             precision, scale = map(int, re.findall(r"\d+", kind))
             if number.is_finite() and number.copy_abs() < 10 ** (
                 precision - scale
             ):
-                with localcontext(Context(prec=precision + 2)):
-                    quantum = Decimal(1).scaleb(-scale)
+                with decimal.localcontext(decimal.Context(prec=precision + 2)):
+                    quantum = decimal.Decimal(1).scaleb(-scale)
                     if number == number.quantize(quantum):
                         return number
         elif isinstance(value, str):
             if kind == "date":
-                return date.fromisoformat(value)
+                return datetime.date.fromisoformat(value)
             if re.search(r"[.,]\d{7,}", value):
                 raise ValueError
-            parsed = datetime.fromisoformat(value)
+            parsed = datetime.datetime.fromisoformat(value)
             if (parsed.utcoffset() is not None) == (kind == "timestamptz"):
                 return parsed
-    except (ValueError, InvalidOperation, OverflowError):
+    except (ValueError, decimal.InvalidOperation, OverflowError):
         pass
-    raise ScenarioError("INVALID_TYPED_VALUE")
+    raise errors.ScenarioError("INVALID_TYPED_VALUE")
 
 
-def unfinished_rows(value):
+def unfinished_rows(value: object) -> bool:
     return (
         isinstance(value, str)
         and re.fullmatch(r"replace_with_[A-Za-z0-9_]+_rows", value) is not None
     )
 
 
-def unfinished_rows_error(error):
+def unfinished_rows_error(
+    error: jsonschema.exceptions.ValidationError,
+) -> tuple[str | int, ...] | None:
     location = tuple(error.absolute_path)
     if (
         error.validator == "type"
@@ -191,34 +202,36 @@ def unfinished_rows_error(error):
     return None
 
 
-def typed_rows(rows: list, columns: dict, location=()) -> list[tuple]:
+def typed_rows(
+    rows: list, columns: dict, location: tuple[str | int, ...] = ()
+) -> list[tuple]:
     if unfinished_rows(rows):
-        raise ScenarioError("UNFILLED_TEMPLATE_ROWS", location=location)
+        raise errors.ScenarioError("UNFILLED_TEMPLATE_ROWS", location=location)
     if not isinstance(rows, list) or len(rows) > 100_000:
-        raise ScenarioError("INVALID_FIXTURE_SIZE", location=location)
+        raise errors.ScenarioError("INVALID_FIXTURE_SIZE", location=location)
     result = []
     for index, row in enumerate(rows):
         if not isinstance(row, dict) or row.keys() != columns.keys():
-            raise ScenarioError(
+            raise errors.ScenarioError(
                 "FIXTURE_COLUMNS_MISMATCH", location=(*location, index)
             )
         values = []
         for name, kind in columns.items():
             try:
                 values.append(converted(row[name], kind))
-            except ScenarioError as error:
-                raise ScenarioError(
+            except errors.ScenarioError as error:
+                raise errors.ScenarioError(
                     error.code, location=(*location, index, name)
                 ) from None
         result.append(tuple(values))
     return result
 
 
-@dataclass
+@dataclasses.dataclass
 class PreparedRows:
     columns: tuple[tuple[str, str], ...]
-    source: list[tuple] = field(repr=False)
-    values: list[tuple] = field(repr=False)
+    source: list[tuple] = dataclasses.field(repr=False)
+    values: list[tuple] = dataclasses.field(repr=False)
 
     def batch(
         self,
@@ -241,28 +254,34 @@ class PreparedRows:
         return self.values[offset:end]
 
 
-@dataclass
+@dataclasses.dataclass
 class Scenario:
     data: dict
-    path: Path
+    path: pathlib.Path
     fingerprint: str
     fixture_hashes: dict[str, str]
-    prepared: dict[tuple, PreparedRows] = field(
+    prepared: dict[tuple, PreparedRows] = dataclasses.field(
         default_factory=dict,
         repr=False,
         compare=False,
     )
 
 
-def validate_scenario_schema(data) -> None:
+def validate_scenario_schema(data: object) -> None:
     schema = json.loads(
-        files("dbt_scenario").joinpath("scenario.schema.json").read_text()
+        resources.files("dbt_scenario")
+        .joinpath("scenario.schema.json")
+        .read_text()
     )
-    error = next(Draft202012Validator(schema).iter_errors(data), None)
+    error = next(
+        jsonschema.Draft202012Validator(schema).iter_errors(data), None
+    )
     if error:
         unfinished = unfinished_rows_error(error)
         if unfinished is not None:
-            raise ScenarioError("UNFILLED_TEMPLATE_ROWS", location=unfinished)
+            raise errors.ScenarioError(
+                "UNFILLED_TEMPLATE_ROWS", location=unfinished
+            )
         location = tuple(error.absolute_path)
         if error.validator == "required" and isinstance(error.instance, dict):
             missing = next(
@@ -271,16 +290,18 @@ def validate_scenario_schema(data) -> None:
                 if key not in error.instance
             )
             location = (*location, missing)
-        raise ScenarioError("INVALID_SCENARIO_SCHEMA", location=location)
+        raise errors.ScenarioError("INVALID_SCENARIO_SCHEMA", location=location)
 
 
-@dataclass
+@dataclasses.dataclass
 class FixtureReader:
-    path: Path
-    root: Path
-    hashes: dict[str, str] = field(default_factory=dict)
-    cache: dict[Path, dict] = field(default_factory=dict)
-    prepared: dict[tuple, PreparedRows] = field(default_factory=dict)
+    path: pathlib.Path
+    root: pathlib.Path
+    hashes: dict[str, str] = dataclasses.field(default_factory=dict)
+    cache: dict[pathlib.Path, dict] = dataclasses.field(default_factory=dict)
+    prepared: dict[tuple, PreparedRows] = dataclasses.field(
+        default_factory=dict
+    )
 
     def prepare(
         self,
@@ -291,11 +312,11 @@ class FixtureReader:
         if "fixture" in fixture:
             target = (self.path.parent / fixture["fixture"]).resolve()
             if not target.is_relative_to(self.root) or not target.is_file():
-                raise ScenarioError("INVALID_FIXTURE_PATH")
+                raise errors.ScenarioError("INVALID_FIXTURE_PATH")
             if target not in self.cache:
                 payload, fingerprint = read_yaml_document(target)
                 if not isinstance(payload, dict) or set(payload) != {"rows"}:
-                    raise ScenarioError("INVALID_FIXTURE_FILE")
+                    raise errors.ScenarioError("INVALID_FIXTURE_FILE")
                 self.cache[target] = payload
                 self.hashes[target.relative_to(self.root).as_posix()] = (
                     fingerprint
@@ -327,13 +348,13 @@ def validate_columns(data: dict) -> None:
                 or "\x00" in name
                 or len(name.encode()) > 63
             ):
-                raise ScenarioError(
+                raise errors.ScenarioError(
                     "INVALID_COLUMN_NAME", location=(*prefix, "columns")
                 )
             try:
                 sql_type(kind)
-            except ScenarioError as error:
-                raise ScenarioError(
+            except errors.ScenarioError as error:
+                raise errors.ScenarioError(
                     error.code, location=(*prefix, "columns", name)
                 ) from None
 
@@ -341,7 +362,7 @@ def validate_columns(data: dict) -> None:
 def validate_steps(data: dict, fixtures: FixtureReader) -> None:
     nodes = [item["node"] for item in data["inputs"].values()]
     if len(set(nodes)) != len(nodes):
-        raise ScenarioError("DUPLICATE_INPUT_NODE")
+        raise errors.ScenarioError("DUPLICATE_INPUT_NODE")
     columns = data["output"]["columns"]
     keys = data["output"]["primary_key"]
     key_indexes = [list(columns).index(key) for key in keys]
@@ -351,18 +372,18 @@ def validate_steps(data: dict, fixtures: FixtureReader) -> None:
         try:
             json.dumps(step["run"].get("vars", {}), allow_nan=False)
         except (TypeError, ValueError):
-            raise ScenarioError(
+            raise errors.ScenarioError(
                 "INVALID_RUN_VARS", location=("steps", index, "run", "vars")
             ) from None
         if step["name"] in seen:
-            raise ScenarioError("DUPLICATE_STEP_NAME")
+            raise errors.ScenarioError("DUPLICATE_STEP_NAME")
         if step["run"]["mode"] != ("initial" if index == 0 else "incremental"):
-            raise ScenarioError(
+            raise errors.ScenarioError(
                 "INVALID_STEP_ORDER", location=("steps", index, "run", "mode")
             )
         for name, update in step.get("inputs", {}).items():
             if name not in data["inputs"]:
-                raise ScenarioError("UNKNOWN_INPUT")
+                raise errors.ScenarioError("UNKNOWN_INPUT")
             fixtures.prepare(
                 update["replace"],
                 data["inputs"][name]["columns"],
@@ -370,13 +391,13 @@ def validate_steps(data: dict, fixtures: FixtureReader) -> None:
             )
             initialized.add(name)
         if initialized != data["inputs"].keys():
-            raise ScenarioError(
+            raise errors.ScenarioError(
                 "UNINITIALIZED_INPUT", location=("steps", index, "inputs")
             )
         expected = step["expect"]
         if "same_as" in expected:
             if expected["same_as"] not in seen:
-                raise ScenarioError(
+                raise errors.ScenarioError(
                     "INVALID_SAME_AS_REFERENCE",
                     location=("steps", index, "expect", "same_as"),
                 )
@@ -390,25 +411,25 @@ def validate_steps(data: dict, fixtures: FixtureReader) -> None:
             if any(None in key for key in identities) or len(
                 set(identities)
             ) != len(identities):
-                raise ScenarioError(
+                raise errors.ScenarioError(
                     "INVALID_EXPECTED_KEY",
                     location=("steps", index, "expect", "rows"),
                 )
         seen.add(step["name"])
 
 
-def load_scenario(path: Path, project_dir: Path) -> Scenario:
+def load_scenario(path: pathlib.Path, project_dir: pathlib.Path) -> Scenario:
     path = path.resolve()
     root = project_dir.resolve()
     if not path.is_relative_to(root):
-        raise ScenarioError("SCENARIO_OUTSIDE_PROJECT")
+        raise errors.ScenarioError("SCENARIO_OUTSIDE_PROJECT")
     data = read_yaml(path)
     validate_scenario_schema(data)
     validate_columns(data)
     keys = data["output"]["primary_key"]
     columns = data["output"]["columns"]
     if len(set(keys)) != len(keys) or not set(keys) <= columns.keys():
-        raise ScenarioError("INVALID_PRIMARY_KEY")
+        raise errors.ScenarioError("INVALID_PRIMARY_KEY")
     fixtures = FixtureReader(path, root)
     validate_steps(data, fixtures)
     canonical = json.dumps(

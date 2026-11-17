@@ -1,27 +1,25 @@
 import argparse
 import copy
+import dataclasses
+import datetime
 import hashlib
 import json
 import math
 import os
+import pathlib
 import platform
 import statistics
 import tempfile
 import time
 import uuid
-from dataclasses import replace
-from datetime import UTC, datetime, timedelta
-from importlib.metadata import version
-from importlib.resources import files
-from pathlib import Path
+from importlib import metadata, resources
 
+import resource_limits
 import yaml
-from resource_limits import resource_limits
 
-from dbt_scenario import __version__
-from dbt_scenario.config import load_config
-from dbt_scenario.loader import YAML_BASE, load_scenario, read_yaml
-from dbt_scenario.runner import run_scenario
+import dbt_scenario
+from dbt_scenario import config as scenario_config
+from dbt_scenario import loader, runner
 
 COLUMNS = {
     "event_id": "bigint",
@@ -38,7 +36,7 @@ COLUMNS = {
 
 
 def implementation_hash(directory=None, prefix=""):
-    directory = directory or files("dbt_scenario")
+    directory = directory or resources.files("dbt_scenario")
     digest = hashlib.sha256()
     for child in sorted(directory.iterdir(), key=lambda entry: entry.name):
         if child.name == "__pycache__":
@@ -59,9 +57,9 @@ def write_yaml(path, document):
 
 def generate_project(directory, rows):
     initial = []
-    epoch = datetime(2026, 1, 1)
+    epoch = datetime.datetime(2026, 1, 1)
     for index in range(1, rows + 1):
-        timestamp = (epoch + timedelta(seconds=index)).isoformat()
+        timestamp = (epoch + datetime.timedelta(seconds=index)).isoformat()
         initial.append(
             {
                 "event_id": index,
@@ -86,7 +84,7 @@ def generate_project(directory, rows):
             event_id=index,
             event_at="2025-12-31T00:00:00",
             updated_at=(
-                epoch + timedelta(days=1, seconds=index - rows)
+                epoch + datetime.timedelta(days=1, seconds=index - rows)
             ).isoformat(),
         )
         updated.append(row)
@@ -163,7 +161,7 @@ def generate_project(directory, rows):
 
 def save_result(path, result):
     descriptor, name = tempfile.mkstemp(prefix=".benchmark-", dir=path.parent)
-    temporary = Path(name)
+    temporary = pathlib.Path(name)
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as output:
             json.dump(result, output, indent=2)
@@ -179,11 +177,13 @@ def main():
     parser = argparse.ArgumentParser(
         description="Measure complete synthetic dbt scenario runs."
     )
-    parser.add_argument("--config", type=Path, required=True)
+    parser.add_argument("--config", type=pathlib.Path, required=True)
     parser.add_argument("--samples", type=int, default=20)
     parser.add_argument("--rows", type=int, default=10000)
     parser.add_argument(
-        "--output", type=Path, default=Path("artifacts/benchmark/result.json")
+        "--output",
+        type=pathlib.Path,
+        default=pathlib.Path("artifacts/benchmark/result.json"),
     )
     parser.add_argument("--require-limits", action="store_true")
     arguments = parser.parse_args()
@@ -193,29 +193,31 @@ def main():
         )
     if arguments.output.exists():
         parser.error("output already exists; choose a new path")
-    limits = resource_limits()
+    limits = resource_limits.resource_limits()
     if arguments.require_limits and not limits["verified"]:
         parser.error(
             "requires cgroup v2 limits of 2 CPUs, 8 GiB memory and no extra "
             "swap"
         )
-    config = load_config(arguments.config, load_project_env=False)
+    config = scenario_config.load_config(
+        arguments.config, load_project_env=False
+    )
     arguments.output.parent.mkdir(parents=True, exist_ok=True)
     benchmark_id = uuid.uuid4().hex
     workspace = arguments.output.parent / f"project_{benchmark_id}"
     workspace.mkdir()
     expected_counts = generate_project(workspace, arguments.rows)
-    runner_config = read_yaml(arguments.config)
+    runner_config = loader.read_yaml(arguments.config)
     runner_config.update(project_dir=".", env_allowlist=[])
     write_yaml(workspace / "scenario-runner.yml", runner_config)
-    config = replace(config, project_dir=workspace, project_env={})
+    config = dataclasses.replace(config, project_dir=workspace, project_env={})
     result = {
         "schema_version": 1,
         "benchmark_id": benchmark_id,
-        "started_at": datetime.now(UTC).isoformat(),
-        "package_version": __version__,
+        "started_at": datetime.datetime.now(datetime.UTC).isoformat(),
+        "package_version": dbt_scenario.__version__,
         "benchmark_script_sha256": hashlib.sha256(
-            Path(__file__).read_bytes()
+            pathlib.Path(__file__).read_bytes()
         ).hexdigest(),
         "implementation_sha256": implementation_hash(),
         "environment": {
@@ -226,9 +228,9 @@ def main():
             "logical_cpus": os.cpu_count(),
             "resource_limits_enforced": limits["verified"],
             "resource_limits": limits,
-            "yaml_parser": YAML_BASE.__name__,
+            "yaml_parser": loader.YAML_BASE.__name__,
             "dependencies": {
-                name: version(name)
+                name: metadata.version(name)
                 for name in [
                     "dbt-core",
                     "dbt-postgres",
@@ -274,9 +276,11 @@ def main():
     save_result(arguments.output, result)
     for index in range(arguments.samples):
         started = time.perf_counter()
-        scenario = load_scenario(workspace / "scenarios/events.yml", workspace)
+        scenario = loader.load_scenario(
+            workspace / "scenarios/events.yml", workspace
+        )
         loaded = time.perf_counter()
-        report = run_scenario(scenario, config, report_dir)
+        report = runner.run_scenario(scenario, config, report_dir)
         finished = time.perf_counter()
         counts = [step.get("actual_rows") for step in report["steps"]]
         passed = (
@@ -318,13 +322,14 @@ def main():
             )
     durations = sorted(sample["wall_ms"] for sample in result["samples"])
     result["complete"] = True
-    result["summary"] = {
+    summary = {
         "samples": len(durations),
         "p50_ms": statistics.median(durations),
         "p95_ms": durations[math.ceil(0.95 * len(durations)) - 1],
         "min_ms": durations[0],
         "max_ms": durations[-1],
     }
+    result["summary"] = summary
     eligible = (
         limits["verified"]
         and arguments.rows == 10000
@@ -333,10 +338,10 @@ def main():
     result["performance_target"] = {
         "eligible": eligible,
         "p95_limit_ms": 60000,
-        "met": result["summary"]["p95_ms"] <= 60000 if eligible else None,
+        "met": summary["p95_ms"] <= 60000 if eligible else None,
     }
     save_result(arguments.output, result)
-    print(json.dumps(result["summary"]), flush=True)
+    print(json.dumps(summary), flush=True)
 
 
 if __name__ == "__main__":

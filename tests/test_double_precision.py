@@ -1,15 +1,14 @@
 import copy
 import math
+import pathlib
 import sys
-from pathlib import Path
 
 import pytest
 import yaml
 
-from dbt_scenario.errors import ScenarioError
-from dbt_scenario.loader import converted, load_scenario, sql_type
+from dbt_scenario import errors, loader
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = pathlib.Path(__file__).resolve().parents[1]
 PROJECT = ROOT / "examples/shop"
 
 
@@ -29,12 +28,12 @@ PROJECT = ROOT / "examples/shop"
 def test_double_precision_converts_quoted_decimal_values_to_binary64(
     value, expected
 ):
-    assert sql_type("double precision") == "double precision"
-    actual = converted(value, "double precision")
+    assert loader.sql_type("double precision") == "double precision"
+    actual = loader.converted(value, "double precision")
     assert type(actual) is float
     assert actual == expected
     assert math.copysign(1, actual) == math.copysign(1, expected)
-    assert converted(None, "double precision") is None
+    assert loader.converted(None, "double precision") is None
 
 
 @pytest.mark.parametrize(
@@ -63,15 +62,15 @@ def test_double_precision_converts_quoted_decimal_values_to_binary64(
     ],
 )
 def test_double_precision_rejects_nonfinite_lossy_or_unquoted_values(value):
-    with pytest.raises(ScenarioError, match="INVALID_TYPED_VALUE"):
-        converted(value, "double precision")
+    with pytest.raises(errors.ScenarioError, match="INVALID_TYPED_VALUE"):
+        loader.converted(value, "double precision")
 
 
 def test_distinct_decimal_keys_that_round_to_one_double_are_duplicate_keys(
     tmp_path,
 ):
     data = copy.deepcopy(
-        load_scenario(PROJECT / "scenarios/orders.yml", PROJECT).data
+        loader.load_scenario(PROJECT / "scenarios/orders.yml", PROJECT).data
     )
     data["output"] = {
         "columns": {"key": "double precision"},
@@ -83,5 +82,5 @@ def test_distinct_decimal_keys_that_round_to_one_double_are_duplicate_keys(
     }
     path = tmp_path / "scenario.yml"
     path.write_text(yaml.safe_dump(data))
-    with pytest.raises(ScenarioError, match="INVALID_EXPECTED_KEY"):
-        load_scenario(path, tmp_path)
+    with pytest.raises(errors.ScenarioError, match="INVALID_EXPECTED_KEY"):
+        loader.load_scenario(path, tmp_path)

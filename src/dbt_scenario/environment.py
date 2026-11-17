@@ -1,7 +1,7 @@
 import os
 import re
 
-from dbt_scenario.errors import ScenarioError
+from dbt_scenario import errors
 
 BASE_NAMES = {"PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "LANG", "LC_ALL"}
 RESERVED_NAMES = BASE_NAMES | {
@@ -26,9 +26,9 @@ RESERVED_NAMES = BASE_NAMES | {
 RESERVED_PREFIXES = ("PG", "PYTHON", "LD_", "DYLD_", "GIT_", "PIP_", "UV_")
 
 
-def validate_names(names):
+def validate_names(names: object) -> None:
     if not isinstance(names, list) or len(names) > 64:
-        raise ScenarioError(
+        raise errors.ScenarioError(
             "INVALID_ENV_ALLOWLIST", location=("env_allowlist",)
         )
     seen = set()
@@ -36,7 +36,7 @@ def validate_names(names):
         if not isinstance(name, str) or not re.fullmatch(
             r"[A-Za-z_][A-Za-z0-9_]{0,127}", name
         ):
-            raise ScenarioError(
+            raise errors.ScenarioError(
                 "INVALID_ENV_ALLOWLIST", location=("env_allowlist", index)
             )
         normalized = name.upper()
@@ -49,22 +49,24 @@ def validate_names(names):
                 and not normalized.startswith("DBT_ENV_SECRET_")
             )
         ):
-            raise ScenarioError(
+            raise errors.ScenarioError(
                 "INVALID_ENV_ALLOWLIST", location=("env_allowlist", index)
             )
         seen.add(normalized)
 
 
-def selected_environment(names, password_name: str) -> dict[str, str]:
+def selected_environment(
+    names: list[str], password_name: str
+) -> dict[str, str]:
     validate_names(names)
     selected = {}
     for index, name in enumerate(names):
         if name.upper() == password_name.upper():
-            raise ScenarioError(
+            raise errors.ScenarioError(
                 "INVALID_ENV_ALLOWLIST", location=("env_allowlist", index)
             )
         if name not in os.environ:
-            raise ScenarioError(
+            raise errors.ScenarioError(
                 "MISSING_PROJECT_ENV", location=("env_allowlist", index)
             )
         selected[name] = os.environ[name]

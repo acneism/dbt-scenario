@@ -1,15 +1,15 @@
 import json
 import os
+import pathlib
 import secrets
 import socket
 import subprocess
 import tempfile
-from pathlib import Path
 
 import psycopg
 from psycopg import sql
 
-from dbt_scenario import __version__
+import dbt_scenario
 
 
 class AcceptanceError(Exception):
@@ -23,12 +23,14 @@ def run(arguments, **kwargs):
         )
     except (OSError, subprocess.SubprocessError):
         raise AcceptanceError(
-            "COMMAND_FAILED_" + Path(arguments[0]).name.upper()
+            "COMMAND_FAILED_" + pathlib.Path(arguments[0]).name.upper()
         ) from None
 
 
 def network_proof():
-    interfaces = sorted(path.name for path in Path("/sys/class/net").iterdir())
+    interfaces = sorted(
+        path.name for path in pathlib.Path("/sys/class/net").iterdir()
+    )
     if interfaces != ["lo"]:
         raise AcceptanceError("NETWORK_ISOLATION_REQUIRED")
     blocked = {}
@@ -55,7 +57,7 @@ def main():
     with tempfile.TemporaryDirectory(
         prefix="dbt-scenario-offline-"
     ) as temporary:
-        root = Path(temporary)
+        root = pathlib.Path(temporary)
         project = root / "demo"
         static_environment = {
             key: value
@@ -192,7 +194,7 @@ def main():
                 server_version = database.info.server_version
             result = {
                 "status": "PASS",
-                "package_version": __version__,
+                "package_version": dbt_scenario.__version__,
                 "postgresql": server_version,
                 "network": network,
                 "static_validation": {

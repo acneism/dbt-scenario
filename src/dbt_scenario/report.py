@@ -1,7 +1,7 @@
 import json
-from pathlib import Path
+import pathlib
 from typing import Literal, NotRequired, TypedDict
-from xml.etree.ElementTree import Element, SubElement, tostring
+from xml.etree import ElementTree
 
 ScenarioStatus = Literal["PASS", "FAIL", "ERROR"]
 CleanupStatus = Literal["CLEANED", "KEPT", "ERROR", "NOT_NEEDED"]
@@ -72,18 +72,18 @@ def reason_lines(report: ScenarioReport) -> list[str]:
     return lines
 
 
-def write_report(report: ScenarioReport, directory: Path) -> None:
+def write_report(report: ScenarioReport, directory: pathlib.Path) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     (directory / "summary.json").write_text(
         json.dumps(report, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
     steps = report["steps"]
-    suite = Element(
+    suite = ElementTree.Element(
         "testsuite", name=report["scenario"], tests=str(max(1, len(steps)))
     )
     for step in steps:
-        case = SubElement(
+        case = ElementTree.SubElement(
             suite,
             "testcase",
             name=step["name"],
@@ -92,18 +92,22 @@ def write_report(report: ScenarioReport, directory: Path) -> None:
         )
         status = step["status"]
         if status in {"FAIL", "ERROR"}:
-            SubElement(
+            ElementTree.SubElement(
                 case,
                 "failure" if status == "FAIL" else "error",
                 message=step["reason_code"] or status,
             )
         elif status == "NOT_RUN":
-            SubElement(case, "skipped", message="PREVIOUS_STEP_UNSUCCESSFUL")
+            ElementTree.SubElement(
+                case, "skipped", message="PREVIOUS_STEP_UNSUCCESSFUL"
+            )
     if report["overall_status"] == "ERROR" and not any(
         s["status"] == "ERROR" for s in steps
     ):
-        case = SubElement(suite, "testcase", name="scenario_setup_or_cleanup")
-        SubElement(
+        case = ElementTree.SubElement(
+            suite, "testcase", name="scenario_setup_or_cleanup"
+        )
+        ElementTree.SubElement(
             case, "error", message=report["reason_code"] or "SCENARIO_ERROR"
         )
     suite.set("tests", str(len(suite)))
@@ -111,7 +115,7 @@ def write_report(report: ScenarioReport, directory: Path) -> None:
     suite.set("errors", str(sum(len(c.findall("error")) for c in suite)))
     suite.set("skipped", str(sum(len(c.findall("skipped")) for c in suite)))
     (directory / "junit.xml").write_bytes(
-        tostring(suite, encoding="utf-8", xml_declaration=True)
+        ElementTree.tostring(suite, encoding="utf-8", xml_declaration=True)
     )
     lines = [f"Result: {report['overall_status']}", ""]
     if reasons := reason_lines(report):

@@ -1,23 +1,21 @@
 import copy
-from datetime import UTC, datetime
-from decimal import Decimal
-from pathlib import Path
+import datetime
+import decimal
+import pathlib
 
 import pytest
 import yaml
-from click.testing import CliRunner
+from click import testing
 
-from dbt_scenario.cli import main
-from dbt_scenario.errors import ScenarioError
-from dbt_scenario.loader import converted, load_scenario, read_yaml
+from dbt_scenario import cli, errors, loader
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = pathlib.Path(__file__).resolve().parents[1]
 PROJECT = ROOT / "examples" / "shop"
 SCENARIO = PROJECT / "scenarios" / "orders.yml"
 
 
 def inline_example():
-    return copy.deepcopy(load_scenario(SCENARIO, PROJECT).data)
+    return copy.deepcopy(loader.load_scenario(SCENARIO, PROJECT).data)
 
 
 def write_scenario(tmp_path, data):
@@ -40,17 +38,17 @@ def write_scenario(tmp_path, data):
     ],
 )
 def test_rejects_lossy_or_ambiguous_values(value, kind):
-    with pytest.raises(ScenarioError, match="INVALID_TYPED_VALUE"):
-        converted(value, kind)
+    with pytest.raises(errors.ScenarioError, match="INVALID_TYPED_VALUE"):
+        loader.converted(value, kind)
 
 
 def test_preserves_decimal_and_timezone():
-    assert converted("9999999999.99", "numeric(12,2)") == Decimal(
-        "9999999999.99"
-    )
-    assert converted("2026-01-01T03:00:00+03:00", "timestamptz") == datetime(
-        2026, 1, 1, tzinfo=UTC
-    )
+    assert loader.converted(
+        "9999999999.99", "numeric(12,2)"
+    ) == decimal.Decimal("9999999999.99")
+    assert loader.converted(
+        "2026-01-01T03:00:00+03:00", "timestamptz"
+    ) == datetime.datetime(2026, 1, 1, tzinfo=datetime.UTC)
 
 
 @pytest.mark.parametrize(
@@ -64,8 +62,8 @@ def test_preserves_decimal_and_timezone():
 def test_rejects_unsafe_yaml(tmp_path, text, reason):
     path = tmp_path / "unsafe.yml"
     path.write_text(text)
-    with pytest.raises(ScenarioError, match=reason):
-        read_yaml(path)
+    with pytest.raises(errors.ScenarioError, match=reason):
+        loader.read_yaml(path)
 
 
 @pytest.mark.parametrize(
@@ -98,19 +96,19 @@ def test_rejects_unsafe_yaml(tmp_path, text, reason):
 def test_rejects_invalid_scenarios(tmp_path, mutation, reason):
     data = inline_example()
     mutation(data)
-    with pytest.raises(ScenarioError, match=reason):
-        load_scenario(write_scenario(tmp_path, data), tmp_path)
+    with pytest.raises(errors.ScenarioError, match=reason):
+        loader.load_scenario(write_scenario(tmp_path, data), tmp_path)
 
 
 def test_blocks_fixture_path_escape(tmp_path):
     data = inline_example()
     data["steps"][0]["expect"] = {"fixture": "../outside.yml"}
-    with pytest.raises(ScenarioError, match="INVALID_FIXTURE_PATH"):
-        load_scenario(write_scenario(tmp_path, data), tmp_path)
+    with pytest.raises(errors.ScenarioError, match="INVALID_FIXTURE_PATH"):
+        loader.load_scenario(write_scenario(tmp_path, data), tmp_path)
 
 
 def test_prepared_rows_require_unchanged_values_and_column_order():
-    scenario = load_scenario(SCENARIO, PROJECT)
+    scenario = loader.load_scenario(SCENARIO, PROJECT)
     rows = scenario.data["steps"][0]["inputs"]["orders"]["replace"]["rows"]
     columns = scenario.data["inputs"]["orders"]["columns"]
     location = ("steps", 0, "inputs", "orders", "replace", "rows")
@@ -129,16 +127,18 @@ def test_prepared_rows_require_unchanged_values_and_column_order():
 def test_var_change_changes_fingerprint(tmp_path):
     data = inline_example()
     path = write_scenario(tmp_path, data)
-    before = load_scenario(path, tmp_path).fingerprint
+    before = loader.load_scenario(path, tmp_path).fingerprint
     data["steps"][0]["run"]["vars"] = {"as_of": "2026-01-01"}
-    after = load_scenario(write_scenario(tmp_path, data), tmp_path).fingerprint
+    after = loader.load_scenario(
+        write_scenario(tmp_path, data), tmp_path
+    ).fingerprint
     assert before != after
 
 
 def test_cli_empty_selection_is_error(monkeypatch):
     monkeypatch.setenv("DSC_TEST_PASSWORD", "disposable-test-password")
-    result = CliRunner().invoke(
-        main, ["test", "--config", str(ROOT / "scenario-runner.yml")]
+    result = testing.CliRunner().invoke(
+        cli.main, ["test", "--config", str(ROOT / "scenario-runner.yml")]
     )
     assert result.exit_code == 2
     assert "NO_SCENARIOS_SELECTED" in result.output

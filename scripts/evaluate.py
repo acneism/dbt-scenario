@@ -2,33 +2,33 @@ import argparse
 import hashlib
 import json
 import os
+import pathlib
 import platform
 import re
 import subprocess
 import sys
-from importlib.metadata import version
-from pathlib import Path
+from importlib import metadata
 
+import local_postgres
+import offline_acceptance
 import psycopg
+import resource_limits
 import yaml
-from local_postgres import local_postgres
-from offline_acceptance import network_proof
-from resource_limits import resource_limits
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("mode", choices=["performance", "comparison"])
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--output", type=pathlib.Path, required=True)
     arguments = parser.parse_args()
     if arguments.output.exists():
         parser.error("output already exists")
-    limits = resource_limits()
+    limits = resource_limits.resource_limits()
     if not limits["verified"]:
         raise RuntimeError("EVALUATION_RESOURCE_LIMITS_UNVERIFIED")
-    network = network_proof()
-    scripts = Path(__file__).resolve().parent
-    with local_postgres() as config:
+    network = offline_acceptance.network_proof()
+    scripts = pathlib.Path(__file__).resolve().parent
+    with local_postgres.local_postgres() as config:
         root = config.project_dir
         (root / "dbt_project.yml").write_text(
             yaml.safe_dump(
@@ -98,7 +98,7 @@ def main():
         python=platform.python_version(),
         platform=platform.platform(),
         dependencies={
-            name: version(name)
+            name: metadata.version(name)
             for name in [
                 "dbt-core",
                 "dbt-postgres",
@@ -109,18 +109,20 @@ def main():
         },
     )
     result["evaluation_script_sha256"] = hashlib.sha256(
-        Path(__file__).read_bytes()
+        pathlib.Path(__file__).read_bytes()
     ).hexdigest()
     commit = os.environ.get("EVALUATION_COMMIT", "")
     result["source_commit"] = (
         commit if re.fullmatch("[0-9a-f]{40}", commit) else None
     )
     result["database_cleanup_verified"] = True
-    peak = Path("/sys/fs/cgroup/memory.peak")
+    peak = pathlib.Path("/sys/fs/cgroup/memory.peak")
     result["environment"]["container_peak_memory_bytes"] = (
         int(peak.read_text()) if peak.exists() else None
     )
-    arguments.output.write_text(json.dumps(result, indent=2) + "\n")
+    arguments.output.write_text(
+        json.dumps(result, indent=2) + "\n", encoding="utf-8"
+    )
     print(
         "EVALUATION_RESULT=" + json.dumps(result, separators=(",", ":")),
         flush=True,

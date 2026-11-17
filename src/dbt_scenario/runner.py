@@ -1,62 +1,67 @@
+import dataclasses
+import datetime
 import hashlib
 import json
+import pathlib
 import re
 import tempfile
 import time
 import uuid
-from dataclasses import dataclass, field
-from datetime import UTC, datetime
-from importlib.metadata import version
-from pathlib import Path
+from importlib import metadata
 
 import psycopg
 import sqlparse
 
-from dbt_scenario.artifacts import successful_model_result
-from dbt_scenario.config import Config
-from dbt_scenario.database import Database
-from dbt_scenario.deadline import Deadline
-from dbt_scenario.errors import ScenarioError
-from dbt_scenario.journal import Journal, schema_names
-from dbt_scenario.lifecycle import finish_run
-from dbt_scenario.loader import PreparedRows, Scenario
-from dbt_scenario.project import Project
-from dbt_scenario.report import (
-    ErrorStage,
-    RunMode,
-    ScenarioReport,
-    StepSummary,
-    write_report,
+from dbt_scenario import artifacts as scenario_artifacts
+from dbt_scenario import config as scenario_config
+from dbt_scenario import database as scenario_database
+from dbt_scenario import (
+    deadline,
+    errors,
+    lifecycle,
+    loader,
+    requirements,
+    sql_audit,
 )
-from dbt_scenario.requirements import check_model_config
-from dbt_scenario.sql_audit import audit_sql
+from dbt_scenario import journal as scenario_journal
+from dbt_scenario import project as scenario_project
+from dbt_scenario import report as scenario_report
 
 
-def execution_node(manifest, node, actual_schema, database):
+def execution_node(
+    manifest: dict, node: dict, actual_schema: str, database: str
+) -> dict:
     selected = manifest["nodes"].get(node["unique_id"])
     try:
-        check_model_config(selected.get("config") if selected else None)
-    except ScenarioError:
-        raise ScenarioError("MODEL_CONFIGURATION_CHANGED") from None
+        requirements.check_model_config(
+            selected.get("config") if selected else None
+        )
+    except errors.ScenarioError:
+        raise errors.ScenarioError("MODEL_CONFIGURATION_CHANGED") from None
     if (
         not selected
         or selected["alias"] != node["alias"]
         or selected["schema"] != actual_schema
         or selected["database"] != database
     ):
-        raise ScenarioError("MODEL_CONFIGURATION_CHANGED")
+        raise errors.ScenarioError("MODEL_CONFIGURATION_CHANGED")
     return selected
 
 
 def observe_mode(
-    project: Project, node: dict, artifact_dir: Path, mode: str, before, after
+    project: scenario_project.Project,
+    node: dict,
+    artifact_dir: pathlib.Path,
+    mode: str,
+    before: int | None,
+    after: int | None,
 ) -> dict:
     if after is None or (mode == "initial" and before is not None):
-        raise ScenarioError("EXECUTION_MODE_UNVERIFIED")
+        raise errors.ScenarioError("EXECUTION_MODE_UNVERIFIED")
     if mode == "incremental" and (before is None or before != after):
-        raise ScenarioError("TARGET_REBUILT")
+        raise errors.ScenarioError("TARGET_REBUILT")
     results = project.read_run_results(artifact_dir)
-    successful_model_result(results, node["unique_id"])
+    scenario_artifacts.successful_model_result(results, node["unique_id"])
     run_path = (
         artifact_dir
         / "target"
@@ -67,7 +72,7 @@ def observe_mode(
     try:
         statement = run_path.read_text(encoding="utf-8")
     except OSError:
-        raise ScenarioError("EXECUTION_MODE_UNVERIFIED") from None
+        raise errors.ScenarioError("EXECUTION_MODE_UNVERIFIED") from None
     normalized = re.sub(
         r"\s+", " ", sqlparse.format(statement, strip_comments=True)
     ).lower()
@@ -91,7 +96,7 @@ def observe_mode(
             re.search(pattern, normalized) for pattern in patterns[strategy]
         )
     if not verified:
-        raise ScenarioError("EXECUTION_MODE_UNVERIFIED")
+        raise errors.ScenarioError("EXECUTION_MODE_UNVERIFIED")
     return {
         "operation": operation,
         "method": "dbt_invocation_main_sql_and_target_oid",
@@ -100,24 +105,24 @@ def observe_mode(
     }
 
 
-@dataclass(slots=True)
+@dataclasses.dataclass(slots=True)
 class StepExecution:
-    project: Project
-    database: Database
+    project: scenario_project.Project
+    database: scenario_database.Database
     schemas: tuple[str, str, str]
     definition: dict
     node: dict
     mapping: dict[str, str]
     database_name: str
-    prepared: dict[tuple, PreparedRows]
-    snapshots: dict[str, str] = field(default_factory=dict)
+    prepared: dict[tuple, loader.PreparedRows]
+    snapshots: dict[str, str] = dataclasses.field(default_factory=dict)
 
     def execute(
         self,
         index: int,
         step: dict,
-        budget: Deadline,
-        summary: StepSummary,
+        budget: deadline.Deadline,
+        summary: scenario_report.StepSummary,
     ) -> None:
         actual_schema, input_schema, _ = self.schemas
         mode = summary["requested_mode"]
@@ -136,7 +141,7 @@ class StepExecution:
                     )
             before = self.database.oid(actual_schema, self.node["alias"])
             if (before is None) != (mode == "initial"):
-                raise ScenarioError("INVALID_TARGET_STATE")
+                raise errors.ScenarioError("INVALID_TARGET_STATE")
             args = [
                 "--select",
                 self.node["name"],
@@ -148,11 +153,11 @@ class StepExecution:
 
     def materialize(
         self,
-        mode: RunMode,
+        mode: scenario_report.RunMode,
         before: int | None,
-        budget: Deadline,
+        budget: deadline.Deadline,
         args: list[str],
-        summary: StepSummary,
+        summary: scenario_report.StepSummary,
     ) -> None:
         actual_schema, input_schema, _ = self.schemas
         dbname = self.database_name
@@ -166,7 +171,7 @@ class StepExecution:
         allowed = {(input_schema, table) for table in self.mapping.values()}
         if mode == "incremental":
             allowed.add((actual_schema, self.node["alias"]))
-        compile_audit = audit_sql(
+        compile_audit = sql_audit.audit_sql(
             compiled_node.get("compiled_code"),
             dbname,
             allowed,
@@ -175,7 +180,7 @@ class StepExecution:
 
         manifest, artifacts = self.project.invoke("run", budget, args)
         run_node = execution_node(manifest, self.node, actual_schema, dbname)
-        executed_audit = audit_sql(
+        executed_audit = sql_audit.audit_sql(
             run_node.get("compiled_code"),
             dbname,
             allowed,
@@ -197,7 +202,7 @@ class StepExecution:
         self,
         index: int,
         expected: dict,
-        summary: StepSummary,
+        summary: scenario_report.StepSummary,
     ) -> None:
         actual_schema, _, expected_schema = self.schemas
         columns = self.definition["output"]["columns"]
@@ -235,10 +240,10 @@ class StepExecution:
 
 
 def initialize_report(
-    scenario: Scenario,
-    config: Config,
+    scenario: loader.Scenario,
+    config: scenario_config.Config,
     run_id: str,
-) -> ScenarioReport:
+) -> scenario_report.ScenarioReport:
     return {
         "schema_version": 1,
         "run_id": run_id,
@@ -249,10 +254,11 @@ def initialize_report(
         "project_hash": None,
         "project_hash_format": 2,
         "project_env_names": sorted(config.project_env),
-        "started_at": datetime.now(UTC).isoformat(),
+        "started_at": datetime.datetime.now(datetime.UTC).isoformat(),
         "duration_ms": 0,
         "engine_versions": {
-            name: version(name) for name in ["dbt-core", "dbt-postgres"]
+            name: metadata.version(name)
+            for name in ["dbt-core", "dbt-postgres"]
         },
         "overall_status": "ERROR",
         "cleanup_status": "NOT_NEEDED",
@@ -262,7 +268,9 @@ def initialize_report(
     }
 
 
-def initialize_step(name: str, mode: RunMode) -> StepSummary:
+def initialize_step(
+    name: str, mode: scenario_report.RunMode
+) -> scenario_report.StepSummary:
     return {
         "name": name,
         "requested_mode": mode,
@@ -280,10 +288,13 @@ def initialize_step(name: str, mode: RunMode) -> StepSummary:
 
 
 def finish_resources(
-    database: Database, journal: Journal, report: ScenarioReport, keep: bool
+    database: scenario_database.Database,
+    journal: scenario_journal.Journal,
+    report: scenario_report.ScenarioReport,
+    keep: bool,
 ) -> None:
     try:
-        report["cleanup_status"] = finish_run(
+        report["cleanup_status"] = lifecycle.finish_run(
             database, journal, keep and report["overall_status"] != "PASS"
         )
     except Exception as error:
@@ -291,7 +302,7 @@ def finish_resources(
             overall_status="ERROR",
             cleanup_status="ERROR",
             cleanup_reason_code=error.code
-            if isinstance(error, ScenarioError)
+            if isinstance(error, errors.ScenarioError)
             else "CLEANUP_FAILED",
         )
         report["reason_code"] = report["reason_code"] or "CLEANUP_FAILED"
@@ -302,36 +313,42 @@ def finish_resources(
 
 
 def run_scenario(
-    scenario: Scenario,
-    config: Config,
-    report_dir: Path,
+    scenario: loader.Scenario,
+    config: scenario_config.Config,
+    report_dir: pathlib.Path,
     keep_on_failure: bool = False,
-) -> ScenarioReport:
+) -> scenario_report.ScenarioReport:
     started = time.monotonic()
-    scenario_budget = Deadline(config.scenario_timeout, "SCENARIO_TIMEOUT")
+    scenario_budget = deadline.Deadline(
+        config.scenario_timeout, "SCENARIO_TIMEOUT"
+    )
     run_id = uuid.uuid4().hex
     definition = scenario.data
     report = initialize_report(scenario, config, run_id)
-    actual_schema, input_schema, expected_schema = schema_names(run_id)
+    actual_schema, input_schema, expected_schema = (
+        scenario_journal.schema_names(run_id)
+    )
     database = journal = current_step = None
     step_started = started
-    stage: ErrorStage = "setup"
+    stage: scenario_report.ErrorStage = "setup"
     output_dir = report_dir / run_id
     output_dir.mkdir(parents=True)
     try:
         with tempfile.TemporaryDirectory(prefix="dbt-scenario-") as temporary:
-            database = Database(config, scenario_budget)
+            database = scenario_database.Database(config, scenario_budget)
             report["engine_versions"]["postgresql"] = (
                 database.connection.info.server_version
             )
             with database.budget(scenario_budget):
-                project = Project(config, Path(temporary), actual_schema)
+                project = scenario_project.Project(
+                    config, pathlib.Path(temporary), actual_schema
+                )
                 report["project_hash"] = project.project_hash
                 scenario_budget.check()
                 node = project.inspect(definition, scenario_budget)
                 mapping = project.install_mapping(definition, input_schema)
                 database.acquire_run_lock(run_id)
-                journal = Journal.create(config, run_id)
+                journal = scenario_journal.Journal.create(config, run_id)
                 database.create_schemas(journal)
             execution = StepExecution(
                 project,
@@ -351,7 +368,7 @@ def run_scenario(
                 )
                 report["steps"].append(current_step)
                 step_started = time.monotonic()
-                step_budget = Deadline(
+                step_budget = deadline.Deadline(
                     config.step_timeout, "STEP_TIMEOUT", scenario_budget
                 )
                 execution.execute(index, step, step_budget, current_step)
@@ -367,7 +384,7 @@ def run_scenario(
                 else "FAIL"
             )
             stage = "workspace_cleanup"
-    except ScenarioError as error:
+    except errors.ScenarioError as error:
         report["reason_code"] = error.code
         report["diagnostic"] = error.diagnostic()
     except psycopg.Error:
@@ -402,5 +419,5 @@ def run_scenario(
                 }
             )
         report["duration_ms"] = round((time.monotonic() - started) * 1000)
-        write_report(report, output_dir)
+        scenario_report.write_report(report, output_dir)
     return report

@@ -1,7 +1,7 @@
-from pathlib import Path
+import pathlib
 
 
-def resource_limits(root=Path("/sys/fs/cgroup")):
+def resource_limits(root=pathlib.Path("/sys/fs/cgroup")):
     try:
         quota, period = (root / "cpu.max").read_text().split()
         memory = (root / "memory.max").read_text().strip()

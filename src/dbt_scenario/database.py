@@ -1,24 +1,25 @@
+import contextlib
 import hashlib
 import math
-from contextlib import contextmanager
-from threading import Event, Timer
+import threading
+from collections.abc import Iterator, Mapping, Sequence
 
 import psycopg
 from psycopg import sql
 
-from dbt_scenario.config import Config
-from dbt_scenario.deadline import Deadline
-from dbt_scenario.errors import ScenarioError
-from dbt_scenario.journal import Journal
-from dbt_scenario.loader import PreparedRows, typed_rows
-from dbt_scenario.report import ComparisonResult, DiffCounts
+from dbt_scenario import config as scenario_config
+from dbt_scenario import deadline as scenario_deadline
+from dbt_scenario import errors, loader, report
+from dbt_scenario import journal as scenario_journal
 
 
-def relation(schema: str, table: str):
+def relation(schema: str, table: str) -> sql.Identifier:
     return sql.Identifier(schema, table)
 
 
-def value_column(name: str, kind: str, alias: str | None = None):
+def value_column(
+    name: str, kind: str, alias: str | None = None
+) -> sql.Composable:
     column = sql.Identifier(alias, name) if alias else sql.Identifier(name)
     if kind == "text":
         return sql.SQL('{} COLLATE "C"').format(column)
@@ -26,7 +27,11 @@ def value_column(name: str, kind: str, alias: str | None = None):
 
 
 class Database:
-    def __init__(self, config: Config, deadline: Deadline | None = None):
+    def __init__(
+        self,
+        config: scenario_config.Config,
+        deadline: scenario_deadline.Deadline | None = None,
+    ) -> None:
         kwargs = config.connection_kwargs()
         if deadline:
             kwargs["connect_timeout"] = max(
@@ -50,27 +55,31 @@ class Database:
                 "FROM pg_roles WHERE rolname=current_user)"
             ).fetchone()
             if not 160000 <= version < 170000:
-                raise ScenarioError("POSTGRES_VERSION_UNSUPPORTED")
+                raise errors.ScenarioError("POSTGRES_VERSION_UNSUPPORTED")
             if privileged:
-                raise ScenarioError("PRIVILEGED_DATABASE_ROLE")
+                raise errors.ScenarioError("PRIVILEGED_DATABASE_ROLE")
         except BaseException:
             self.connection.close()
             raise
 
-    def check_deadline(self):
+    def check_deadline(self) -> None:
         if self.deadline:
             self.deadline.check()
 
-    def execute(self, statement, parameters=None):
+    def execute(
+        self,
+        statement: str | bytes | sql.Composable,
+        parameters: Sequence[object] | Mapping[str, object] | None = None,
+    ) -> psycopg.Cursor[tuple]:
         self.check_deadline()
         result = self.connection.execute(statement, parameters)
         self.check_deadline()
         return result
 
-    @contextmanager
-    def budget(self, deadline: Deadline):
+    @contextlib.contextmanager
+    def budget(self, deadline: scenario_deadline.Deadline) -> Iterator[None]:
         self.deadline = deadline
-        expired = Event()
+        expired = threading.Event()
 
         def cancel():
             expired.set()
@@ -79,7 +88,7 @@ class Database:
             except psycopg.Error:
                 pass
 
-        timer = Timer(deadline.remaining(), cancel)
+        timer = threading.Timer(deadline.remaining(), cancel)
         timer.daemon = True
         timer.start()
         try:
@@ -87,28 +96,28 @@ class Database:
             deadline.check()
         except psycopg.errors.QueryCanceled:
             if expired.is_set():
-                raise ScenarioError(deadline.expired_reason()) from None
+                raise errors.ScenarioError(deadline.expired_reason()) from None
             raise
         finally:
             timer.cancel()
             timer.join()
             self.deadline = None
 
-    def acquire_run_lock(self, run_id: str):
+    def acquire_run_lock(self, run_id: str) -> None:
         if self.locked_run == run_id:
             return
         if self.locked_run:
-            raise ScenarioError("DATABASE_ALREADY_LOCKED")
+            raise errors.ScenarioError("DATABASE_ALREADY_LOCKED")
         lock_key = int.from_bytes(
             hashlib.sha256(run_id.encode()).digest()[:8], signed=True
         )
         if not self.execute(
             "SELECT pg_try_advisory_lock(%s)", [lock_key]
         ).fetchone()[0]:
-            raise ScenarioError("RUN_STILL_ACTIVE")
+            raise errors.ScenarioError("RUN_STILL_ACTIVE")
         self.locked_run = run_id
 
-    def create_schemas(self, journal: Journal):
+    def create_schemas(self, journal: scenario_journal.Journal) -> None:
         self.acquire_run_lock(journal.data["run_id"])
         with self.connection.transaction():
             for name in journal.data["schemas"]:
@@ -121,7 +130,7 @@ class Database:
                     )
                 )
 
-    def cancel_model_queries(self, application_name: str):
+    def cancel_model_queries(self, application_name: str) -> None:
         self.execute(
             "SELECT pg_cancel_backend(pid) FROM pg_stat_activity "
             "WHERE application_name=%s AND usename=current_user AND "
@@ -129,7 +138,7 @@ class Database:
             [application_name],
         )
 
-    def cleanup(self, journal: Journal):
+    def cleanup(self, journal: scenario_journal.Journal) -> None:
         self.acquire_run_lock(journal.data["run_id"])
         with self.connection.transaction():
             existing = []
@@ -143,7 +152,7 @@ class Database:
                 if record is None:
                     continue
                 if record != (journal.marker(), True):
-                    raise ScenarioError("CLEANUP_OWNERSHIP_MISMATCH")
+                    raise errors.ScenarioError("CLEANUP_OWNERSHIP_MISMATCH")
                 existing.append(name)
             for name in reversed(existing):
                 tables = self.execute(
@@ -166,7 +175,7 @@ class Database:
                     )
                 )
 
-    def close(self):
+    def close(self) -> None:
         self.connection.close()
 
     def replace(
@@ -176,7 +185,7 @@ class Database:
         columns: dict[str, str],
         rows: list,
         *,
-        prepared: PreparedRows | None = None,
+        prepared: loader.PreparedRows | None = None,
     ) -> None:
         name = relation(schema, table)
         definitions = sql.SQL(", ").join(
@@ -199,11 +208,11 @@ class Database:
                         else None
                     )
                     if values is None:
-                        values = typed_rows(batch, columns)
+                        values = loader.typed_rows(batch, columns)
                     cursor.executemany(statement, values)
                     self.check_deadline()
 
-    def oid(self, schema: str, table: str):
+    def oid(self, schema: str, table: str) -> int | None:
         record = self.execute(
             "SELECT c.oid FROM pg_class c JOIN pg_namespace n ON "
             "n.oid=c.relnamespace "
@@ -218,7 +227,7 @@ class Database:
         table: str,
         expected_schema: str,
         snapshot: str,
-    ):
+    ) -> None:
         self.execute(
             sql.SQL("CREATE TABLE {} AS TABLE {}").format(
                 relation(expected_schema, snapshot),
@@ -280,7 +289,7 @@ class Database:
         expected: sql.Identifier,
         columns: dict[str, str],
         keys: list[str],
-    ) -> tuple[DiffCounts, list[str]]:
+    ) -> tuple[report.DiffCounts, list[str]]:
         join = sql.SQL(" AND ").join(
             sql.SQL("{} = {}").format(
                 value_column(key, columns[key], "a"),
@@ -342,10 +351,10 @@ class Database:
         expected_table: str,
         columns: dict[str, str],
         keys: list[str],
-    ) -> ComparisonResult:
+    ) -> report.ComparisonResult:
         actual = relation(actual_schema, table)
         expected = relation(expected_schema, expected_table)
-        base: ComparisonResult = {
+        base: report.ComparisonResult = {
             "status": "PASS",
             "reason_code": None,
             "diff_counts": None,
@@ -354,7 +363,7 @@ class Database:
             "changed_columns": [],
         }
         if self.oid(actual_schema, table) is None:
-            raise ScenarioError("TARGET_MISSING")
+            raise errors.ScenarioError("TARGET_MISSING")
         if not self.columns_match(actual_schema, table, columns):
             return {**base, "status": "FAIL", "reason_code": "SCHEMA_MISMATCH"}
         base["actual_rows"] = self.execute(

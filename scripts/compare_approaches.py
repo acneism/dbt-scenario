@@ -3,6 +3,7 @@ import copy
 import hashlib
 import json
 import os
+import pathlib
 import re
 import shutil
 import subprocess
@@ -10,17 +11,16 @@ import sys
 import tempfile
 import time
 import uuid
-from pathlib import Path
 
 import psycopg
 import yaml
 from psycopg import sql
 
-from dbt_scenario import __version__
-from dbt_scenario.config import load_config
-from dbt_scenario.loader import read_yaml
+import dbt_scenario
+from dbt_scenario import config as scenario_config
+from dbt_scenario import loader
 
-ASSETS = Path(__file__).resolve().parents[1] / "evaluation"
+ASSETS = pathlib.Path(__file__).resolve().parents[1] / "evaluation"
 COLUMNS = {
     "order_id": "bigint",
     "event_at": "timestamp",
@@ -42,7 +42,7 @@ def write_yaml(path, data):
 
 
 def timeline(case):
-    fixtures = read_yaml(ASSETS / "fixtures.yml")
+    fixtures = loader.read_yaml(ASSETS / "fixtures.yml")
     initial, updated = fixtures["initial"], fixtures["updated"]
     incoming, expected = updated, updated
     if case == "duplicate_retry":
@@ -77,6 +77,7 @@ def call(arguments, root, environment):
             cwd=root,
             env=environment,
             capture_output=True,
+            check=False,
             timeout=180,
         )
     except (OSError, subprocess.SubprocessError):
@@ -357,7 +358,7 @@ def native_case(case, approach, config, root, packages):
     schemas, marker = [actual, inputs, expected], "comparison:" + run_id
     create_project(root, config, actual, approach, packages)
     environment = selected_environment(config.database["password"])
-    executable = Path(sys.executable).parent / (
+    executable = pathlib.Path(sys.executable).parent / (
         "dbt.exe" if os.name == "nt" else "dbt"
     )
     steps = []
@@ -521,7 +522,7 @@ def scenario_case(case, config, root):
         root / "runner.yml",
         {"version": 1, "project_dir": ".", "database": database},
     )
-    executable = Path(sys.executable).parent / (
+    executable = pathlib.Path(sys.executable).parent / (
         "dbt-scenario.exe" if os.name == "nt" else "dbt-scenario"
     )
     started = time.perf_counter()
@@ -566,16 +567,16 @@ def scenario_case(case, config, root):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=Path, required=True)
-    parser.add_argument("--packages-dir", type=Path, required=True)
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--config", type=pathlib.Path, required=True)
+    parser.add_argument("--packages-dir", type=pathlib.Path, required=True)
+    parser.add_argument("--output", type=pathlib.Path, required=True)
     arguments = parser.parse_args()
     if arguments.output.exists():
         parser.error("output already exists")
-    config = load_config(arguments.config)
+    config = scenario_config.load_config(arguments.config)
     result = {
         "schema_version": 1,
-        "package_version": __version__,
+        "package_version": dbt_scenario.__version__,
         "complete": False,
         "model_sha256": hashlib.sha256(
             (ASSETS / "model.sql").read_bytes()
@@ -583,9 +584,9 @@ def main():
         "fixtures_sha256": hashlib.sha256(
             (ASSETS / "fixtures.yml").read_bytes()
         ).hexdigest(),
-        "dependencies": read_yaml(ASSETS / "dependencies/package-lock.yml")[
-            "packages"
-        ],
+        "dependencies": loader.read_yaml(
+            ASSETS / "dependencies/package-lock.yml"
+        )["packages"],
         "protocol": {
             "synthetic_project": True,
             "repeats_per_case": 1,
@@ -608,7 +609,7 @@ def main():
         for case in CASES:
             result["cases"][case] = {}
             for approach in ["manual", "audit_helper_ext", "dbt_scenario"]:
-                root = Path(temporary) / f"{case}_{approach}"
+                root = pathlib.Path(temporary) / f"{case}_{approach}"
                 measured = (
                     scenario_case(case, config, root)
                     if approach == "dbt_scenario"

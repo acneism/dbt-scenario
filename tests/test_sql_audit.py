@@ -2,8 +2,7 @@ import json
 
 import pytest
 
-from dbt_scenario.errors import ScenarioError
-from dbt_scenario.sql_audit import audit_sql
+from dbt_scenario import errors, sql_audit
 
 ALLOWED = {("fixtures", "input_0"), ("actual", "result")}
 
@@ -28,7 +27,7 @@ ALLOWED = {("fixtures", "input_0"), ("actual", "result")}
     ],
 )
 def test_audit_allows_fixture_target_and_scoped_queries(query):
-    report = audit_sql(query, "test_db", ALLOWED)
+    report = sql_audit.audit_sql(query, "test_db", ALLOWED)
     assert report["status"] == "PASS"
     assert len(report["compiled_sha256"]) == 64
     assert query not in json.dumps(report)
@@ -54,8 +53,8 @@ def test_audit_allows_fixture_target_and_scoped_queries(query):
     ],
 )
 def test_external_or_ambiguous_relations_are_rejected(query):
-    with pytest.raises(ScenarioError, match="SQL_EXTERNAL_RELATION"):
-        audit_sql(query, "test_db", ALLOWED)
+    with pytest.raises(errors.ScenarioError, match="SQL_EXTERNAL_RELATION"):
+        sql_audit.audit_sql(query, "test_db", ALLOWED)
 
 
 @pytest.mark.parametrize(
@@ -76,8 +75,8 @@ def test_external_or_ambiguous_relations_are_rejected(query):
     ],
 )
 def test_unknown_writing_locking_or_dynamic_table_sql_is_rejected(query):
-    with pytest.raises(ScenarioError, match="SQL_AUDIT_UNSUPPORTED"):
-        audit_sql(query, "test_db", ALLOWED)
+    with pytest.raises(errors.ScenarioError, match="SQL_AUDIT_UNSUPPORTED"):
+        sql_audit.audit_sql(query, "test_db", ALLOWED)
 
 
 @pytest.mark.parametrize(
@@ -85,8 +84,8 @@ def test_unknown_writing_locking_or_dynamic_table_sql_is_rejected(query):
     ["vacuum synthetic_private_data", "select 'synthetic_private_data' ("],
 )
 def test_parser_errors_do_not_log_sql(query, caplog, capsys):
-    with pytest.raises(ScenarioError) as error:
-        audit_sql(query, "test_db", ALLOWED)
+    with pytest.raises(errors.ScenarioError) as error:
+        sql_audit.audit_sql(query, "test_db", ALLOWED)
     captured = capsys.readouterr()
     assert "synthetic_private_data" not in str(error.value)
     assert "synthetic_private_data" not in caplog.text
@@ -94,7 +93,7 @@ def test_parser_errors_do_not_log_sql(query, caplog, capsys):
 
 
 def test_target_is_not_an_initial_input():
-    with pytest.raises(ScenarioError, match="SQL_EXTERNAL_RELATION"):
-        audit_sql(
+    with pytest.raises(errors.ScenarioError, match="SQL_EXTERNAL_RELATION"):
+        sql_audit.audit_sql(
             "select * from actual.result", "test_db", {("fixtures", "input_0")}
         )

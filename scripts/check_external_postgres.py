@@ -1,29 +1,26 @@
 import argparse
 import copy
+import dataclasses
+import datetime
 import hashlib
 import json
 import os
+import pathlib
 import shutil
 import sys
 import tempfile
-from dataclasses import replace
-from datetime import UTC, datetime
-from pathlib import Path
-from uuid import UUID
+import uuid
 
+import compare_approaches
+import external_metadata
 import psycopg
-from external_metadata import parse_metadata, static_metadata
-from reproduce_history import verified_sources, write_yaml
+import reproduce_history
 
-from dbt_scenario import __version__
-from dbt_scenario.config import load_config
-from dbt_scenario.discovery import discover_models
-from dbt_scenario.errors import ScenarioError
-from dbt_scenario.initialize import initialize
-from dbt_scenario.loader import load_scenario, read_yaml
-from dbt_scenario.runner import run_scenario
+import dbt_scenario
+from dbt_scenario import config as scenario_config_module
+from dbt_scenario import discovery, errors, initialize, loader, runner
 
-ASSETS = Path(__file__).resolve().parents[1] / "compatibility/aqw"
+ASSETS = pathlib.Path(__file__).resolve().parents[1] / "compatibility/aqw"
 MODEL = "fct_air_quality_hourly"
 CASES = {
     "normal": ("PASS", [2, 3, 3]),
@@ -78,7 +75,7 @@ def prepare_project(root, sources, config, fixtures):
         {"name": name, "data_type": kind}
         for name, kind in fixtures["columns"].items()
     ]
-    write_yaml(
+    compare_approaches.write_yaml(
         project / "models/scenario_columns.yml",
         {
             "version": 2,
@@ -88,10 +85,12 @@ def prepare_project(root, sources, config, fixtures):
             ],
         },
     )
-    scenario_config = replace(config, project_dir=project)
-    _, manifest = parse_metadata(scenario_config, root, "dsc_aqw_metadata")
-    with static_metadata():
-        inventory = discover_models(project, manifest)
+    scenario_config = dataclasses.replace(config, project_dir=project)
+    _, manifest = external_metadata.parse_metadata(
+        scenario_config, root, "dsc_aqw_metadata"
+    )
+    with external_metadata.static_metadata():
+        inventory = discovery.discover_models(project, manifest)
         if inventory["models"] != [
             {
                 "model": "model.aqw." + MODEL,
@@ -101,9 +100,9 @@ def prepare_project(root, sources, config, fixtures):
             }
         ]:
             raise RuntimeError("EXTERNAL_METADATA_NOT_READY")
-        initialize(project, model=MODEL, manifest_path=manifest)
+        initialize.initialize(project, model=MODEL, manifest_path=manifest)
         template_path = project / f"scenarios/{MODEL}.yml"
-        template = read_yaml(template_path)
+        template = loader.read_yaml(template_path)
         if (
             template["output"]["columns"] != fixtures["columns"]
             or template["output"]["primary_key"] != ["sensor_id", "ts_utc"]
@@ -112,8 +111,8 @@ def prepare_project(root, sources, config, fixtures):
         ):
             raise RuntimeError("EXTERNAL_METADATA_SCHEMA_MISMATCH")
         try:
-            load_scenario(template_path, project)
-        except ScenarioError as error:
+            loader.load_scenario(template_path, project)
+        except errors.ScenarioError as error:
             if error.code != "UNFILLED_TEMPLATE_ROWS":
                 raise RuntimeError(
                     "EXTERNAL_TEMPLATE_DIAGNOSTIC_MISMATCH"
@@ -127,8 +126,10 @@ def prepare_project(root, sources, config, fixtures):
                 if case == "normal"
                 else project / f"scenarios/aqw_{case}.yml"
             )
-            write_yaml(path, build_scenario(template, case, fixtures))
-            load_scenario(path, project)
+            compare_approaches.write_yaml(
+                path, build_scenario(template, case, fixtures)
+            )
+            loader.load_scenario(path, project)
             paths[case] = path
     return scenario_config, paths, destinations
 
@@ -160,17 +161,17 @@ def validate_report(report, case):
             or len(evidence.get("statement_sha256", "")) != 64
         ):
             raise RuntimeError("EXTERNAL_EXECUTION_EVIDENCE_MISSING")
-        UUID(evidence["invocation_id"])
+        uuid.UUID(evidence["invocation_id"])
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--sources-dir", type=Path, required=True)
+    parser.add_argument("--sources-dir", type=pathlib.Path, required=True)
     parser.add_argument("--fetch-only", action="store_true")
-    parser.add_argument("--config", type=Path)
-    parser.add_argument("--output", type=Path)
+    parser.add_argument("--config", type=pathlib.Path)
+    parser.add_argument("--output", type=pathlib.Path)
     arguments = parser.parse_args()
-    provenance = verified_sources(
+    provenance = reproduce_history.verified_sources(
         arguments.sources_dir, arguments.fetch_only, ASSETS / "sources.json"
     )
     if arguments.fetch_only:
@@ -182,18 +183,18 @@ def main():
         or arguments.output.exists()
     ):
         parser.error("execution requires --config and a new --output file")
-    config = load_config(arguments.config)
-    fixtures = read_yaml(ASSETS / "fixtures.yml")
+    config = scenario_config_module.load_config(arguments.config)
+    fixtures = loader.read_yaml(ASSETS / "fixtures.yml")
     result = {
         "schema_version": 1,
         "status": "ERROR",
         "complete": False,
         "source_commit": os.environ.get("GITHUB_SHA"),
-        "package_version": __version__,
+        "package_version": dbt_scenario.__version__,
         "python_version": sys.version.split()[0],
-        "started_at": datetime.now(UTC).isoformat(),
+        "started_at": datetime.datetime.now(datetime.UTC).isoformat(),
         "check_script_sha256": hashlib.sha256(
-            Path(__file__).read_bytes()
+            pathlib.Path(__file__).read_bytes()
         ).hexdigest(),
         "upstream": provenance,
         "fixture_specification_sha256": hashlib.sha256(
@@ -222,13 +223,13 @@ def main():
     arguments.output.parent.mkdir(parents=True, exist_ok=True)
     baseline = owned_schemas(config)
     with tempfile.TemporaryDirectory(prefix="dbt-scenario-aqw-") as temporary:
-        root = Path(temporary)
+        root = pathlib.Path(temporary)
         prepared, paths, destinations = prepare_project(
             root, arguments.sources_dir, config, fixtures
         )
         for case, path in paths.items():
-            report = run_scenario(
-                load_scenario(path, prepared.project_dir),
+            report = runner.run_scenario(
+                loader.load_scenario(path, prepared.project_dir),
                 prepared,
                 root / "reports",
             )

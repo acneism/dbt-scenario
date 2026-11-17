@@ -1,25 +1,18 @@
+import datetime
 import hashlib
 import json
 import os
+import pathlib
 import shutil
 import sys
-from datetime import UTC, datetime
-from pathlib import Path
+from collections.abc import Sequence
 
 import yaml
 
-from dbt_scenario.artifacts import read_artifact, validate_metadata
-from dbt_scenario.config import Config
-from dbt_scenario.deadline import Deadline
-from dbt_scenario.environment import process_environment
-from dbt_scenario.errors import ScenarioError
-from dbt_scenario.process import run_process
-from dbt_scenario.requirements import (
-    check_dependencies,
-    check_model_config,
-    check_project_macros,
-    project_settings,
-)
+from dbt_scenario import artifacts, errors, process, requirements
+from dbt_scenario import config as scenario_config
+from dbt_scenario import deadline as scenario_deadline
+from dbt_scenario import environment as scenario_environment
 
 MACROS = """
 {% macro generate_schema_name(custom_schema_name, node) %}
@@ -77,7 +70,7 @@ EXCLUDED_DIRECTORIES = frozenset(
 )
 
 
-def fingerprint(project_dir: Path) -> str:
+def fingerprint(project_dir: pathlib.Path) -> str:
     digest = hashlib.sha256()
     digest.update(b"dbt-scenario-project-v2\x00")
     for base, dirs, names in os.walk(project_dir):
@@ -85,9 +78,9 @@ def fingerprint(project_dir: Path) -> str:
             name for name in dirs if name not in EXCLUDED_DIRECTORIES
         )
         for name in sorted(names):
-            path = Path(base) / name
+            path = pathlib.Path(base) / name
             if path.is_symlink():
-                raise ScenarioError("PROJECT_SYMLINK_UNSUPPORTED")
+                raise errors.ScenarioError("PROJECT_SYMLINK_UNSUPPORTED")
             if path.suffix in {".sql", ".yml", ".yaml", ".json", ".lock"}:
                 relative = (
                     path.relative_to(project_dir).as_posix().encode("utf-8")
@@ -99,7 +92,12 @@ def fingerprint(project_dir: Path) -> str:
 
 
 class Project:
-    def __init__(self, config: Config, workspace: Path, schema: str):
+    def __init__(
+        self,
+        config: scenario_config.Config,
+        workspace: pathlib.Path,
+        schema: str,
+    ) -> None:
         self.config = config
         self.workspace = workspace
         self.root = workspace / "project"
@@ -108,7 +106,7 @@ class Project:
         self.sequence = 0
         self.invocations = {}
         self.seen_invocations = set()
-        self.environment = process_environment(
+        self.environment = scenario_environment.process_environment(
             config.project_env, config.database["password"]
         )
         ignored = shutil.ignore_patterns(*EXCLUDED_DIRECTORIES)
@@ -119,14 +117,14 @@ class Project:
             for name in dirs + [
                 name for name in names if name not in EXCLUDED_DIRECTORIES
             ]:
-                if (Path(base) / name).is_symlink():
-                    raise ScenarioError("PROJECT_SYMLINK_UNSUPPORTED")
+                if (pathlib.Path(base) / name).is_symlink():
+                    raise errors.ScenarioError("PROJECT_SYMLINK_UNSUPPORTED")
         shutil.copytree(config.project_dir, self.root, ignore=ignored)
-        self.settings = project_settings(self.root)
-        check_dependencies(self.root, self.settings)
+        self.settings = requirements.project_settings(self.root)
+        requirements.check_dependencies(self.root, self.settings)
         self.project_hash = fingerprint(self.root)
         if self.settings.get("on-run-start") or self.settings.get("on-run-end"):
-            raise ScenarioError("PROJECT_HOOKS_UNSUPPORTED")
+            raise errors.ScenarioError("PROJECT_HOOKS_UNSUPPORTED")
         self.settings["profile"] = "dbt_scenario"
         self.profiles = workspace / "profiles"
         self.profiles.mkdir()
@@ -152,18 +150,21 @@ class Project:
         profile_path.chmod(0o600)
         self.write_settings()
 
-    def write_settings(self):
+    def write_settings(self) -> None:
         (self.root / "dbt_project.yml").write_text(
             yaml.safe_dump(self.settings, sort_keys=False), encoding="utf-8"
         )
 
     def invoke(
-        self, command: str, timeout: float | Deadline, args=()
-    ) -> tuple[dict, Path]:
+        self,
+        command: str,
+        timeout: float | scenario_deadline.Deadline,
+        args: Sequence[str] = (),
+    ) -> tuple[dict, pathlib.Path]:
         deadline = (
             timeout
-            if isinstance(timeout, Deadline)
-            else Deadline(timeout, "DBT_TIMEOUT")
+            if isinstance(timeout, scenario_deadline.Deadline)
+            else scenario_deadline.Deadline(timeout, "DBT_TIMEOUT")
         )
         deadline.check()
         self.sequence += 1
@@ -171,8 +172,10 @@ class Project:
         try:
             artifact_dir.mkdir()
         except FileExistsError:
-            raise ScenarioError("DBT_ARTIFACT_DIRECTORY_EXISTS") from None
-        executable = Path(sys.executable).parent / (
+            raise errors.ScenarioError(
+                "DBT_ARTIFACT_DIRECTORY_EXISTS"
+            ) from None
+        executable = pathlib.Path(sys.executable).parent / (
             "dbt.exe" if os.name == "nt" else "dbt"
         )
         argv = [
@@ -199,54 +202,56 @@ class Project:
                 f"-c statement_timeout={milliseconds} -c lock_timeout=10000"
             ),
         }
-        started = datetime.now(UTC)
-        result = run_process(argv, environment, self.root, deadline)
-        finished = datetime.now(UTC)
+        started = datetime.datetime.now(datetime.UTC)
+        result = process.run_process(argv, environment, self.root, deadline)
+        finished = datetime.datetime.now(datetime.UTC)
         if result:
-            raise ScenarioError("DBT_EXECUTION_ERROR")
-        manifest = read_artifact(artifact_dir, "manifest.json")
-        invocation_id = validate_metadata(
+            raise errors.ScenarioError("DBT_EXECUTION_ERROR")
+        manifest = artifacts.read_artifact(artifact_dir, "manifest.json")
+        invocation_id = artifacts.validate_metadata(
             manifest, "manifest", started, finished
         )
         if invocation_id in self.seen_invocations:
-            raise ScenarioError("DBT_ARTIFACT_STALE")
+            raise errors.ScenarioError("DBT_ARTIFACT_STALE")
         self.seen_invocations.add(invocation_id)
         self.invocations[artifact_dir] = (started, finished, invocation_id)
         if command == "run":
             self.read_run_results(artifact_dir)
         return manifest, artifact_dir
 
-    def read_run_results(self, artifact_dir: Path) -> dict:
+    def read_run_results(self, artifact_dir: pathlib.Path) -> dict:
         if artifact_dir not in self.invocations:
-            raise ScenarioError("DBT_ARTIFACT_INVOCATION_MISMATCH")
+            raise errors.ScenarioError("DBT_ARTIFACT_INVOCATION_MISMATCH")
         started, finished, invocation_id = self.invocations[artifact_dir]
-        results = read_artifact(artifact_dir, "run_results.json")
-        validate_metadata(
+        results = artifacts.read_artifact(artifact_dir, "run_results.json")
+        artifacts.validate_metadata(
             results, "run-results", started, finished, invocation_id
         )
         arguments = results.get("args")
         if not isinstance(arguments, dict) or arguments.get("which") != "run":
-            raise ScenarioError("DBT_ARTIFACT_INVALID")
+            raise errors.ScenarioError("DBT_ARTIFACT_INVALID")
         refresh = arguments.get("full_refresh")
         if refresh is not None and refresh is not False:
-            raise ScenarioError("EXECUTION_MODE_UNVERIFIED")
+            raise errors.ScenarioError("EXECUTION_MODE_UNVERIFIED")
         return results
 
-    def inspect(self, scenario: dict, timeout: float | Deadline) -> dict:
+    def inspect(
+        self, scenario: dict, timeout: float | scenario_deadline.Deadline
+    ) -> dict:
         initial_vars = scenario["steps"][0]["run"].get("vars", {})
         manifest, _ = self.invoke(
             "parse", timeout, ["--vars", json.dumps(initial_vars)]
         )
         node = manifest["nodes"].get(scenario["model"])
         if not node or node["package_name"] != self.settings["name"]:
-            raise ScenarioError("MODEL_NOT_FOUND")
-        check_model_config(node["config"])
-        check_project_macros(manifest.get("macros"))
+            raise errors.ScenarioError("MODEL_NOT_FOUND")
+        requirements.check_model_config(node["config"])
+        requirements.check_project_macros(manifest.get("macros"))
         inputs = {
             definition["node"] for definition in scenario["inputs"].values()
         }
         if set(node["depends_on"]["nodes"]) != inputs:
-            raise ScenarioError("INPUT_DEPENDENCIES_MISMATCH")
+            raise errors.ScenarioError("INPUT_DEPENDENCIES_MISMATCH")
         for identity in inputs:
             dependency = manifest["nodes"].get(identity) or manifest[
                 "sources"
@@ -255,9 +260,9 @@ class Project:
                 not dependency
                 or dependency["package_name"] != self.settings["name"]
             ):
-                raise ScenarioError("INPUT_DEPENDENCY_UNSUPPORTED")
+                raise errors.ScenarioError("INPUT_DEPENDENCY_UNSUPPORTED")
             if dependency.get("config", {}).get("materialized") == "ephemeral":
-                raise ScenarioError("EPHEMERAL_INPUT_UNSUPPORTED")
+                raise errors.ScenarioError("EPHEMERAL_INPUT_UNSUPPORTED")
         for dependency in [
             node,
             *(manifest["nodes"].get(i, {}) for i in inputs),
@@ -268,7 +273,7 @@ class Project:
                 or "builtins.ref" in code
                 or "builtins.source" in code
             ):
-                raise ScenarioError(
+                raise errors.ScenarioError(
                     "DIRECT_BUILTIN_OR_VERSIONED_REF_UNSUPPORTED"
                 )
         return node

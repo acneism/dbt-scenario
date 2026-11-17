@@ -1,27 +1,29 @@
 import argparse
+import dataclasses
+import datetime
 import hashlib
 import json
 import os
+import pathlib
 import shutil
 import sys
 import tempfile
 import urllib.request
 import uuid
-from dataclasses import replace
-from datetime import UTC, datetime
-from importlib.metadata import version
-from pathlib import Path
+from importlib import metadata
 
+import compare_approaches
 import psycopg
-from compare_approaches import call, cleanup, selected_environment, write_yaml
 from psycopg import sql
 
-from dbt_scenario import __version__
-from dbt_scenario.config import load_config
-from dbt_scenario.loader import load_scenario, read_yaml
-from dbt_scenario.runner import run_scenario
+import dbt_scenario
+from dbt_scenario import config as scenario_config
+from dbt_scenario import loader, runner
 
-ASSETS = Path(__file__).resolve().parents[1] / "historical/mit-empty-watermark"
+ASSETS = (
+    pathlib.Path(__file__).resolve().parents[1]
+    / "historical/mit-empty-watermark"
+)
 MODEL = "int__edxorg__mitx_user_activity"
 INPUT = "stg__edxorg__s3__tracking_logs__user_activity"
 
@@ -55,7 +57,7 @@ def verified_sources(directory, fetch=False, specification_path=None):
 
 def create_project(root, sources, revision, config, schema):
     root.mkdir()
-    write_yaml(
+    compare_approaches.write_yaml(
         root / "dbt_project.yml",
         {
             "name": "historical",
@@ -87,17 +89,17 @@ def create_project(root, sources, revision, config, schema):
         sslmode=config.database.get("sslmode", "prefer"),
     )
     profile["pass"] = "{{ env_var('DBT_ENV_SECRET_DSC_PASSWORD') }}"
-    write_yaml(
+    compare_approaches.write_yaml(
         root / "profiles/profiles.yml",
         {"historical": {"target": "test", "outputs": {"test": profile}}},
     )
 
 
 def dbt(root, config, command, selection, artifacts, variables):
-    executable = Path(sys.executable).parent / (
+    executable = pathlib.Path(sys.executable).parent / (
         "dbt.exe" if os.name == "nt" else "dbt"
     )
-    executed = call(
+    executed = compare_approaches.call(
         [
             str(executable),
             "--no-use-colors",
@@ -117,7 +119,7 @@ def dbt(root, config, command, selection, artifacts, variables):
             json.dumps(variables),
         ],
         root,
-        selected_environment(config.database["password"]),
+        compare_approaches.selected_environment(config.database["password"]),
     )
     results = json.loads((artifacts / "target/run_results.json").read_text())[
         "results"
@@ -200,7 +202,7 @@ def native_case(root, config, sources, revision, scenario):
                     )
                 ).fetchone()[0]
                 counts.append({"name": step["name"], "actual_rows": count})
-            write_yaml(
+            compare_approaches.write_yaml(
                 root / "models/native_tests.yml",
                 {
                     "version": 2,
@@ -246,15 +248,15 @@ def native_case(root, config, sources, revision, scenario):
                 for kind in ["data", "unit"]
             }
         finally:
-            cleanup(connection, schemas, marker)
+            compare_approaches.cleanup(connection, schemas, marker)
     return {"steps": counts, "tests": tests, "cleanup_status": "CLEANED"}
 
 
 def scenario_case(root, config, sources, revision):
     create_project(root, sources, revision, config, "unused")
-    report = run_scenario(
-        load_scenario(root / "scenario.yml", root),
-        replace(config, project_dir=root),
+    report = runner.run_scenario(
+        loader.load_scenario(root / "scenario.yml", root),
+        dataclasses.replace(config, project_dir=root),
         root / "reports",
     )
     return {
@@ -312,10 +314,10 @@ def validate(result):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--sources-dir", type=Path, required=True)
+    parser.add_argument("--sources-dir", type=pathlib.Path, required=True)
     parser.add_argument("--fetch-only", action="store_true")
-    parser.add_argument("--config", type=Path)
-    parser.add_argument("--output", type=Path)
+    parser.add_argument("--config", type=pathlib.Path)
+    parser.add_argument("--output", type=pathlib.Path)
     arguments = parser.parse_args()
     sources = arguments.sources_dir.resolve()
     specification = verified_sources(sources, fetch=arguments.fetch_only)
@@ -330,7 +332,7 @@ def main():
         or arguments.output.exists()
     ):
         parser.error("execution requires --config and a new --output file")
-    config = load_config(arguments.config)
+    config = scenario_config.load_config(arguments.config)
     with psycopg.connect(**config.connection_kwargs()) as connection:
         previous_schemas = set(
             connection.execute(
@@ -341,12 +343,13 @@ def main():
     result = {
         "schema_version": 1,
         "complete": False,
-        "started_at": datetime.now(UTC).isoformat(),
+        "started_at": datetime.datetime.now(datetime.UTC).isoformat(),
         "source_commit": os.environ.get("GITHUB_SHA"),
-        "package_version": __version__,
+        "package_version": dbt_scenario.__version__,
         "python_version": sys.version.split()[0],
         "dependencies": {
-            name: version(name) for name in ["dbt-core", "dbt-postgres"]
+            name: metadata.version(name)
+            for name in ["dbt-core", "dbt-postgres"]
         },
         "upstream": specification,
         "scenario_sha256": hashlib.sha256(
@@ -373,14 +376,14 @@ def main():
         for revision in ["before", "after"]:
             result["revisions"][revision] = {
                 "native": native_case(
-                    Path(temporary) / (revision + "_native"),
+                    pathlib.Path(temporary) / (revision + "_native"),
                     config,
                     sources,
                     revision,
-                    read_yaml(ASSETS / "scenario.yml"),
+                    loader.read_yaml(ASSETS / "scenario.yml"),
                 ),
                 "scenario": scenario_case(
-                    Path(temporary) / (revision + "_scenario"),
+                    pathlib.Path(temporary) / (revision + "_scenario"),
                     config,
                     sources,
                     revision,

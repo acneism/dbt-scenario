@@ -3,14 +3,10 @@ import json
 import uuid
 
 import pytest
-from click.testing import CliRunner
+from click import testing
 
-from dbt_scenario.cli import main
-from dbt_scenario.discovery import discover_models
-from dbt_scenario.errors import ScenarioError
-from dbt_scenario.initialize import initialize
-from dbt_scenario.loader import load_scenario, read_yaml
-from dbt_scenario.project import Project
+from dbt_scenario import cli, discovery, errors, initialize, loader
+from dbt_scenario import project as scenario_project
 
 
 @pytest.fixture
@@ -28,7 +24,9 @@ def artifacts(tmp_path):
         "model.analytics.fct_orders",
     )
     metadata = {
-        "dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v12.json",
+        "dbt_schema_version": (
+            "https://schemas.getdbt.com/dbt/manifest/v12.json"
+        ),
         "adapter_type": "postgres",
         "project_name": "analytics",
         "invocation_id": str(uuid.uuid4()),
@@ -70,7 +68,9 @@ def artifacts(tmp_path):
     }
     catalog = {
         "metadata": {
-            "dbt_schema_version": "https://schemas.getdbt.com/dbt/catalog/v1.json",
+            "dbt_schema_version": (
+                "https://schemas.getdbt.com/dbt/catalog/v1.json"
+            ),
             "invocation_id": metadata["invocation_id"],
         },
         "nodes": {},
@@ -105,7 +105,7 @@ def generate(artifacts, *, with_catalog=False, **kwargs):
     manifest_path.write_text(json.dumps(manifest))
     catalog_path = root / "catalog.json"
     catalog_path.write_text(json.dumps(catalog))
-    return initialize(
+    return initialize.initialize(
         root,
         model=kwargs.pop("model", "fct_orders"),
         manifest_path=manifest_path,
@@ -135,7 +135,7 @@ def discover(artifacts, *, with_catalog=False):
     ]
     if with_catalog:
         arguments.extend(["--catalog", str(root / "catalog.json")])
-    return CliRunner().invoke(main, arguments)
+    return testing.CliRunner().invoke(cli.main, arguments)
 
 
 def test_discovery_lists_first_blockers_without_credentials_execution_or_writes(
@@ -258,14 +258,14 @@ def test_custom_macro_refusal_matches_execution_before_rows_or_writes(
     assert entry["reason_code"] == "CUSTOM_MACRO_UNSUPPORTED"
     assert entry["diagnostic"]["hint"]
     assert "synthetic.private@example.invalid" not in result.output
-    with pytest.raises(ScenarioError, match="CUSTOM_MACRO_UNSUPPORTED"):
+    with pytest.raises(errors.ScenarioError, match="CUSTOM_MACRO_UNSUPPORTED"):
         generate(artifacts)
     assert not (root / "scenario-runner.yml").exists()
     assert not (root / "scenarios").exists()
-    project = Project.__new__(Project)
+    project = scenario_project.Project.__new__(scenario_project.Project)
     project.settings = {"name": "analytics"}
     project.invoke = lambda *args: (manifest, None)
-    with pytest.raises(ScenarioError, match="CUSTOM_MACRO_UNSUPPORTED"):
+    with pytest.raises(errors.ScenarioError, match="CUSTOM_MACRO_UNSUPPORTED"):
         project.inspect(
             {"model": "model.analytics.fct_orders", "steps": [{"run": {}}]}, 120
         )
@@ -315,7 +315,7 @@ def test_unusable_macro_entries_fail_without_writing_templates(
         json.loads(result.output)["models"][0]["reason_code"]
         == "DBT_ARTIFACT_INVALID"
     )
-    with pytest.raises(ScenarioError, match="DBT_ARTIFACT_INVALID"):
+    with pytest.raises(errors.ScenarioError, match="DBT_ARTIFACT_INVALID"):
         generate(artifacts)
     assert not (root / "scenario-runner.yml").exists()
 
@@ -368,7 +368,7 @@ def test_discovery_and_initializer_share_the_same_refusal(
     result = discover(artifacts)
     assert result.exit_code == 0, result.output
     assert json.loads(result.output)["models"][0]["reason_code"] == code
-    with pytest.raises(ScenarioError, match=code):
+    with pytest.raises(errors.ScenarioError, match=code):
         generate(artifacts)
 
 
@@ -446,7 +446,7 @@ def test_discovery_reads_each_artifact_once_for_many_models(
         return original(path, schema)
 
     monkeypatch.setattr(module, "read_metadata", observed)
-    report = discover_models(
+    report = discovery.discover_models(
         root, root / "manifest.json", root / "catalog.json"
     )
     assert len(report["models"]) == 26
@@ -493,7 +493,7 @@ def test_metadata_template_uses_real_ids_and_types_but_requires_explicit_rows(
     path = root / "scenarios/fct_orders.yml"
     text = path.read_text()
     assert "synthetic.private@example.invalid" not in text
-    data = read_yaml(path)
+    data = loader.read_yaml(path)
     assert data["model"] == "model.analytics.fct_orders"
     assert [entry["node"] for entry in data["inputs"].values()] == [
         "model.analytics.stg_orders",
@@ -504,8 +504,8 @@ def test_metadata_template_uses_real_ids_and_types_but_requires_explicit_rows(
         "primary_key": ["order_id"],
     }
     assert data["steps"][2]["expect"] == {"same_as": "incremental"}
-    with pytest.raises(ScenarioError, match="UNFILLED_TEMPLATE_ROWS"):
-        load_scenario(path, root)
+    with pytest.raises(errors.ScenarioError, match="UNFILLED_TEMPLATE_ROWS"):
+        loader.load_scenario(path, root)
 
 
 def test_catalog_supplies_schema_when_manifest_has_no_declared_columns(
@@ -516,7 +516,7 @@ def test_catalog_supplies_schema_when_manifest_has_no_declared_columns(
         for node in manifest[collection].values():
             node["columns"] = {}
     generate(artifacts, with_catalog=True)
-    data = read_yaml(root / "scenarios/fct_orders.yml")
+    data = loader.read_yaml(root / "scenarios/fct_orders.yml")
     assert list(data["output"]["columns"]) == ["order_id", "amount"]
 
 
@@ -543,7 +543,7 @@ def test_metadata_preserves_the_supported_native_type(
     assert result.exit_code == 0, result.output
     assert json.loads(result.output)["models"][0]["status"] == "TEMPLATE_READY"
     generate(artifacts, with_catalog=with_catalog)
-    scenario = read_yaml(root / "scenarios/fct_orders.yml")
+    scenario = loader.read_yaml(root / "scenarios/fct_orders.yml")
     assert scenario["output"]["columns"]["amount"] == expected
     assert all(
         node["columns"]["amount"] == expected
@@ -562,7 +562,7 @@ def test_additional_template_preserves_config_and_refuses_overwrite(
     assert config.read_text() == "user configuration must survive\n"
     scenario = root / "scenarios/fct_orders.yml"
     scenario.write_text("user scenario must survive\n")
-    with pytest.raises(ScenarioError, match="INIT_WOULD_OVERWRITE"):
+    with pytest.raises(errors.ScenarioError, match="INIT_WOULD_OVERWRITE"):
         generate(artifacts)
     assert scenario.read_text() == "user scenario must survive\n"
     assert config.read_text() == "user configuration must survive\n"
@@ -575,7 +575,7 @@ def test_second_scenario_for_same_model_gets_a_distinct_safe_name(artifacts):
     first = (root / "scenarios/fct_orders.yml").read_bytes()
     created = generate(artifacts, scenario_name="orders_late_arrival")
     assert created == ["scenarios/orders_late_arrival.yml"]
-    data = read_yaml(root / "scenarios/orders_late_arrival.yml")
+    data = loader.read_yaml(root / "scenarios/orders_late_arrival.yml")
     assert data["name"] == "orders_late_arrival"
     assert (root / "scenario-runner.yml").read_bytes() == config
     assert (root / "scenarios/fct_orders.yml").read_bytes() == first
@@ -586,7 +586,9 @@ def test_second_scenario_for_same_model_gets_a_distinct_safe_name(artifacts):
 )
 def test_scenario_names_cannot_escape_or_use_device_files(artifacts, name):
     root, _, _ = artifacts
-    with pytest.raises(ScenarioError, match="INIT_SCENARIO_NAME_INVALID"):
+    with pytest.raises(
+        errors.ScenarioError, match="INIT_SCENARIO_NAME_INVALID"
+    ):
         generate(artifacts, scenario_name=name)
     assert not (root / "scenario-runner.yml").exists()
 
@@ -601,11 +603,11 @@ def test_missing_or_expression_key_requires_explicit_valid_output_columns(
     manifest["nodes"]["model.analytics.fct_orders"]["config"]["unique_key"] = (
         value
     )
-    with pytest.raises(ScenarioError, match="INIT_PRIMARY_KEY_REQUIRED"):
+    with pytest.raises(errors.ScenarioError, match="INIT_PRIMARY_KEY_REQUIRED"):
         generate(artifacts)
     assert not (root / "scenario-runner.yml").exists()
     generate(artifacts, primary_key=("order_id", "amount"))
-    assert read_yaml(root / "scenarios/fct_orders.yml")["output"][
+    assert loader.read_yaml(root / "scenarios/fct_orders.yml")["output"][
         "primary_key"
     ] == [
         "order_id",
@@ -635,7 +637,7 @@ def test_incompatible_types_are_not_guessed_or_upcast(artifacts, kind):
     manifest["nodes"]["model.analytics.fct_orders"]["columns"]["amount"][
         "data_type"
     ] = kind
-    with pytest.raises(ScenarioError, match="UNSUPPORTED_COLUMN_TYPE"):
+    with pytest.raises(errors.ScenarioError, match="UNSUPPORTED_COLUMN_TYPE"):
         generate(artifacts)
     assert not (root / "scenario-runner.yml").exists()
     assert not (root / "scenarios").exists()
@@ -686,7 +688,7 @@ def test_unsupported_metadata_fails_before_any_template_write(
         model["config"]["incremental_strategy"] = []
     elif change == "refresh":
         model["config"]["full_refresh"] = True
-    with pytest.raises(ScenarioError, match=code):
+    with pytest.raises(errors.ScenarioError, match=code):
         generate(artifacts)
     assert not (root / "scenario-runner.yml").exists()
 
@@ -707,7 +709,8 @@ def test_catalog_must_be_complete_and_paired_with_manifest(artifacts, change):
             "index"
         ] = 1
     with pytest.raises(
-        ScenarioError, match="INIT_CATALOG_MISMATCH|INIT_METADATA_INVALID"
+        errors.ScenarioError,
+        match="INIT_CATALOG_MISMATCH|INIT_METADATA_INVALID",
     ):
         generate(artifacts, with_catalog=True)
     assert not (root / "scenario-runner.yml").exists()
@@ -715,8 +718,8 @@ def test_catalog_must_be_complete_and_paired_with_manifest(artifacts, change):
 
 def test_cli_rejects_invalid_flag_combinations_without_writing(artifacts):
     root, _, _ = artifacts
-    result = CliRunner().invoke(
-        main, ["init", "--project-dir", str(root), "--model", "fct_orders"]
+    result = testing.CliRunner().invoke(
+        cli.main, ["init", "--project-dir", str(root), "--model", "fct_orders"]
     )
     assert result.exit_code == 2
     assert "INIT_OPTIONS_INVALID" in result.output
@@ -731,8 +734,8 @@ def test_cli_reports_missing_metadata_without_exposing_values(artifacts):
     )
     path = root / "manifest.json"
     path.write_text(json.dumps(manifest))
-    result = CliRunner().invoke(
-        main,
+    result = testing.CliRunner().invoke(
+        cli.main,
         [
             "init",
             "--project-dir",
@@ -755,8 +758,8 @@ def test_malformed_or_duplicate_json_is_rejected(artifacts, content):
     root, _, _ = artifacts
     path = root / "invalid.json"
     path.write_text(content)
-    with pytest.raises(ScenarioError, match="INIT_METADATA_INVALID"):
-        initialize(root, model="fct_orders", manifest_path=path)
+    with pytest.raises(errors.ScenarioError, match="INIT_METADATA_INVALID"):
+        initialize.initialize(root, model="fct_orders", manifest_path=path)
     assert not (root / "scenario-runner.yml").exists()
 
 
@@ -766,7 +769,7 @@ def test_non_json_constants_in_otherwise_valid_metadata_are_rejected(
 ):
     root, manifest, _ = artifacts
     manifest["unused_statistic"] = value
-    with pytest.raises(ScenarioError, match="INIT_METADATA_INVALID"):
+    with pytest.raises(errors.ScenarioError, match="INIT_METADATA_INVALID"):
         generate(artifacts)
     assert not (root / "scenario-runner.yml").exists()
 
@@ -781,7 +784,9 @@ def test_metadata_refuses_sql_configuration_before_writing_templates(
     manifest["nodes"]["model.analytics.fct_orders"]["config"][setting] = (
         "select 1"
     )
-    with pytest.raises(ScenarioError, match="MODEL_SQL_CONFIG_UNSUPPORTED"):
+    with pytest.raises(
+        errors.ScenarioError, match="MODEL_SQL_CONFIG_UNSUPPORTED"
+    ):
         generate(artifacts)
     assert not (root / "scenario-runner.yml").exists()
     assert not (root / "scenarios").exists()

@@ -1,9 +1,9 @@
 import importlib
-from pathlib import Path
+import pathlib
 
 import pytest
 
-from dbt_scenario.loader import load_scenario, read_yaml
+from dbt_scenario import loader
 
 
 @pytest.mark.parametrize(
@@ -14,14 +14,14 @@ def test_watermark_fixture_generation_roundtrips_through_strict_scenario_loader(
     tmp_path, monkeypatch, case, initial_only
 ):
     monkeypatch.syspath_prepend(
-        str(Path(__file__).resolve().parents[1] / "scripts")
+        str(pathlib.Path(__file__).resolve().parents[1] / "scripts")
     )
     module = importlib.import_module("check_watermarks")
-    specification = read_yaml(module.ASSETS / "cases.yml")
+    specification = loader.read_yaml(module.ASSETS / "cases.yml")
     definition = module.build_scenario(case, specification, initial_only)
     path = tmp_path / "scenario.yml"
-    module.write_yaml(path, definition)
-    scenario = load_scenario(path, tmp_path)
+    importlib.import_module("compare_approaches").write_yaml(path, definition)
+    scenario = loader.load_scenario(path, tmp_path)
     steps = scenario.data["steps"]
     assert len(steps) == (1 if initial_only else 3)
     expected = steps[0 if initial_only else 1]["expect"]["rows"]

@@ -1,15 +1,14 @@
 import copy
+import pathlib
 import shutil
-from pathlib import Path
 
 import pytest
 import yaml
-from click.testing import CliRunner
+from click import testing
 
-from dbt_scenario.cli import main
-from dbt_scenario.loader import read_yaml
+from dbt_scenario import cli, loader
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 @pytest.fixture
@@ -21,12 +20,12 @@ def definition(tmp_path):
         ignore=shutil.ignore_patterns(".dbt-scenario"),
     )
     scenario = project / "scenarios/orders.yml"
-    return project, scenario, read_yaml(scenario)
+    return project, scenario, loader.read_yaml(scenario)
 
 
 def invoke(project, path):
-    return CliRunner().invoke(
-        main,
+    return testing.CliRunner().invoke(
+        cli.main,
         ["validate", "--project-dir", str(project), "--scenario", str(path)],
     )
 
@@ -90,7 +89,7 @@ def test_placeholder_spelling_inside_a_real_text_cell_remains_valid(definition):
     data["output"]["columns"]["note"] = "text"
     for name in ["initial", "updated"]:
         fixture = project / f"scenarios/fixtures/{name}.yml"
-        rows = read_yaml(fixture)["rows"]
+        rows = loader.read_yaml(fixture)["rows"]
         for row in rows:
             row["note"] = "replace_with_expected_initial_rows"
         fixture.write_text(yaml.safe_dump({"rows": rows}))
@@ -111,7 +110,7 @@ def test_other_invalid_strings_keep_the_schema_error(definition):
 def test_value_errors_are_found_without_revealing_fixture_values(definition):
     project, path, _ = definition
     fixture = project / "scenarios/fixtures/initial.yml"
-    rows = read_yaml(fixture)["rows"]
+    rows = loader.read_yaml(fixture)["rows"]
     rows[0]["amount"] = "synthetic.private@example.invalid"
     fixture.write_text(yaml.safe_dump({"rows": rows}))
     result = invoke(project, path)
@@ -123,7 +122,7 @@ def test_value_errors_are_found_without_revealing_fixture_values(definition):
 def test_duplicate_expected_keys_are_refused_before_execution(definition):
     project, path, _ = definition
     fixture = project / "scenarios/fixtures/initial.yml"
-    rows = read_yaml(fixture)["rows"]
+    rows = loader.read_yaml(fixture)["rows"]
     rows.append(copy.deepcopy(rows[0]))
     fixture.write_text(yaml.safe_dump({"rows": rows}))
     result = invoke(project, path)
