@@ -195,7 +195,12 @@ class PreparedRows:
     source: list[tuple] = field(repr=False)
     values: list[tuple] = field(repr=False)
 
-    def batch(self, rows: list, offset: int, columns: dict[str, str]) -> list[tuple] | None:
+    def batch(
+        self,
+        rows: list,
+        offset: int,
+        columns: dict[str, str],
+    ) -> list[tuple] | None:
         if not isinstance(rows, list) or self.columns != tuple(columns.items()):
             return None
         end = offset + len(rows)
@@ -217,7 +222,11 @@ class Scenario:
     path: Path
     fingerprint: str
     fixture_hashes: dict[str, str]
-    prepared: dict[tuple, PreparedRows] = field(default_factory=dict, repr=False, compare=False)
+    prepared: dict[tuple, PreparedRows] = field(
+        default_factory=dict,
+        repr=False,
+        compare=False,
+    )
 
 
 def validate_scenario_schema(data) -> None:
@@ -242,7 +251,12 @@ class FixtureReader:
     cache: dict[Path, dict] = field(default_factory=dict)
     prepared: dict[tuple, PreparedRows] = field(default_factory=dict)
 
-    def prepare(self, fixture: dict, columns: dict[str, str], location: tuple) -> list[tuple]:
+    def prepare(
+        self,
+        fixture: dict,
+        columns: dict[str, str],
+        location: tuple,
+    ) -> list[tuple]:
         if "fixture" in fixture:
             target = (self.path.parent / fixture["fixture"]).resolve()
             if not target.is_relative_to(self.root) or not target.is_file():
@@ -258,7 +272,11 @@ class FixtureReader:
         rows = fixture["rows"]
         values = typed_rows(rows, columns, location)
         source = [tuple(row[name] for name in columns) for row in rows]
-        self.prepared[location] = PreparedRows(tuple(columns.items()), source, values)
+        self.prepared[location] = PreparedRows(
+            tuple(columns.items()),
+            source,
+            values,
+        )
         return values
 
 
@@ -313,7 +331,11 @@ def validate_steps(data: dict, fixtures: FixtureReader) -> None:
                     "INVALID_SAME_AS_REFERENCE", location=("steps", index, "expect", "same_as")
                 )
         else:
-            rows = fixtures.prepare(expected, columns, ("steps", index, "expect", "rows"))
+            rows = fixtures.prepare(
+                expected,
+                columns,
+                ("steps", index, "expect", "rows"),
+            )
             identities = [tuple(row[i] for i in key_indexes) for row in rows]
             if any(None in key for key in identities) or len(set(identities)) != len(identities):
                 raise ScenarioError(

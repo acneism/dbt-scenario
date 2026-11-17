@@ -133,7 +133,11 @@ def scenario_filename(name):
     return f"scenarios/{name}.yml"
 
 
-def select_model(project: str, selector: str, manifest: dict) -> tuple[str, dict]:
+def select_model(
+    project: str,
+    selector: str,
+    manifest: dict,
+) -> tuple[str, dict]:
     direct = manifest["nodes"].get(selector)
     entries = [(selector, direct)] if isinstance(direct, dict) else manifest["nodes"].items()
     candidates = [
@@ -166,7 +170,12 @@ def metadata_columns(
     return column_types(entry, location, catalog=True)
 
 
-def model_inputs(project: str, model: dict, manifest: dict, catalog: dict | None) -> dict:
+def model_inputs(
+    project: str,
+    model: dict,
+    manifest: dict,
+    catalog: dict | None,
+) -> dict:
     depends_on = model.get("depends_on")
     dependencies = depends_on.get("nodes") if isinstance(depends_on, dict) else None
     if (
@@ -201,13 +210,22 @@ def model_inputs(project: str, model: dict, manifest: dict, catalog: dict | None
                 raise ScenarioError("DIRECT_BUILTIN_OR_VERSIONED_REF_UNSUPPORTED")
         inputs[f"input_{index + 1}"] = {
             "node": dependency,
-            "columns": metadata_columns(dependency, node, ("inputs", index, "columns"), catalog),
+            "columns": metadata_columns(
+                dependency,
+                node,
+                ("inputs", index, "columns"),
+                catalog,
+            ),
         }
     return inputs
 
 
 def prepare_model_metadata(
-    project: str, selector: str, manifest: dict, catalog: dict | None, primary_key
+    project: str,
+    selector: str,
+    manifest: dict,
+    catalog: dict | None,
+    primary_key,
 ) -> tuple[str, str, dict, dict[str, str], list[str]]:
     identity, model = select_model(project, selector, manifest)
     name = model.get("name")
@@ -243,13 +261,19 @@ def validate_template(scenario: dict) -> None:
             update["replace"]["rows"] = []
         if "rows" in step["expect"]:
             step["expect"]["rows"] = []
-    schema = json.loads(files("dbt_scenario").joinpath("scenario.schema.json").read_text())
+    schema = json.loads(
+        files("dbt_scenario").joinpath("scenario.schema.json").read_text(),
+    )
     if next(Draft202012Validator(schema).iter_errors(prototype), None):
         raise ScenarioError("INIT_TEMPLATE_UNSUPPORTED")
 
 
 def scaffold_from_metadata(
-    settings: dict, selector: str, manifest: dict, catalog: dict | None = None, primary_key=()
+    settings: dict,
+    selector: str,
+    manifest: dict,
+    catalog: dict | None = None,
+    primary_key=(),
 ) -> tuple[str, dict]:
     identity, name, inputs, output, keys = prepare_model_metadata(
         settings["name"], selector, manifest, catalog, primary_key

@@ -193,7 +193,12 @@ class Database:
             )
         )
 
-    def columns_match(self, actual_schema: str, table: str, columns: dict[str, str]) -> bool:
+    def columns_match(
+        self,
+        actual_schema: str,
+        table: str,
+        columns: dict[str, str],
+    ) -> bool:
         actual_types = dict(
             self.execute(
                 "SELECT a.attname, format_type(a.atttypid,a.atttypmod) "
@@ -281,7 +286,10 @@ class Database:
                 ).fetchone()[0]
                 if exists:
                     changed_columns.append(name)
-        return {"missing": missing, "unexpected": unexpected, "changed": modified}, changed_columns
+        return (
+            {"missing": missing, "unexpected": unexpected, "changed": modified},
+            changed_columns,
+        )
 
     def compare(
         self,
@@ -314,7 +322,12 @@ class Database:
         ).fetchone()[0]
         if reason := self.key_problem(actual, columns, keys):
             return {**base, "status": "FAIL", "reason_code": reason}
-        differences, changed_columns = self.compare_rows(actual, expected, columns, keys)
+        differences, changed_columns = self.compare_rows(
+            actual,
+            expected,
+            columns,
+            keys,
+        )
         base.update(diff_counts=differences, changed_columns=changed_columns)
         if any(differences.values()):
             base.update(status="FAIL", reason_code="ROWS_MISMATCH")

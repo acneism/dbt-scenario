@@ -75,7 +75,11 @@ def prepare_project(root, sources, config, fixtures):
         },
     )
     prepared = replace(config, project_dir=project)
-    manifest, manifest_path = parse_metadata(prepared, root, "dsc_clinical_metadata")
+    manifest, manifest_path = parse_metadata(
+        prepared,
+        root,
+        "dsc_clinical_metadata",
+    )
     with static_metadata():
         inventory = discover_models(project, manifest_path)
         if inventory["models"] != [

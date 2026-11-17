@@ -21,7 +21,13 @@ from dbt_scenario.journal import Journal, schema_names
 from dbt_scenario.lifecycle import finish_run
 from dbt_scenario.loader import PreparedRows, Scenario
 from dbt_scenario.project import Project
-from dbt_scenario.report import ErrorStage, RunMode, ScenarioReport, StepSummary, write_report
+from dbt_scenario.report import (
+    ErrorStage,
+    RunMode,
+    ScenarioReport,
+    StepSummary,
+    write_report,
+)
 from dbt_scenario.requirements import check_model_config
 from dbt_scenario.sql_audit import audit_sql
 
@@ -92,7 +98,13 @@ class StepExecution:
     prepared: dict[tuple, PreparedRows]
     snapshots: dict[str, str] = field(default_factory=dict)
 
-    def execute(self, index: int, step: dict, budget: Deadline, summary: StepSummary) -> None:
+    def execute(
+        self,
+        index: int,
+        step: dict,
+        budget: Deadline,
+        summary: StepSummary,
+    ) -> None:
         actual_schema, input_schema, _ = self.schemas
         mode = summary["requested_mode"]
         with self.database.budget(budget):
@@ -131,23 +143,48 @@ class StepExecution:
         actual_schema, input_schema, _ = self.schemas
         dbname = self.database_name
         compiled, _ = self.project.invoke("compile", budget, args)
-        compiled_node = execution_node(compiled, self.node, actual_schema, dbname)
+        compiled_node = execution_node(
+            compiled,
+            self.node,
+            actual_schema,
+            dbname,
+        )
         allowed = {(input_schema, table) for table in self.mapping.values()}
         if mode == "incremental":
             allowed.add((actual_schema, self.node["alias"]))
-        compile_audit = audit_sql(compiled_node.get("compiled_code"), dbname, allowed)
+        compile_audit = audit_sql(
+            compiled_node.get("compiled_code"),
+            dbname,
+            allowed,
+        )
         summary["sql_audit"] = compile_audit
 
         manifest, artifacts = self.project.invoke("run", budget, args)
         run_node = execution_node(manifest, self.node, actual_schema, dbname)
-        executed_audit = audit_sql(run_node.get("compiled_code"), dbname, allowed)
+        executed_audit = audit_sql(
+            run_node.get("compiled_code"),
+            dbname,
+            allowed,
+        )
         compile_audit["run_compiled_sha256"] = executed_audit["compiled_sha256"]
 
         after = self.database.oid(actual_schema, self.node["alias"])
-        evidence = observe_mode(self.project, run_node, artifacts, mode, before, after)
+        evidence = observe_mode(
+            self.project,
+            run_node,
+            artifacts,
+            mode,
+            before,
+            after,
+        )
         summary.update(observed_mode=mode, observed_mode_evidence=evidence)
 
-    def assert_output(self, index: int, expected: dict, summary: StepSummary) -> None:
+    def assert_output(
+        self,
+        index: int,
+        expected: dict,
+        summary: StepSummary,
+    ) -> None:
         actual_schema, _, expected_schema = self.schemas
         columns = self.definition["output"]["columns"]
         table = self.node["alias"]
@@ -174,11 +211,20 @@ class StepExecution:
         )
         if summary["status"] == "PASS":
             snapshot = f"snapshot_{index}"
-            self.database.snapshot(actual_schema, table, expected_schema, snapshot)
+            self.database.snapshot(
+                actual_schema,
+                table,
+                expected_schema,
+                snapshot,
+            )
             self.snapshots[summary["name"]] = snapshot
 
 
-def initialize_report(scenario: Scenario, config: Config, run_id: str) -> ScenarioReport:
+def initialize_report(
+    scenario: Scenario,
+    config: Config,
+    run_id: str,
+) -> ScenarioReport:
     return {
         "schema_version": 1,
         "run_id": run_id,
@@ -240,7 +286,10 @@ def finish_resources(
 
 
 def run_scenario(
-    scenario: Scenario, config: Config, report_dir: Path, keep_on_failure: bool = False
+    scenario: Scenario,
+    config: Config,
+    report_dir: Path,
+    keep_on_failure: bool = False,
 ) -> ScenarioReport:
     started = time.monotonic()
     scenario_budget = Deadline(config.scenario_timeout, "SCENARIO_TIMEOUT")
@@ -278,7 +327,10 @@ def run_scenario(
             )
             stage = "step"
             for index, step in enumerate(definition["steps"]):
-                current_step = initialize_step(step["name"], step["run"]["mode"])
+                current_step = initialize_step(
+                    step["name"],
+                    step["run"]["mode"],
+                )
                 report["steps"].append(current_step)
                 step_started = time.monotonic()
                 step_budget = Deadline(config.step_timeout, "STEP_TIMEOUT", scenario_budget)

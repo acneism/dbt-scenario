@@ -75,4 +75,9 @@ def load_config(path: Path, *, load_project_env: bool = True) -> Config:
     limits = [data.get("step_timeout", 120), data.get("scenario_timeout", 600)]
     if any(type(value) is not int or value <= 0 for value in limits):
         raise ScenarioError("INVALID_TIMEOUT")
-    return Config(project_dir, cast(DatabaseConfig, database), *limits, project_env)
+    return Config(
+        project_dir,
+        cast(DatabaseConfig, database),
+        *limits,
+        project_env,
+    )
