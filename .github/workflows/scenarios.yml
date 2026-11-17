@@ -182,7 +182,7 @@ jobs:
                   report = json.loads(path.read_text(encoding="utf-8"))
                   status = report["overall_status"]
                   cleanup = report["cleanup_status"]
-                  if status not in {"PASS", "FAIL", "ERROR"} or cleanup not in {"CLEANED", "KEPT", "CLEANUP_FAILED", "NOT_STARTED"}:
+                  if status not in {"PASS", "FAIL", "ERROR"} or cleanup not in {"CLEANED", "KEPT", "ERROR", "NOT_NEEDED"}:
                       raise ValueError
                   statuses[status] += 1
                   cleanups[cleanup] += 1

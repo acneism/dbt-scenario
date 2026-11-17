@@ -46,6 +46,8 @@ def check_model_config(config):
         raise ScenarioError("UNSUPPORTED_INCREMENTAL_STRATEGY")
     if any(config.get(name) for name in ["pre-hook", "post-hook", "grants", "persist_docs"]):
         raise ScenarioError("MODEL_HOOKS_UNSUPPORTED")
+    if any(config.get(name) for name in ["incremental_predicates", "predicates", "sql_header"]):
+        raise ScenarioError("MODEL_SQL_CONFIG_UNSUPPORTED")
     contract = config.get("contract", {})
     if (
         not isinstance(contract, dict)

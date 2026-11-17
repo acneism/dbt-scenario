@@ -51,7 +51,7 @@ Expected row counts are 0 / 3 / 3. The demo SQL uses a PostgreSQL `-infinity` ti
 
 The prerelease includes a wheel, source archive, SHA256SUMS and Linux/Windows verification reports. It is distributed through GitHub Releases; the [release procedure](docs/RELEASING.md) explains the checks. A contributor checkout can still be installed with `python -m pip install -e '.[dev]'`.
 
-Run `docker compose down` after using the example. The database is disposable and has no persistent volume. Keep the two passwords unchanged while the container is running.
+Run `docker compose down --volumes` after using the example to remove its disposable database and the PostgreSQL image's anonymous data volume. Keep the two passwords unchanged while the container is running.
 
 ## Initialize a project
 
@@ -219,6 +219,7 @@ Journals from alpha 1 do not exist, so its abandoned schemas cannot be recovered
 - One SQL incremental model per scenario; direct upstream models are fixtures, so their SQL is outside the test.
 - Standard PostgreSQL `append`, `delete+insert` and `merge` materializations.
 - Custom materializations, hooks, overridden routing/strategy macros, ephemeral inputs, versioned refs and Fusion are unsupported.
+- SQL in `sql_header`, `incremental_predicates` or `predicates` is refused before execution because it falls outside the audited model SELECT.
 - Model queries must fit the SQL audit's supported SELECT subset; table-valued functions, LATERAL, locks, writes and SQL over 1 MiB are unsupported.
 - No production connection is needed. The runner is for trusted project code on a disposable test database; it is not a sandbox for malicious macros.
 - Project dependencies must already be installed. The runner does not fetch packages or forward arbitrary environment variables into dbt.

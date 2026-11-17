@@ -644,3 +644,13 @@ def test_non_json_constants_in_otherwise_valid_metadata_are_rejected(artifacts, 
     with pytest.raises(ScenarioError, match="INIT_METADATA_INVALID"):
         generate(artifacts)
     assert not (root / "scenario-runner.yml").exists()
+
+
+@pytest.mark.parametrize("setting", ["sql_header", "incremental_predicates", "predicates"])
+def test_metadata_refuses_sql_configuration_before_writing_templates(artifacts, setting):
+    root, manifest, _ = artifacts
+    manifest["nodes"]["model.analytics.fct_orders"]["config"][setting] = "select 1"
+    with pytest.raises(ScenarioError, match="MODEL_SQL_CONFIG_UNSUPPORTED"):
+        generate(artifacts)
+    assert not (root / "scenario-runner.yml").exists()
+    assert not (root / "scenarios").exists()

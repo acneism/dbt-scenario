@@ -60,19 +60,25 @@ MACROS = """
 {% endmacro %}
 """
 
+EXCLUDED_DIRECTORIES = frozenset(
+    {".git", ".venv", "target", "logs", "artifacts", ".dbt-scenario", "__pycache__"}
+)
+
 
 def fingerprint(project_dir: Path) -> str:
     digest = hashlib.sha256()
-    excluded = {".git", ".venv", "target", "logs", "artifacts", ".dbt-scenario", "__pycache__"}
+    digest.update(b"dbt-scenario-project-v2\x00")
     for base, dirs, names in os.walk(project_dir):
-        dirs[:] = sorted(name for name in dirs if name not in excluded)
+        dirs[:] = sorted(name for name in dirs if name not in EXCLUDED_DIRECTORIES)
         for name in sorted(names):
             path = Path(base) / name
             if path.is_symlink():
                 raise ScenarioError("PROJECT_SYMLINK_UNSUPPORTED")
             if path.suffix in {".sql", ".yml", ".yaml", ".json", ".lock"}:
-                digest.update(str(path.relative_to(project_dir)).replace("\\", "/").encode())
-                digest.update(path.read_bytes())
+                relative = path.relative_to(project_dir).as_posix().encode("utf-8")
+                digest.update(len(relative).to_bytes(8, "big"))
+                digest.update(relative)
+                digest.update(hashlib.sha256(path.read_bytes()).digest())
     return digest.hexdigest()
 
 
@@ -90,11 +96,10 @@ class Project:
         settings = project_settings(config.project_dir)
         check_dependencies(config.project_dir, settings)
         self.project_hash = fingerprint(config.project_dir)
-        ignored = shutil.ignore_patterns(
-            ".git", ".venv", "target", "logs", "artifacts", ".dbt-scenario", "__pycache__"
-        )
+        ignored = shutil.ignore_patterns(*EXCLUDED_DIRECTORIES)
         for base, dirs, names in os.walk(config.project_dir):
-            for name in dirs + names:
+            dirs[:] = [name for name in dirs if name not in EXCLUDED_DIRECTORIES]
+            for name in dirs + [name for name in names if name not in EXCLUDED_DIRECTORIES]:
                 if (Path(base) / name).is_symlink():
                     raise ScenarioError("PROJECT_SYMLINK_UNSUPPORTED")
         shutil.copytree(config.project_dir, self.root, ignore=ignored)

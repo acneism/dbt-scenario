@@ -21,26 +21,21 @@ from dbt_scenario.lifecycle import finish_run
 from dbt_scenario.loader import Scenario
 from dbt_scenario.project import Project
 from dbt_scenario.report import write_report
+from dbt_scenario.requirements import check_model_config
 from dbt_scenario.sql_audit import audit_sql
 
 
 def execution_node(manifest, node, actual_schema, database):
     selected = manifest["nodes"].get(node["unique_id"])
+    try:
+        check_model_config(selected.get("config") if selected else None)
+    except ScenarioError:
+        raise ScenarioError("MODEL_CONFIGURATION_CHANGED") from None
     if (
         not selected
         or selected["alias"] != node["alias"]
         or selected["schema"] != actual_schema
         or selected["database"] != database
-        or selected["config"]["materialized"] != "incremental"
-        or selected["config"].get("full_refresh") is True
-        or selected["config"].get("incremental_strategy")
-        not in {None, "append", "merge", "delete+insert"}
-        or any(
-            selected["config"].get(name)
-            for name in ["pre-hook", "post-hook", "grants", "persist_docs"]
-        )
-        or selected["config"].get("contract", {}).get("enforced")
-        or selected["config"].get("language", "sql") != "sql"
     ):
         raise ScenarioError("MODEL_CONFIGURATION_CHANGED")
     return selected
@@ -99,6 +94,7 @@ def run_scenario(
         "scenario_hash": scenario.fingerprint,
         "fixture_hashes": scenario.fixture_hashes,
         "project_hash": None,
+        "project_hash_format": 2,
         "project_env_names": sorted(config.project_env),
         "started_at": datetime.now(UTC).isoformat(),
         "duration_ms": 0,

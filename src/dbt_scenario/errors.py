@@ -30,6 +30,11 @@ FIELDS = {
 }
 
 HINTS = {
+    "MODEL_SQL_CONFIG_UNSUPPORTED": (
+        "Remove sql_header and incremental_predicates/predicates; "
+        "SQL outside the model SELECT is not supported."
+    ),
+    "PROCESS_ISOLATION_FAILED": "Use a Windows environment that permits nested Job Objects.",
     "CUSTOM_MACRO_UNSUPPORTED": (
         "Choose a project without custom routing, incremental-strategy or materialization macros."
     ),

@@ -18,7 +18,7 @@ The generated workspace and run reports are local artifacts. Publish the sanitiz
 
 ## Recorded alpha 6 Linux result
 
-Measured on November 3, 2026 for source commit `080ec1c4813f5d51f04c6cd9d3ae5489e712c006`. The installed package hash matches the current Git source with LF checkout bytes. [CI job](https://github.com/acneism/dbt-scenario/actions/runs/41631791262/job/125902931701), [original measurements](benchmarks/postgresql16-linux-2cpu-8g-10000x10.json).
+Measured on November 3, 2026 for source commit `080ec1c4813f5d51f04c6cd9d3ae5489e712c006`. The installed package hash matches that measured source commit with LF checkout bytes. [CI job](https://github.com/acneism/dbt-scenario/actions/runs/41631791262/job/125902931701), [original measurements](benchmarks/postgresql16-linux-2cpu-8g-10000x10.json).
 
 | Metric | Full scenario |
 |---|---:|

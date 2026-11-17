@@ -55,6 +55,8 @@ The [reusable GitHub Actions workflow](GITHUB-ACTIONS.md) now supplies a public-
 
 A [first-to-second scenario rehearsal](FIRST-AND-SECOND-SCENARIO.md) now connects the installed public CLI and a real parsed manifest to two successive passing CI runs. The second commit adds only its scenario file; the first scenario, SQL, runner configuration and workflow remain unchanged. This verifies the technical addition path without completing the human comparison or external pilot items.
 
+Alpha13 corrects [seven audit findings](AUDIT-FIXES.md), including model SQL configuration refusals, Windows process-tree lifetime, ignored directories, dependency security, CI counts, demo teardown and project fingerprint framing. These corrections strengthen the implemented functionality; they do not complete the external pilot or human-effort comparison.
+
 The remaining work is:
 
 - Broader SQL compatibility guided by real projects, while keeping the trusted-code/disposable-database boundary explicit.

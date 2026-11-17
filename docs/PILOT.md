@@ -64,7 +64,9 @@ Do not count a benchmark timing as onboarding effort, or a passing toy example a
 
 ## Check repeat use
 
-If the first scenario is useful, have someone in the project add a second scenario without the tool author's assistance. Record the time and help required. Put the scenarios into CI using the same dedicated database setup and keep them through normal project changes for two weeks. The two-week period is a trial criterion, not an observed retention result or runtime promise.
+If the first scenario is useful, have someone in the project add a second scenario without the tool author's assistance. Record the time and help required. Put the scenarios into CI using the same dedicated database setup and keep them through normal project changes for four weeks, with at least three meaningful runs on project changes. This period is a trial criterion, not an observed retention result or runtime promise.
+
+The original pilot criterion calls for three independent teams to participate, with at least two teams connecting a real scenario, reproducing a known defect or replacing a maintained manual check, and retaining CI through that four-week period. At least one participant should add a second scenario independently. A two-week checkpoint can record early feedback; it does not complete the retention criterion.
 
 Record whether the team keeps the tests, removes them, or stops earlier, and why. Useful signals include a confirmed unexpected regression, reduced work compared with the existing harness, independently added scenarios, and actionable diagnostics. A successful install or a star alone does not demonstrate continued use.
 
@@ -82,7 +84,7 @@ Compatibility or diagnostic problems:
 Existing checks: what ran and what they detected
 Equivalent baseline: setup minutes, assertions, help needed
 Second scenario: added independently? minutes and help needed
-CI after two weeks: kept / removed / trial stopped, with reason
+CI after four weeks: kept / removed / trial stopped, meaningful runs, with reason
 Confirmed defect: yes / no / unresolved, with a permitted minimal example
 ```
 

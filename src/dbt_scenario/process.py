@@ -1,64 +1,68 @@
 import os
 import signal
 import subprocess
+import sys
 
 from dbt_scenario.deadline import Deadline
 from dbt_scenario.errors import ScenarioError
+from dbt_scenario.windows_job import WindowsJob
+
+WINDOWS_LAUNCHER = (
+    "import subprocess,sys\n"
+    "if sys.stdin.buffer.read(1) != b'1': sys.exit(125)\n"
+    "sys.exit(subprocess.call(sys.argv[1:], stdin=subprocess.DEVNULL))\n"
+)
 
 
 def stop_process(process: subprocess.Popen):
-    if os.name == "nt" and process.poll() is not None:
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
         return
-    if os.name == "nt":
-        try:
-            subprocess.run(
-                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
-                capture_output=True,
-                check=False,
-                timeout=5,
-                creationflags=subprocess.CREATE_NO_WINDOW,
-            )
-        except subprocess.TimeoutExpired:
-            process.kill()
-    else:
-        try:
-            os.killpg(process.pid, signal.SIGTERM)
-        except ProcessLookupError:
-            return
     try:
         process.wait(timeout=2)
     except subprocess.TimeoutExpired:
-        if os.name == "nt":
-            process.kill()
-        else:
-            os.killpg(process.pid, signal.SIGKILL)
+        os.killpg(process.pid, signal.SIGKILL)
         process.wait(timeout=2)
     finally:
-        if os.name != "nt":
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
 
 
 def run_process(argv: list[str], environment: dict, directory, deadline: Deadline) -> int:
     deadline.check()
-    process = subprocess.Popen(
-        argv,
-        env=environment,
-        cwd=directory,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        start_new_session=os.name != "nt",
-        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
-    )
+    job = WindowsJob() if os.name == "nt" else None
+    process = None
     try:
-        process.communicate(timeout=deadline.remaining())
+        process = subprocess.Popen(
+            [sys.executable, "-I", "-c", WINDOWS_LAUNCHER, *argv] if job else argv,
+            env=environment,
+            cwd=directory,
+            stdin=subprocess.PIPE if job else subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            start_new_session=os.name != "nt",
+            creationflags=subprocess.CREATE_NO_WINDOW if job else 0,
+        )
+        if job:
+            job.assign(process.pid)
+        process.communicate(input=b"1" if job else None, timeout=deadline.remaining())
     except subprocess.TimeoutExpired:
-        stop_process(process)
         raise ScenarioError(deadline.expired_reason()) from None
-    except BaseException:
-        stop_process(process)
-        raise
+    finally:
+        if job:
+            job.close()
+            if process:
+                if process.poll() is None:
+                    process.kill()
+                process.wait(timeout=5)
+        elif process:
+            stop_process(process)
+        if process:
+            for stream in [process.stdin, process.stdout, process.stderr]:
+                if stream:
+                    stream.close()
     deadline.check()
     return process.returncode

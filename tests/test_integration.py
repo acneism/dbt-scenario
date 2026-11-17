@@ -1182,7 +1182,7 @@ def test_cte_model_passes_compiled_relation_audit(project):
     assert [step["sql_audit"]["checked_relations"] for step in report["steps"]] == [1, 2, 2]
 
 
-@pytest.mark.parametrize("change", ["hook", "strategy"])
+@pytest.mark.parametrize("change", ["hook", "strategy", "sql_header", "incremental_predicates"])
 def test_later_unsupported_config_is_rejected_before_model_run(project, monkeypatch, change):
     config, scenario, reports = project
     if change == "hook":
@@ -1194,8 +1194,21 @@ def test_later_unsupported_config_is_rejected_before_model_run(project, monkeypa
             )
         )
         scenario.data["steps"][1]["run"]["vars"] = {"hook_sql": ["select 1"]}
-    else:
+    elif change == "strategy":
         scenario.data["steps"][1]["run"]["vars"] = {"strategy": "unsupported_custom"}
+    else:
+        model = config.project_dir / "models" / "fct_orders.sql"
+        default = "''" if change == "sql_header" else "[]"
+        model.write_text(
+            model.read_text().replace(
+                "materialized='incremental'",
+                f"materialized='incremental', {change}=var('unaudited_sql', {default})",
+            )
+        )
+        sql = "select count(*) from pg_catalog.pg_class;"
+        scenario.data["steps"][1]["run"]["vars"] = {
+            "unaudited_sql": sql if change == "sql_header" else ["exists (" + sql[:-1] + ")"]
+        }
     original = Project.invoke
     calls = []
 
@@ -1210,3 +1223,32 @@ def test_later_unsupported_config_is_rejected_before_model_run(project, monkeypa
     assert calls.count("run") == 1
     assert [step["status"] for step in report["steps"]] == ["PASS", "ERROR", "NOT_RUN"]
     assert report["cleanup_status"] == "CLEANED"
+
+
+@pytest.mark.parametrize("setting", ["sql_header", "incremental_predicates"])
+def test_model_sql_configuration_is_refused_before_materialization(project, monkeypatch, setting):
+    config, scenario, reports = project
+    model = config.project_dir / "models/fct_orders.sql"
+    value = (
+        "'select count(*) from pg_catalog.pg_class;'"
+        if setting == "sql_header"
+        else "['exists (select 1 from pg_catalog.pg_class)']"
+    )
+    model.write_text(
+        model.read_text().replace(
+            "materialized='incremental'", f"materialized='incremental', {setting}={value}"
+        )
+    )
+    original = Project.invoke
+    calls = []
+
+    def observed(self, command, timeout, args=()):
+        calls.append(command)
+        return original(self, command, timeout, args)
+
+    monkeypatch.setattr(Project, "invoke", observed)
+    report = run_scenario(scenario, config, reports)
+    assert report["overall_status"] == "ERROR"
+    assert report["reason_code"] == "MODEL_SQL_CONFIG_UNSUPPORTED"
+    assert "run" not in calls and "compile" not in calls
+    assert report["cleanup_status"] == "NOT_NEEDED"
