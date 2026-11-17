@@ -21,6 +21,16 @@ Before publishing:
 
 An alpha release establishes availability of tested artifacts. It does not establish external adoption, a new production bug discovery, or support for another warehouse.
 
+## Audit-corrections prerelease
+
+[`v0.1.0a13`](https://github.com/acneism/dbt-scenario/releases/tag/v0.1.0a13) points to source `f94f1127e2e2c506663e497ee7d91947cf3e998e` and corrects [seven audit findings](AUDIT-FIXES.md). The [full CI](https://github.com/acneism/dbt-scenario/actions/runs/44115416096) passed 406 Linux unit tests, all 97 integration tests, the offline demo and 407 Windows unit tests. All five [external-model checks](https://github.com/acneism/dbt-scenario/actions/runs/44115416031) passed. These are author-run checks.
+
+The exact [distribution CI artifacts](https://github.com/acneism/dbt-scenario/actions/runs/44115416329) passed fresh-environment verification on Linux and Windows. All 32 runtime/resource files match the verified source. Both ordinary 2 / 3 / 3 and empty-start 0 / 3 / 3 scenarios pass with SQL audit and cleanup; owned schema inventories are preserved. See the [Linux report](distribution/v0.1.0a13-linux.json), [Windows report](distribution/v0.1.0a13-windows.json) and [release provenance](distribution/v0.1.0a13.json).
+
+All seven public assets were downloaded anonymously and matched their verified copies. A fresh [public-URL installation](distribution/v0.1.0a13-install.json) matches every package file and runs the static checks without database passwords. Database execution is recorded separately in the platform reports. The [reusable workflow](GITHUB-ACTIONS.md) at `c862ff3fb2ca2e91b020314addc56a42795af3b4` consumes the public wheel and constraints with pinned SHA-256 hashes.
+
+Project hashes now use framing format 2. Nonempty `sql_header`, `incremental_predicates` and `predicates` are refused. Development pytest is pinned to 9.0.3; the lock's 65 packages returned no known OSV findings on November 17, 2026. That query does not audit operating-system/container vulnerabilities or validate all dependency versions allowed by ranges.
+
 ## First published prerelease
 
 [`v0.1.0a6`](https://github.com/acneism/dbt-scenario/releases/tag/v0.1.0a6) points to commit `8e83523e141e9025204a2600766ad215fa2a494c`. Its uploaded wheel and sdist are the unchanged artifacts from the [successful distribution job](https://github.com/acneism/dbt-scenario/actions/runs/41659976719/job/126000296926). The same pair passed the installed-package PostgreSQL check on Linux/Python 3.12.15 and Windows/Python 3.12.10. All 28 runtime/resource files also match the earlier validated source at `27f2ea8e272d3533b33ba0bc4cd57bcb094444f7` byte for byte; this release adds distribution and verification rather than changing runtime behavior.

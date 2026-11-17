@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "package_version": "0.1.0a13",
+  "source_commit": "f94f1127e2e2c506663e497ee7d91947cf3e998e",
+  "runtime_files_checked": 32,
+  "ci_url": "https://github.com/acneism/dbt-scenario/actions/runs/44115416096",
+  "distribution_ci_url": "https://github.com/acneism/dbt-scenario/actions/runs/44115416329",
+  "external_model_ci_url": "https://github.com/acneism/dbt-scenario/actions/runs/44115416031",
+  "original_ci_artifact_sha256": "33ee2f3209389a13c9b8539744bc5b010fe70d38eeaf06ecbf3365a238477c57",
+  "platforms": [
+    "linux",
+    "win32"
+  ],
+  "audit_corrections": [
+    "F01",
+    "F02",
+    "F03",
+    "F04",
+    "F05",
+    "F06",
+    "F07"
+  ],
+  "windows_ci_unit_tests": {
+    "passed": 407,
+    "skipped": 1
+  },
+  "model_sql_configuration_refusals": [
+    "sql_header",
+    "incremental_predicates",
+    "predicates"
+  ],
+  "project_hash_format": 2,
+  "osv_lock_check": {
+    "checked_at": "2026-11-17T15:32:45.589315+00:00",
+    "source": "https://api.osv.dev/v1/querybatch",
+    "lockfile": "requirements-dev.lock.txt",
+    "packages_queried": 65,
+    "findings": []
+  },
+  "external_adoption_confirmed": false,
+  "artifacts": {
+    "constraints.txt": "a8c8776ccbdee1279d00bab6559566dfc6d7c0a7e49dbb1453b38e35247a2b1f",
+    "dbt_scenario-0.1.0a13-py3-none-any.whl": "26b09557f7d6b08df53b8b90666cdb60b1b2ba695e1d01ad38cd0641cb6ec0cc",
+    "dbt_scenario-0.1.0a13.tar.gz": "27361db52bbd5a944efcfbf7cd0067fd1c2e35300724034b0d4e02d04d2ba9c8",
+    "verification-windows.json": "36402174753393d208c510c9bfbcce7ccb8dec4ad9449a745a7b86e1473c26cb",
+    "verification.json": "d77bf58e0673ae8ea0bf88bc21806e923b0e7e7b08a5d4473419a13c58c63c47"
+  }
+}

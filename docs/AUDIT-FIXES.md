@@ -32,3 +32,13 @@ python -m pytest -m integration -k 'model_sql_configuration or later_unsupported
 ```
 
 The integration command needs the documented restricted PostgreSQL 16 test role and disposable database. The repository CI runs all unit and integration tests on Linux, the offline demo and a Windows unit job. Actual release validation and exact source/run identifiers are recorded in the [release checks](RELEASING.md).
+
+## Recorded verification
+
+Checked November 17, 2026 for source `f94f1127e2e2c506663e497ee7d91947cf3e998e`. The [full CI](https://github.com/acneism/dbt-scenario/actions/runs/44115416096) passed 406 Linux unit tests and all 97 PostgreSQL integration tests, offline acceptance, and 407 Windows unit tests. The platform-specific skips are reported by each job; these counts are not a sum of distinct cross-platform test cases. The Windows GitHub runner executed both real symlink checks and the descendant-lifetime checks.
+
+Eight targeted PostgreSQL tests also passed locally on Windows: normal incremental strategies, refusal of initial SQL configuration and refusal after a later vars change. The exact [CI wheel and sdist](https://github.com/acneism/dbt-scenario/actions/runs/44115416329) passed fresh installed-package verification on Linux and Windows, including both ordinary and empty-start demos. All 32 packaged runtime/resource files match source. All five [external-model checks](https://github.com/acneism/dbt-scenario/actions/runs/44115416031) passed.
+
+The published [alpha13](https://github.com/acneism/dbt-scenario/releases/tag/v0.1.0a13) assets were downloaded anonymously and matched all seven verified files. A fresh public-URL installation matched all 32 package files, validated both demo definitions without a database password, refused the three SQL configuration names and preserved process exit codes. Its [installation report](distribution/v0.1.0a13-install.json) distinguishes that static check from the separate database verification.
+
+The current [workflow controls](evaluation/audit-fixes-alpha13-controls.json) confirm two PASS/CLEANED reports and, separately, two early ERROR/NOT_NEEDED reports with CLI exit 2. This is technical validation by the author, not external adoption. The [validation index](evaluation/audit-fixes-alpha13.json) links the evidence and records the limits of Docker teardown and dependency checks.

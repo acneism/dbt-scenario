@@ -2,7 +2,7 @@
 
 This walkthrough connects metadata initialization to the [GitHub Actions workflow](GITHUB-ACTIONS.md). It uses one incremental model, explicit expected rows and the same CI configuration for both scenarios. If you have no project yet, start with the [supplied Actions demo](GITHUB-ACTIONS.md#try-it-without-your-own-project).
 
-Use the [public 0.1.0a12 installation](../README.md#quickstart) in a separate Python 3.12 environment. For an existing project, choose a supported PostgreSQL incremental model and install its dbt dependencies. The example below uses `fct_orders`; substitute your own model name and paths.
+Use the [public installation](../README.md#quickstart) in a separate Python 3.12 environment. For an existing project, choose a supported PostgreSQL incremental model and install its dbt dependencies. The example below uses `fct_orders`; substitute your own model name and paths.
 
 ## Prepare the metadata
 

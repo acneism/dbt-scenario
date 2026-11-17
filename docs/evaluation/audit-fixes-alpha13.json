@@ -1,0 +1,145 @@
+{
+  "schema_version": 1,
+  "status": "PASS",
+  "checked_on": "2026-11-17",
+  "package_version": "0.1.0a13",
+  "runtime_source_commit": "f94f1127e2e2c506663e497ee7d91947cf3e998e",
+  "workflow_commit": "c862ff3fb2ca2e91b020314addc56a42795af3b4",
+  "audit_source_commit": "fbeb3bce24aee4102a86f04cb3d02dcedcdd0544",
+  "release_url": "https://github.com/acneism/dbt-scenario/releases/tag/v0.1.0a13",
+  "corrections": {
+    "F01": {
+      "status": "corrected",
+      "verification": "real PostgreSQL initial/later-config tests and published-package early-error CI"
+    },
+    "F02": {
+      "status": "corrected",
+      "verification": "real Windows descendant-lifetime regressions, running and exited parent"
+    },
+    "F03": {
+      "status": "corrected",
+      "verification": "real symlink regressions in Linux and Windows CI; portable excluded-directory checks"
+    },
+    "F04": {
+      "status": "corrected",
+      "verification": "pytest 9.0.3 in range and lock; updated-suite CI; OSV returned no findings"
+    },
+    "F05": {
+      "status": "corrected",
+      "verification": "workflow-code unit checks and real early ERROR/NOT_NEEDED CI aggregate"
+    },
+    "F06": {
+      "status": "documentation_corrected",
+      "verification": "quickstart now uses docker compose down --volumes",
+      "docker_teardown_reexecuted_locally": false
+    },
+    "F07": {
+      "status": "corrected",
+      "verification": "audit collision trees now have different fingerprints",
+      "project_hash_format": 2
+    }
+  },
+  "ci_gates": [
+    {
+      "id": 44115416096,
+      "head_sha": "f94f1127e2e2c506663e497ee7d91947cf3e998e",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/acneism/dbt-scenario/actions/runs/44115416096"
+    },
+    {
+      "id": 44115416329,
+      "head_sha": "f94f1127e2e2c506663e497ee7d91947cf3e998e",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/acneism/dbt-scenario/actions/runs/44115416329"
+    },
+    {
+      "id": 44115416031,
+      "head_sha": "f94f1127e2e2c506663e497ee7d91947cf3e998e",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/acneism/dbt-scenario/actions/runs/44115416031"
+    },
+    {
+      "id": 44115416266,
+      "head_sha": "f94f1127e2e2c506663e497ee7d91947cf3e998e",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/acneism/dbt-scenario/actions/runs/44115416266"
+    }
+  ],
+  "linux_tests": {
+    "unit_passed": 406,
+    "unit_skipped": 2,
+    "integration_passed": 97
+  },
+  "windows_ci_tests": {
+    "unit_passed": 407,
+    "unit_skipped": 1
+  },
+  "windows_local_targeted_integration": {
+    "passed": 8,
+    "junit_sha256": "f26d58e1fa5307e477641a7a5c630bc75e4c38579c4789421861bf46e642aaf9"
+  },
+  "installed_distribution_platforms": [
+    "linux",
+    "win32"
+  ],
+  "installed_runtime_resource_files_matched": 32,
+  "distribution_artifact_id": 14342148383,
+  "distribution_artifact_sha256": "33ee2f3209389a13c9b8539744bc5b010fe70d38eeaf06ecbf3365a238477c57",
+  "public_verification": {
+    "status": "PASS",
+    "version": "0.1.0a13",
+    "anonymous_downloads": true,
+    "files": [
+      {
+        "name": "constraints.txt",
+        "sha256": "a8c8776ccbdee1279d00bab6559566dfc6d7c0a7e49dbb1453b38e35247a2b1f",
+        "bytes": 1200
+      },
+      {
+        "name": "dbt_scenario-0.1.0a13-py3-none-any.whl",
+        "sha256": "26b09557f7d6b08df53b8b90666cdb60b1b2ba695e1d01ad38cd0641cb6ec0cc",
+        "bytes": 57002
+      },
+      {
+        "name": "dbt_scenario-0.1.0a13.tar.gz",
+        "sha256": "27361db52bbd5a944efcfbf7cd0067fd1c2e35300724034b0d4e02d04d2ba9c8",
+        "bytes": 201652
+      },
+      {
+        "name": "release.json",
+        "sha256": "adcbbbfea82938600dfd064b25c6871da7b362f66eeaa77cdbc7a5f9747442da",
+        "bytes": 1719
+      },
+      {
+        "name": "SHA256SUMS",
+        "sha256": "5aa19407b5e2d0d656befd12d611938af3e98da59f8555d1bc33a93e9349bfd2",
+        "bytes": 543
+      },
+      {
+        "name": "verification-windows.json",
+        "sha256": "36402174753393d208c510c9bfbcce7ccb8dec4ad9449a745a7b86e1473c26cb",
+        "bytes": 1961
+      },
+      {
+        "name": "verification.json",
+        "sha256": "d77bf58e0673ae8ea0bf88bc21806e923b0e7e7b08a5d4473419a13c58c63c47",
+        "bytes": 1880
+      }
+    ]
+  },
+  "public_installation_report": "../distribution/v0.1.0a13-install.json",
+  "workflow_control_report": "audit-fixes-alpha13-controls.json",
+  "osv_lock_check": {
+    "checked_at": "2026-11-17T15:32:45.589315+00:00",
+    "source": "https://api.osv.dev/v1/querybatch",
+    "lockfile": "requirements-dev.lock.txt",
+    "packages_queried": 65,
+    "findings": []
+  },
+  "external_adoption_validated": false,
+  "current_version_controlled_performance_benchmark": false
+}

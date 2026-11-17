@@ -1,6 +1,6 @@
 # Run scenarios in GitHub Actions
 
-Copy [this workflow](examples/github-actions.yml) to `.github/workflows/dbt-scenario.yml` in your repository. It calls the tested reusable workflow at commit `8f4b36cdf41c66b152127f1e0cb1c83f577578e7` and installs the public 0.1.0a12 package. Your repository needs an existing dbt project, completed scenario definitions and permission to use public reusable workflows.
+Copy [this workflow](examples/github-actions.yml) to `.github/workflows/dbt-scenario.yml` in your repository. It calls the tested reusable workflow at commit `c862ff3fb2ca2e91b020314addc56a42795af3b4` and installs the public 0.1.0a13 package. Your repository needs an existing dbt project, completed scenario definitions and permission to use public reusable workflows.
 
 ```yaml
 name: dbt-scenario
@@ -11,7 +11,7 @@ permissions:
   contents: read
 jobs:
   scenarios:
-    uses: acneism/dbt-scenario/.github/workflows/scenarios.yml@8f4b36cdf41c66b152127f1e0cb1c83f577578e7
+    uses: acneism/dbt-scenario/.github/workflows/scenarios.yml@c862ff3fb2ca2e91b020314addc56a42795af3b4
     with:
       project-dir: .
       scenario-dir: scenarios
@@ -60,7 +60,7 @@ Add another completed scenario file to the same directory to select it on the ne
 
 For the exact initialization, fixture edits and selection checks, follow the [first and second scenario walkthrough](FIRST-AND-SECOND-SCENARIO.md). It records a first passing run followed by a commit that adds only the second scenario, using the same public package and CI caller.
 
-## Recorded controls
+## Recorded alpha12 controls
 
 Checked November 8, 2026. The [controlled consumer](https://github.com/acneism/dbt-scenario/tree/00e245353af634c38e8af4873a4f91116f81318a) contains 18 files and no dbt-scenario runtime or contributor scripts. It installs public `dbt_utils` 1.3.3 and uses its `safe_add` macro in a real incremental model. Its original runner configuration deliberately names an unusable database and an unset password variable; the positive run succeeds through the forced CI database instead.
 
@@ -75,3 +75,11 @@ The [verified report](evaluation/github-actions-consumer-linux.json) records all
 The [full CI for the workflow commit](https://github.com/acneism/dbt-scenario/actions/runs/42407744919) passed 388 unit and 93 integration tests, the repository demo and offline acceptance. Workflow syntax and embedded Python programs were checked locally; actionlint 1.7.12 passed for the reusable workflow, its example check and the copyable caller.
 
 These are author-run controls with synthetic data. They do not measure human onboarding time, independently authored scenarios or an external team's continued use. The intentionally red control runs establish failure propagation, not a defect in the workflow. No branch-protection settings were changed.
+
+## Alpha13 audit corrections
+
+The current pinned workflow installs public alpha13 with verified wheel/constraints hashes and accepts the runner's actual cleanup status values. The [published-package run](https://github.com/acneism/dbt-scenario/actions/runs/44118779169) reports two PASS/CLEANED scenarios with six distinct model invocations.
+
+A separate [controlled early-error run](https://github.com/acneism/dbt-scenario/actions/runs/44119136329) supplies a model with unsupported `sql_header`. Both scenarios refuse before materialization: CLI exit 2, two ERROR reports, two NOT_NEEDED cleanup statuses, valid summaries and two JUnit errors. Its red conclusion is intentional. This checks the error-count bug found in the audit; the original alpha12 controls did not exercise early preflight failure.
+
+The [verified artifact report](evaluation/audit-fixes-alpha13-controls.json) records both ZIP hashes, exact source/workflow commits, counts and JUnit checks. Update an older caller's pinned SHA to the current example to receive the workflow corrections; changing the dbt-scenario default branch does not update an immutable caller reference automatically.

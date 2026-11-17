@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "status": "PASS",
+  "source_commit": "f94f1127e2e2c506663e497ee7d91947cf3e998e",
+  "started_at": "2026-11-17T15:33:08.242464+00:00",
+  "python_version": "3.12.16",
+  "platform": "linux",
+  "package_version": "0.1.0a13",
+  "artifacts": {
+    "wheel": {
+      "name": "dbt_scenario-0.1.0a13-py3-none-any.whl",
+      "sha256": "26b09557f7d6b08df53b8b90666cdb60b1b2ba695e1d01ad38cd0641cb6ec0cc",
+      "bytes": 57002
+    },
+    "sdist": {
+      "name": "dbt_scenario-0.1.0a13.tar.gz",
+      "sha256": "27361db52bbd5a944efcfbf7cd0067fd1c2e35300724034b0d4e02d04d2ba9c8",
+      "bytes": 201652
+    }
+  },
+  "archive_checks": {
+    "files_checked": 32,
+    "content_sha256": "109c72cb5179dd2d28f413bcdfa4f1ae88f3b8e15a68d61f1298213198933b76",
+    "wheel_sdist_installed_match": true,
+    "installed_from_environment": true
+  },
+  "dependencies": {
+    "dbt-core": "1.11.16",
+    "dbt-postgres": "1.10.2",
+    "psycopg": "3.3.6",
+    "PyYAML": "6.0.3"
+  },
+  "cli_version": "dbt-scenario, version 0.1.0a13",
+  "dependency_check": "PASS",
+  "static_validation": {
+    "status": "PASS",
+    "without_password_env": true
+  },
+  "metadata_initialization": {
+    "status": "PASS",
+    "explicit_rows_required": true,
+    "model_sql_unchanged": true,
+    "model_discovery": {
+      "status": "PASS",
+      "without_password_env": true
+    }
+  },
+  "demo": {
+    "steps": [
+      "PASS",
+      "PASS",
+      "PASS"
+    ],
+    "actual_rows": [
+      2,
+      3,
+      3
+    ],
+    "cleanup_status": "CLEANED",
+    "engine_versions": {
+      "dbt-core": "1.11.16",
+      "dbt-postgres": "1.10.2",
+      "postgresql": 160016
+    }
+  },
+  "empty_start_demo": {
+    "status": "PASS",
+    "steps": [
+      "PASS",
+      "PASS",
+      "PASS"
+    ],
+    "actual_rows": [
+      0,
+      3,
+      3
+    ],
+    "cleanup_status": "CLEANED"
+  },
+  "owned_schemas_unchanged": true
+}

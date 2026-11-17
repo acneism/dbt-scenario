@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "status": "PASS",
+  "complete": true,
+  "checked_on": "2026-11-17",
+  "package_version": "0.1.0a13",
+  "source_commit": "f94f1127e2e2c506663e497ee7d91947cf3e998e",
+  "workflow_commit": "c862ff3fb2ca2e91b020314addc56a42795af3b4",
+  "external_pilot": false,
+  "negative_case_is_intentional": true,
+  "verified_materializations": 6,
+  "early_error_model_materializations": 0,
+  "fixture_marker_absent_from_reports": true,
+  "cases": {
+    "early_error": {
+      "workflow_run_id": 44119136329,
+      "workflow_url": "https://github.com/acneism/dbt-scenario/actions/runs/44119136329",
+      "consumer_commit": "f5a6c8f8220d6142a653f80a162e50ca95d65817",
+      "conclusion": "failure",
+      "expected_conclusion": true,
+      "artifact_id": 14345185252,
+      "artifact_sha256": "01bbf0f56ff4e7100c87590dfdaa2f3f9cea1c66f5fb4481c83816c8616da4cf",
+      "aggregate": {
+        "schema_version": 1,
+        "package_version": "0.1.0a13",
+        "wheel_sha256": "26b09557f7d6b08df53b8b90666cdb60b1b2ba695e1d01ad38cd0641cb6ec0cc",
+        "test_outcome": "failure",
+        "test_exit_code": 2,
+        "reported_scenarios": 2,
+        "statuses": {
+          "ERROR": 2
+        },
+        "cleanup_statuses": {
+          "NOT_NEEDED": 2
+        },
+        "summaries_valid": true,
+        "all_passed_and_cleaned": false
+      },
+      "junit": {
+        "errors": 2,
+        "failures": 0,
+        "skipped": 6
+      },
+      "reports": {
+        "consumer_empty_start": {
+          "status": "ERROR",
+          "cleanup": "NOT_NEEDED",
+          "reason_code": "MODEL_SQL_CONFIG_UNSUPPORTED",
+          "steps": [
+            "NOT_RUN",
+            "NOT_RUN",
+            "NOT_RUN"
+          ],
+          "actual_rows": [
+            null,
+            null,
+            null
+          ]
+        },
+        "consumer_update_retry": {
+          "status": "ERROR",
+          "cleanup": "NOT_NEEDED",
+          "reason_code": "MODEL_SQL_CONFIG_UNSUPPORTED",
+          "steps": [
+            "NOT_RUN",
+            "NOT_RUN",
+            "NOT_RUN"
+          ],
+          "actual_rows": [
+            null,
+            null,
+            null
+          ]
+        }
+      }
+    },
+    "success": {
+      "workflow_run_id": 44118779169,
+      "workflow_url": "https://github.com/acneism/dbt-scenario/actions/runs/44118779169",
+      "consumer_commit": "c862ff3fb2ca2e91b020314addc56a42795af3b4",
+      "conclusion": "success",
+      "expected_conclusion": true,
+      "artifact_id": 14345095231,
+      "artifact_sha256": "5543cb2f12f34ee5d3673c2f3aa5a73e700f4436d858ac6fa661c9dbd37c66e2",
+      "aggregate": {
+        "schema_version": 1,
+        "package_version": "0.1.0a13",
+        "wheel_sha256": "26b09557f7d6b08df53b8b90666cdb60b1b2ba695e1d01ad38cd0641cb6ec0cc",
+        "test_outcome": "success",
+        "test_exit_code": 0,
+        "reported_scenarios": 2,
+        "statuses": {
+          "PASS": 2
+        },
+        "cleanup_statuses": {
+          "CLEANED": 2
+        },
+        "summaries_valid": true,
+        "all_passed_and_cleaned": true
+      },
+      "junit": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0
+      },
+      "reports": {
+        "orders_empty_start": {
+          "status": "PASS",
+          "cleanup": "CLEANED",
+          "reason_code": null,
+          "steps": [
+            "PASS",
+            "PASS",
+            "PASS"
+          ],
+          "actual_rows": [
+            0,
+            3,
+            3
+          ]
+        },
+        "orders_update_late_arrival_retry": {
+          "status": "PASS",
+          "cleanup": "CLEANED",
+          "reason_code": null,
+          "steps": [
+            "PASS",
+            "PASS",
+            "PASS"
+          ],
+          "actual_rows": [
+            2,
+            3,
+            3
+          ]
+        }
+      }
+    }
+  }
+}
