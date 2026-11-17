@@ -3,6 +3,15 @@ from pathlib import Path
 from xml.etree.ElementTree import Element, SubElement, tostring
 
 
+def reason_lines(report: dict) -> list[str]:
+    lines = []
+    if reason := report.get("reason_code"):
+        lines.append(f"Scenario reason: {reason}")
+    if cleanup_reason := report.get("cleanup_reason_code"):
+        lines.append(f"Cleanup reason: {cleanup_reason}")
+    return lines
+
+
 def write_report(report: dict, directory: Path):
     directory.mkdir(parents=True, exist_ok=True)
     (directory / "summary.json").write_text(
@@ -35,12 +44,11 @@ def write_report(report: dict, directory: Path):
     suite.set("errors", str(sum(len(c.findall("error")) for c in suite)))
     suite.set("skipped", str(sum(len(c.findall("skipped")) for c in suite)))
     (directory / "junit.xml").write_bytes(tostring(suite, encoding="utf-8", xml_declaration=True))
-    lines = [
-        f"Result: {report['overall_status']}",
-        "",
-        "| Step | Status | Reason |",
-        "|---|---|---|",
-    ]
+    lines = [f"Result: {report['overall_status']}", ""]
+    if reasons := reason_lines(report):
+        lines.extend(f"- {line}" for line in reasons)
+        lines.append("")
+    lines.extend(["| Step | Status | Reason |", "|---|---|---|"])
     for step in steps:
         lines.append(f"| {step['name']} | {step['status']} | {step.get('reason_code') or ''} |")
     (directory / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")

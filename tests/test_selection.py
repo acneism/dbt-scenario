@@ -6,6 +6,7 @@ import pytest
 from click.testing import CliRunner
 
 from dbt_scenario.cli import main
+from dbt_scenario.report import write_report
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -80,6 +81,58 @@ def test_mixed_selection_deduplicates_paths_and_keeps_fixture_subdirectories_out
         (scenarios / "empty-start.yml").resolve(),
         extra.resolve(),
     ]
+
+
+@pytest.mark.parametrize(
+    ("reason", "cleanup_reason", "step_status", "exit_code"),
+    [
+        ("MODEL_SQL_CONFIG_UNSUPPORTED", None, "NOT_RUN", 2),
+        ("CLEANUP_FAILED", "SIMULATED_CLEANUP_FAILURE", "PASS", 2),
+        ("INTERRUPTED", None, "ERROR", 130),
+    ],
+)
+def test_cli_and_markdown_show_scenario_and_cleanup_errors(
+    selection, tmp_path, monkeypatch, reason, cleanup_reason, step_status, exit_code
+):
+    project, config, _ = selection
+    report_dir = tmp_path / "reports"
+
+    def run(scenario, config, directory, keep_on_failure):
+        report = {
+            "overall_status": "ERROR",
+            "scenario": scenario.data["name"],
+            "steps": [{"name": "initial", "status": step_status, "reason_code": None}],
+            "run_id": "run",
+            "cleanup_status": "ERROR" if cleanup_reason else "NOT_NEEDED",
+            "reason_code": reason,
+            "cleanup_reason_code": cleanup_reason,
+        }
+        write_report(report, directory / "run")
+        return report
+
+    monkeypatch.setattr("dbt_scenario.cli.run_scenario", run)
+    result = CliRunner().invoke(
+        main,
+        [
+            "test",
+            "--config",
+            str(config),
+            "--scenario",
+            str(project / "scenarios/orders.yml"),
+            "--report-dir",
+            str(report_dir),
+        ],
+    )
+
+    assert result.exit_code == exit_code, result.output
+    markdown = (report_dir / "run/summary.md").read_text(encoding="utf-8")
+    for output in [result.output, markdown]:
+        assert f"Scenario reason: {reason}" in output
+        assert step_status in output
+        if cleanup_reason:
+            assert f"Cleanup reason: {cleanup_reason}" in output
+        else:
+            assert "Cleanup reason:" not in output
 
 
 @pytest.mark.parametrize("command", ["test", "plan", "validate"])

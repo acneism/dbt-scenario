@@ -14,6 +14,7 @@ from dbt_scenario.initialize import initialize
 from dbt_scenario.lifecycle import cleanup_run
 from dbt_scenario.loader import load_scenario
 from dbt_scenario.project import Project
+from dbt_scenario.report import reason_lines
 from dbt_scenario.requirements import check_dependencies, project_settings
 from dbt_scenario.runner import run_scenario
 
@@ -206,6 +207,8 @@ def test_command(config_path, scenario_paths, scenario_dir, report_dir, keep_on_
     for scenario in scenarios:
         report = run_scenario(scenario, config, report_dir.resolve(), keep_on_failure)
         click.echo(f"{report['overall_status']} {report['scenario']}")
+        for line in reason_lines(report):
+            click.echo(f"  {line}")
         for step in report["steps"]:
             click.echo(
                 f"  {step['status']} {step['name']} {step.get('reason_code') or ''}".rstrip()
