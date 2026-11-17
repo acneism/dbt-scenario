@@ -55,6 +55,34 @@ def test_project_fingerprint_frames_path_and_content(tmp_path):
     assert fingerprint(first) != fingerprint(second)
 
 
+def test_project_uses_the_copied_sql_and_settings_for_its_fingerprint(tmp_path, monkeypatch):
+    source = tmp_path / "shop"
+    shutil.copytree(ROOT / "examples/shop", source)
+    model = source / "models/fct_orders.sql"
+    settings = source / "dbt_project.yml"
+    original_hash = fingerprint(source)
+    original_copy = shutil.copytree
+
+    def update_before_copy(project_dir, destination, *args, **options):
+        if Path(project_dir) == source:
+            model.write_text("select 2 as id\n", encoding="utf-8")
+            with settings.open("a", encoding="utf-8") as stream:
+                stream.write("\nvars:\n  copy_marker: staged\n")
+        return original_copy(project_dir, destination, *args, **options)
+
+    monkeypatch.setattr(shutil, "copytree", update_before_copy)
+    config = Config(
+        source,
+        {"host": "unused", "port": 1, "dbname": "unused", "user": "unused", "password": "unused"},
+    )
+    project = Project(config, tmp_path / "workspace", "isolated")
+
+    assert project.project_hash != original_hash
+    assert project.project_hash == fingerprint(source)
+    assert (project.root / model.relative_to(source)).read_bytes() == model.read_bytes()
+    assert project.settings["vars"]["copy_marker"] == "staged"
+
+
 @pytest.mark.parametrize("excluded", [".venv", ".git", "target", "logs"])
 def test_excluded_directory_symlink_is_not_scanned_or_copied(tmp_path, monkeypatch, excluded):
     project = tmp_path / "shop"

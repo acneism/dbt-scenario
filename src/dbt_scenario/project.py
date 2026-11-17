@@ -93,9 +93,6 @@ class Project:
         self.invocations = {}
         self.seen_invocations = set()
         self.environment = process_environment(config.project_env, config.database["password"])
-        settings = project_settings(config.project_dir)
-        check_dependencies(config.project_dir, settings)
-        self.project_hash = fingerprint(config.project_dir)
         ignored = shutil.ignore_patterns(*EXCLUDED_DIRECTORIES)
         for base, dirs, names in os.walk(config.project_dir):
             dirs[:] = [name for name in dirs if name not in EXCLUDED_DIRECTORIES]
@@ -103,7 +100,9 @@ class Project:
                 if (Path(base) / name).is_symlink():
                     raise ScenarioError("PROJECT_SYMLINK_UNSUPPORTED")
         shutil.copytree(config.project_dir, self.root, ignore=ignored)
-        self.settings = settings
+        self.settings = project_settings(self.root)
+        check_dependencies(self.root, self.settings)
+        self.project_hash = fingerprint(self.root)
         if self.settings.get("on-run-start") or self.settings.get("on-run-end"):
             raise ScenarioError("PROJECT_HOOKS_UNSUPPORTED")
         self.settings["profile"] = "dbt_scenario"
