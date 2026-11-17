@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from xml.etree.ElementTree import parse
 
 import pytest
 import yaml
@@ -12,10 +13,12 @@ import yaml
 from dbt_scenario.config import Config
 from dbt_scenario.deadline import Deadline
 from dbt_scenario.errors import ScenarioError
+from dbt_scenario.loader import load_scenario
 from dbt_scenario.process import run_process
 from dbt_scenario.project import Project, fingerprint
+from dbt_scenario.report import write_report
 from dbt_scenario.requirements import check_model_config
-from dbt_scenario.runner import execution_node
+from dbt_scenario.runner import execution_node, initialize_report, run_scenario
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -122,8 +125,21 @@ def test_real_venv_symlink_is_excluded_but_model_symlink_is_refused(tmp_path):
         Project(config, tmp_path / "refused", "isolated")
 
 
-@pytest.mark.parametrize("cleanup", ["NOT_NEEDED", "ERROR", "CLEANED", "KEPT"])
-def test_workflow_summary_counts_runner_error_reports(tmp_path, cleanup):
+@pytest.mark.parametrize(
+    ("status", "cleanup", "step_status", "exit_code", "valid"),
+    [
+        ("PASS", "CLEANED", "PASS", 0, True),
+        ("FAIL", "CLEANED", "FAIL", 1, True),
+        ("ERROR", "NOT_NEEDED", "NOT_RUN", 2, True),
+        ("ERROR", "ERROR", "PASS", 2, True),
+        ("ERROR", "CLEANED", "ERROR", 2, True),
+        ("ERROR", "KEPT", "ERROR", 2, True),
+        ("PASS", "CLEANED", "PASS", 0, False),
+    ],
+)
+def test_workflow_accepts_versioned_reports_and_preserves_results(
+    tmp_path, status, cleanup, step_status, exit_code, valid
+):
     workflow = yaml.safe_load((ROOT / ".github/workflows/scenarios.yml").read_text())
     step = next(
         item
@@ -133,28 +149,67 @@ def test_workflow_summary_counts_runner_error_reports(tmp_path, cleanup):
     code = step["run"].split("<<'PY'\n", 1)[1].rsplit("\nPY", 1)[0]
     directory = tmp_path / "reports" / ("a" * 32)
     directory.mkdir(parents=True)
-    (directory / "summary.json").write_text(
-        json.dumps({"overall_status": "ERROR", "cleanup_status": cleanup})
+    project = ROOT / "examples/shop"
+    scenario = load_scenario(project / "scenarios/orders.yml", project)
+    report = initialize_report(scenario, Config(project, {}), directory.name)
+    report.update(
+        overall_status=status,
+        cleanup_status=cleanup,
+        reason_code="SCENARIO_FAILURE" if status == "ERROR" else None,
+        steps=[
+            {
+                "name": "initial",
+                "status": step_status,
+                "duration_ms": 50,
+                "reason_code": "STEP_FAILURE" if step_status in {"ERROR", "FAIL"} else None,
+            }
+        ],
     )
+    write_report(report, directory)
+    report_path = directory / "summary.json"
+    assert json.loads(report_path.read_text(encoding="utf-8")) == report
+    junit = parse(directory / "junit.xml").getroot()
+    assert junit.get("failures") == str(int(status == "FAIL"))
+    assert junit.get("errors") == str(int(status == "ERROR"))
+    if not valid:
+        report_path.write_text(json.dumps({**report, "schema_version": 2}), encoding="utf-8")
     summary = tmp_path / "github-summary"
     environment = dict(
         os.environ,
         DSC_CI_ROOT=str(tmp_path),
-        DSC_CI_TEST_OUTCOME="failure",
-        DSC_CI_TEST_EXIT="2",
+        DSC_CI_TEST_OUTCOME="failure" if exit_code else "success",
+        DSC_CI_TEST_EXIT=str(exit_code),
         GITHUB_STEP_SUMMARY=str(summary),
     )
     result = subprocess.run(
         [sys.executable, "-I", "-c", code], env=environment, capture_output=True, timeout=10
     )
-    assert result.returncode == 0, result.stderr
+    assert result.returncode == (0 if valid else 1), result.stderr
     aggregate = json.loads((tmp_path / "reports/ci-summary.json").read_text())
-    assert aggregate["statuses"] == {"ERROR": 1}
-    assert aggregate["cleanup_statuses"] == {cleanup: 1}
-    assert aggregate["summaries_valid"] is True
-    assert aggregate["all_passed_and_cleaned"] is False
-    assert aggregate["test_exit_code"] == 2
-    assert "ERROR: 1" in summary.read_text()
+    assert aggregate["statuses"] == ({status: 1} if valid else {})
+    assert aggregate["cleanup_statuses"] == ({cleanup: 1} if valid else {})
+    assert aggregate["summaries_valid"] is valid
+    assert aggregate["all_passed_and_cleaned"] is (valid and not exit_code)
+    assert aggregate["test_exit_code"] == exit_code
+
+
+def test_unexpected_setup_error_reports_a_safe_stage(tmp_path, monkeypatch):
+    project = ROOT / "examples/shop"
+    scenario = load_scenario(project / "scenarios/orders.yml", project)
+
+    def fail_to_connect(config, deadline):
+        raise RuntimeError("private internal details")
+
+    monkeypatch.setattr("dbt_scenario.runner.Database", fail_to_connect)
+    report = run_scenario(scenario, Config(project, {}), tmp_path)
+
+    assert report["overall_status"] == "ERROR"
+    assert report["reason_code"] == "INTERNAL_ERROR"
+    assert report["error_stage"] == "setup"
+    assert all(step["status"] == "NOT_RUN" for step in report["steps"])
+    for filename in ["summary.json", "summary.md", "junit.xml"]:
+        path = tmp_path / report["run_id"] / filename
+        assert "private internal details" not in path.read_text(encoding="utf-8")
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows Job Object semantics")

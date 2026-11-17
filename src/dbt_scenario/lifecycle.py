@@ -1,10 +1,14 @@
+from typing import Literal
+
 from dbt_scenario.config import Config
 from dbt_scenario.database import Database
 from dbt_scenario.deadline import Deadline
 from dbt_scenario.journal import Journal
 
 
-def finish_run(database: Database, journal: Journal, keep: bool = False):
+def finish_run(
+    database: Database, journal: Journal, keep: bool = False
+) -> Literal["KEPT", "CLEANED"]:
     with database.budget(Deadline(10, "CLEANUP_TIMEOUT")):
         database.acquire_run_lock(journal.data["run_id"])
         database.cancel_model_queries(f"dbt-scenario:{journal.data['schemas'][0]}")

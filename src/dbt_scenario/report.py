@@ -1,18 +1,69 @@
 import json
 from pathlib import Path
+from typing import Literal, NotRequired, TypedDict
 from xml.etree.ElementTree import Element, SubElement, tostring
 
+ScenarioStatus = Literal["PASS", "FAIL", "ERROR"]
+CleanupStatus = Literal["CLEANED", "KEPT", "ERROR", "NOT_NEEDED"]
+RunMode = Literal["initial", "incremental"]
+ErrorStage = Literal["setup", "step", "workspace_cleanup"]
 
-def reason_lines(report: dict) -> list[str]:
+
+class DiffCounts(TypedDict):
+    missing: int
+    unexpected: int
+    changed: int
+
+
+class StepSummary(TypedDict):
+    name: str
+    status: ScenarioStatus | Literal["NOT_RUN"]
+    reason_code: str | None
+    duration_ms: int
+    requested_mode: NotRequired[RunMode]
+    observed_mode: NotRequired[RunMode | None]
+    observed_mode_evidence: NotRequired[dict[str, str] | None]
+    sql_audit: NotRequired[dict[str, str | int] | None]
+    diff_counts: NotRequired[DiffCounts | None]
+    actual_rows: NotRequired[int | None]
+    expected_rows: NotRequired[int | None]
+    changed_columns: NotRequired[list[str]]
+
+
+class ScenarioReport(TypedDict):
+    schema_version: Literal[1]
+    run_id: str
+    scenario: str
+    model_unique_id: str
+    scenario_hash: str
+    fixture_hashes: dict[str, str]
+    project_hash: str | None
+    project_hash_format: Literal[2]
+    project_env_names: list[str]
+    started_at: str
+    duration_ms: int
+    engine_versions: dict[str, str | int]
+    overall_status: ScenarioStatus
+    cleanup_status: CleanupStatus
+    cleanup_reason_code: str | None
+    reason_code: str | None
+    steps: list[StepSummary]
+    diagnostic: NotRequired[dict[str, str | int | None]]
+    error_stage: NotRequired[ErrorStage]
+
+
+def reason_lines(report: ScenarioReport) -> list[str]:
     lines = []
     if reason := report.get("reason_code"):
         lines.append(f"Scenario reason: {reason}")
     if cleanup_reason := report.get("cleanup_reason_code"):
         lines.append(f"Cleanup reason: {cleanup_reason}")
+    if stage := report.get("error_stage"):
+        lines.append(f"Error stage: {stage}")
     return lines
 
 
-def write_report(report: dict, directory: Path):
+def write_report(report: ScenarioReport, directory: Path) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     (directory / "summary.json").write_text(
         json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
