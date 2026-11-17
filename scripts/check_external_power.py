@@ -10,10 +10,10 @@ import tempfile
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
-from unittest.mock import patch
 from uuid import UUID
 
 from check_external_postgres import owned_schemas
+from external_metadata import parse_metadata, static_metadata
 from reproduce_history import verified_sources, write_yaml
 
 from dbt_scenario import __version__
@@ -22,7 +22,6 @@ from dbt_scenario.discovery import discover_models
 from dbt_scenario.errors import ScenarioError
 from dbt_scenario.initialize import initialize
 from dbt_scenario.loader import load_scenario, read_yaml
-from dbt_scenario.project import Project
 from dbt_scenario.runner import run_scenario
 
 ASSETS = Path(__file__).resolve().parents[1] / "compatibility/power"
@@ -95,18 +94,8 @@ def prepare_project(root, sources, config, fixtures):
 
 
 def prepare_metadata(root, config, fixtures, password_variable):
-    manifest, artifacts = Project(config, root / "parse", "dsc_power_metadata").invoke("parse", 120)
-    environment = {
-        key: value
-        for key, value in os.environ.items()
-        if key not in {password_variable, "DBT_ENV_SECRET_DSC_PASSWORD"}
-    }
-    with (
-        patch.dict(os.environ, environment, clear=True),
-        patch("psycopg.connect", side_effect=RuntimeError("STATIC_DATABASE_ACCESS")),
-        patch("subprocess.Popen", side_effect=RuntimeError("STATIC_SUBPROCESS_ACCESS")),
-    ):
-        manifest_path = artifacts / "target/manifest.json"
+    manifest, manifest_path = parse_metadata(config, root, "dsc_power_metadata")
+    with static_metadata(password_variable):
         models = discover_models(config.project_dir, manifest_path)["models"]
         if len(models) != 1 or models[0]["model"] != "model.dbt_power." + MODEL:
             raise RuntimeError("POWER_METADATA_MODEL_MISMATCH")

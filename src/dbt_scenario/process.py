@@ -8,8 +8,11 @@ from dbt_scenario.errors import ScenarioError
 from dbt_scenario.windows_job import WindowsJob
 
 WINDOWS_LAUNCHER = (
-    "import subprocess,sys\n"
-    "if sys.stdin.buffer.read(1) != b'1': sys.exit(125)\n"
+    "import subprocess\n"
+    "import sys\n"
+    "\n"
+    "if sys.stdin.buffer.read(1) != b'1':\n"
+    "    sys.exit(125)\n"
     "sys.exit(subprocess.call(sys.argv[1:], stdin=subprocess.DEVNULL))\n"
 )
 

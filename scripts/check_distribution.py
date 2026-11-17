@@ -76,11 +76,18 @@ def compare_archives(wheel, sdist):
                 raise RuntimeError("PACKAGE_CONTENT_MISMATCH")
             digest.update(name.encode())
             digest.update(data)
+        demo_files = ["examples/shop/models/fct_orders.sql", "scripts/init-test-db.sh"]
+        for name in demo_files:
+            example = source.extractfile(f"{root}/{name}")
+            mirror = f"dbt_scenario/templates/demo/{name}"
+            if example is None or mirror not in names or example.read() != binary.read(mirror):
+                raise RuntimeError("DEMO_MIRROR_MISMATCH")
         return {
             "files_checked": len(names),
             "content_sha256": digest.hexdigest(),
             "wheel_sdist_installed_match": True,
             "installed_from_environment": True,
+            "demo_mirrors_checked": len(demo_files),
         }
 
 

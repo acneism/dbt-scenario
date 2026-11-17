@@ -9,10 +9,10 @@ import tempfile
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
-from unittest.mock import patch
 from uuid import UUID
 
 from check_external_postgres import owned_schemas
+from external_metadata import parse_metadata, static_metadata
 from reproduce_history import verified_sources, write_yaml
 
 from dbt_scenario import __version__
@@ -21,7 +21,6 @@ from dbt_scenario.discovery import discover_models
 from dbt_scenario.errors import ScenarioError
 from dbt_scenario.initialize import initialize
 from dbt_scenario.loader import load_scenario, read_yaml
-from dbt_scenario.project import Project
 from dbt_scenario.runner import run_scenario
 
 ASSETS = Path(__file__).resolve().parents[1] / "compatibility/clinical"
@@ -76,20 +75,8 @@ def prepare_project(root, sources, config, fixtures):
         },
     )
     prepared = replace(config, project_dir=project)
-    manifest, artifacts = Project(prepared, root / "parse", "dsc_clinical_metadata").invoke(
-        "parse", 120
-    )
-    environment = {
-        key: value
-        for key, value in os.environ.items()
-        if key not in {"DSC_TEST_PASSWORD", "DBT_ENV_SECRET_DSC_PASSWORD"}
-    }
-    with (
-        patch.dict(os.environ, environment, clear=True),
-        patch("psycopg.connect", side_effect=RuntimeError("STATIC_DATABASE_ACCESS")),
-        patch("subprocess.Popen", side_effect=RuntimeError("STATIC_SUBPROCESS_ACCESS")),
-    ):
-        manifest_path = artifacts / "target/manifest.json"
+    manifest, manifest_path = parse_metadata(prepared, root, "dsc_clinical_metadata")
+    with static_metadata():
         inventory = discover_models(project, manifest_path)
         if inventory["models"] != [
             {

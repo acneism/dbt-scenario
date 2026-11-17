@@ -9,10 +9,10 @@ import tempfile
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
-from unittest.mock import patch
 from uuid import UUID
 
 import psycopg
+from external_metadata import parse_metadata, static_metadata
 from reproduce_history import verified_sources, write_yaml
 
 from dbt_scenario import __version__
@@ -21,7 +21,6 @@ from dbt_scenario.discovery import discover_models
 from dbt_scenario.errors import ScenarioError
 from dbt_scenario.initialize import initialize
 from dbt_scenario.loader import load_scenario, read_yaml
-from dbt_scenario.project import Project
 from dbt_scenario.runner import run_scenario
 
 ASSETS = Path(__file__).resolve().parents[1] / "compatibility/aqw"
@@ -81,18 +80,8 @@ def prepare_project(root, sources, config, fixtures):
         },
     )
     scenario_config = replace(config, project_dir=project)
-    _, artifacts = Project(scenario_config, root / "parse", "dsc_aqw_metadata").invoke("parse", 120)
-    manifest = artifacts / "target/manifest.json"
-    environment = {
-        key: value
-        for key, value in os.environ.items()
-        if key not in {"DSC_TEST_PASSWORD", "DBT_ENV_SECRET_DSC_PASSWORD"}
-    }
-    with (
-        patch.dict(os.environ, environment, clear=True),
-        patch("psycopg.connect", side_effect=RuntimeError("STATIC_DATABASE_ACCESS")),
-        patch("subprocess.Popen", side_effect=RuntimeError("STATIC_SUBPROCESS_ACCESS")),
-    ):
+    _, manifest = parse_metadata(scenario_config, root, "dsc_aqw_metadata")
+    with static_metadata():
         inventory = discover_models(project, manifest)
         if inventory["models"] != [
             {

@@ -150,12 +150,24 @@ jobs:
               connection.execute("REVOKE CREATE ON SCHEMA public FROM PUBLIC")
           PY
       - name: Check database and project dependencies
-        run: python -I -c 'from dbt_scenario.cli import main; main()' doctor --config "$DSC_CI_ROOT/scenario-runner.yml"
+        run: |
+          python -I -c '
+          from dbt_scenario.cli import main
+
+          main()
+          ' doctor --config "$DSC_CI_ROOT/scenario-runner.yml"
       - name: Run scenarios
         id: scenarios
         run: |
           set +e
-          python -I -c 'from dbt_scenario.cli import main; main()' test --config "$DSC_CI_ROOT/scenario-runner.yml" --scenario-dir "$DSC_CI_SCENARIOS" --report-dir "$DSC_CI_ROOT/reports"
+          python -I -c '
+          from dbt_scenario.cli import main
+
+          main()
+          ' test \
+            --config "$DSC_CI_ROOT/scenario-runner.yml" \
+            --scenario-dir "$DSC_CI_SCENARIOS" \
+            --report-dir "$DSC_CI_ROOT/reports"
           result=$?
           printf 'exit_code=%s\n' "$result" >> "$GITHUB_OUTPUT"
           exit "$result"
