@@ -3,6 +3,8 @@ import pathlib
 from typing import Literal, NotRequired, TypedDict
 from xml.etree import ElementTree
 
+from dbt_scenario import errors
+
 ScenarioStatus = Literal["PASS", "FAIL", "ERROR"]
 CleanupStatus = Literal["CLEANED", "KEPT", "ERROR", "NOT_NEEDED"]
 RunMode = Literal["initial", "incremental"]
@@ -69,6 +71,11 @@ def reason_lines(report: ScenarioReport) -> list[str]:
         lines.append(f"Cleanup reason: {cleanup_reason}")
     if stage := report.get("error_stage"):
         lines.append(f"Error stage: {stage}")
+    lines.extend(
+        errors.dbt_failure_lines(
+            report.get("diagnostic", {}), report.get("model_unique_id")
+        )
+    )
     return lines
 
 
@@ -121,11 +128,18 @@ def write_report(report: ScenarioReport, directory: pathlib.Path) -> None:
     if reasons := reason_lines(report):
         lines.extend(f"- {line}" for line in reasons)
         lines.append("")
-    lines.extend(["| Step | Status | Reason |", "|---|---|---|"])
+    lines.extend(
+        [
+            "| Step | Status | Reason | Missing | Unexpected | Changed |",
+            "|---|---|---|---:|---:|---:|",
+        ]
+    )
     for step in steps:
+        counts = step.get("diff_counts") or {}
         lines.append(
             f"| {step['name']} | {step['status']} | "
-            f"{step.get('reason_code') or ''} |"
+            f"{step.get('reason_code') or ''} | {counts.get('missing', '')} | "
+            f"{counts.get('unexpected', '')} | {counts.get('changed', '')} |"
         )
     (directory / "summary.md").write_text(
         "\n".join(lines) + "\n", encoding="utf-8"

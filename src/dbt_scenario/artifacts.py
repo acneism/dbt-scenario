@@ -1,9 +1,46 @@
 import datetime
 import json
+import os
 import pathlib
+import re
 import uuid
 
 from dbt_scenario import errors
+
+DBT_NODE_ID = re.compile(
+    r"(?:model|test|unit_test|seed|snapshot|analysis|operation)"
+    r"(?:\.[A-Za-z0-9_-]+){2,}"
+)
+
+
+def failed_dbt_node(log_path: pathlib.Path) -> str | None:
+    limit = 256 * 1024
+    try:
+        with log_path.open("rb") as log:
+            size = log.seek(0, os.SEEK_END)
+            log.seek(max(0, size - limit))
+            tail = log.read(limit)
+    except OSError:
+        return None
+
+    for line in reversed(tail.splitlines()):
+        try:
+            event = json.loads(line)
+            if event["info"]["name"] != "NodeFinished":
+                continue
+            data = event["data"]
+            if data["run_result"]["status"] != "error":
+                continue
+            node_id = data["node_info"]["unique_id"]
+        except (KeyError, TypeError, ValueError, RecursionError):
+            continue
+        if (
+            isinstance(node_id, str)
+            and len(node_id) <= 255
+            and DBT_NODE_ID.fullmatch(node_id)
+        ):
+            return node_id
+    return None
 
 
 def read_artifact(artifact_dir: pathlib.Path, name: str) -> dict:

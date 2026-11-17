@@ -118,6 +118,64 @@ def test_detects_wrong_watermark_and_stops_dependent_steps(project):
     assert result["steps"][2]["status"] == "NOT_RUN"
 
 
+def test_scenario_preserves_native_data_tests(project, tmp_path):
+    config, scenario, reports = project
+    model = config.project_dir / "models/fct_orders.sql"
+    original = model.read_text(encoding="utf-8")
+    schema = model.with_name("schema.yml")
+    native_tests = (
+        "version: 2\n"
+        "models:\n"
+        "  - name: fct_orders\n"
+        "    columns:\n"
+        "      - name: order_id\n"
+        "        data_tests: [unique, not_null]\n"
+    )
+    schema.write_text(native_tests, encoding="utf-8")
+    model.write_text(
+        original.replace("where updated_at >=", "where event_at >").replace(
+            "max(updated_at)", "max(event_at)"
+        ),
+        encoding="utf-8",
+    )
+    config_path = config_file(config, tmp_path)
+    arguments = [
+        "test",
+        "--config",
+        str(config_path),
+        "--scenario",
+        str(scenario.path),
+        "--report-dir",
+        str(reports),
+    ]
+    red = testing.CliRunner().invoke(cli.main, arguments)
+    assert red.exit_code == 1, red.output
+    assert "ROWS_MISMATCH" in red.output
+    (bad,) = [
+        json.loads(path.read_text(encoding="utf-8"))
+        for path in reports.glob("*/summary.json")
+    ]
+    assert [step["status"] for step in bad["steps"]] == [
+        "PASS",
+        "FAIL",
+        "NOT_RUN",
+    ]
+    assert bad["cleanup_status"] == "CLEANED"
+
+    model.write_text(original, encoding="utf-8")
+    green = testing.CliRunner().invoke(cli.main, arguments)
+    assert green.exit_code == 0, green.output
+    (good,) = [
+        json.loads(path.read_text(encoding="utf-8"))
+        for path in reports.glob("*/summary.json")
+        if path.parent.name != bad["run_id"]
+    ]
+    assert [step["status"] for step in good["steps"]] == ["PASS"] * 3
+    assert good["cleanup_status"] == "CLEANED"
+    assert bad["scenario_hash"] == good["scenario_hash"]
+    assert schema.read_text(encoding="utf-8") == native_tests
+
+
 def test_reports_duplicate_keys_instead_of_collapsing_append_rows(project):
     config, scenario, reports = project
     for step in scenario.data["steps"]:
@@ -159,19 +217,57 @@ def test_ref_input_is_fixtured_without_running_upstream_sql(project):
     assert result["overall_status"] == "PASS", result
 
 
-def test_errors_are_redacted_and_never_pass(project):
+@pytest.mark.parametrize("phase", ["parse", "compile", "run"])
+def test_errors_are_redacted_and_never_pass(project, phase, tmp_path):
     config, scenario, reports = project
     secret = "synthetic.person@example.invalid"
-    (config.project_dir / "models" / "fct_orders.sql").write_text(
-        "{{ exceptions.raise_compiler_error('" + secret + "') }}"
+    model = config.project_dir / "models/fct_orders.sql"
+    failure = "{{ exceptions.raise_compiler_error('" + secret + "') }}"
+    if phase != "parse":
+        failure = (
+            "{% if execute and flags.WHICH == '"
+            + phase
+            + "' %}"
+            + failure
+            + "{% endif %}\n"
+            + model.read_text(encoding="utf-8")
+        )
+    model.write_text(failure, encoding="utf-8")
+    outcome = testing.CliRunner().invoke(
+        cli.main,
+        [
+            "test",
+            "--config",
+            str(config_file(config, tmp_path)),
+            "--scenario",
+            str(scenario.path),
+            "--report-dir",
+            str(reports),
+        ],
     )
-    result = runner.run_scenario(scenario, config, reports)
+    assert outcome.exit_code == 2, outcome.output
+    assert f"dbt phase: {phase}" in outcome.output
+    assert "dbt selected model: model.shop.fct_orders" in outcome.output
+    assert secret not in outcome.output
+    (summary,) = reports.glob("*/summary.json")
+    result = json.loads(summary.read_text(encoding="utf-8"))
     assert result["overall_status"] == "ERROR", result
     assert result["reason_code"] == "DBT_EXECUTION_ERROR"
-    for path in (reports / result["run_id"]).iterdir():
+    diagnostic = result["diagnostic"]
+    assert diagnostic["dbt_command"] == phase
+    markdown = summary.with_name("summary.md").read_text(encoding="utf-8")
+    assert f"dbt phase: {phase}" in markdown
+    if phase in {"compile", "run"}:
+        assert diagnostic["dbt_node_unique_id"] == "model.shop.fct_orders"
+        assert "dbt failed node: model.shop.fct_orders" in outcome.output
+        assert "dbt failed node: model.shop.fct_orders" in markdown
+    else:
+        assert "dbt_node_unique_id" not in diagnostic
+    for path in summary.parent.iterdir():
         assert path.is_file()
-        assert secret not in path.read_text()
-        assert config.database["password"] not in path.read_text()
+        contents = path.read_text(encoding="utf-8")
+        assert secret not in contents
+        assert config.database["password"] not in contents
 
 
 def test_cli_nonzero_and_json_junit_artifacts(project, tmp_path):
@@ -201,6 +297,13 @@ def test_cli_nonzero_and_json_junit_artifacts(project, tmp_path):
     assert len(summaries) == 1
     assert json.loads(summaries[0].read_text())["overall_status"] == "FAIL"
     assert summaries[0].with_name("junit.xml").is_file()
+    markdown = summaries[0].with_name("summary.md").read_text(encoding="utf-8")
+    assert "| Missing | Unexpected | Changed |" in markdown
+    assert "| initial_load | FAIL | ROWS_MISMATCH | 0 | 0 | 1 |" in markdown
+    assert (
+        "| retry_without_changes | NOT_RUN | PREVIOUS_STEP_UNSUCCESSFUL |"
+        in (markdown)
+    )
 
 
 def test_kept_failure_can_be_cleaned_twice_from_cli(project, tmp_path):

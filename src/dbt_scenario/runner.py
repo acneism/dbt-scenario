@@ -161,7 +161,9 @@ class StepExecution:
     ) -> None:
         actual_schema, input_schema, _ = self.schemas
         dbname = self.database_name
-        compiled, _ = self.project.invoke("compile", budget, args)
+        compiled, _ = self.project.invoke(
+            "compile", budget, [*args, "--indirect-selection", "empty"]
+        )
         compiled_node = execution_node(
             compiled,
             self.node,

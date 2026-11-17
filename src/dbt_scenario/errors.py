@@ -202,8 +202,8 @@ HINTS = {
         "permissions."
     ),
     "DBT_EXECUTION_ERROR": (
-        "Check project dependencies, required vars and env_allowlist; raw dbt "
-        "errors are withheld."
+        "Use the reported dbt phase and node to check model SQL, dependencies "
+        "and required vars."
     ),
     "DBT_ARTIFACT_MISSING": (
         "Retry with a writable temporary directory; dbt did not write required "
@@ -279,6 +279,34 @@ class ScenarioError(Exception):
         return result
 
 
+class DbtExecutionError(ScenarioError):
+    def __init__(self, command: str, node_id: str | None) -> None:
+        super().__init__("DBT_EXECUTION_ERROR")
+        self.command = command
+        self.node_id = node_id
+
+    def diagnostic(self) -> dict:
+        result = super().diagnostic()
+        result["dbt_command"] = self.command
+        if self.node_id:
+            result["dbt_node_unique_id"] = self.node_id
+        return result
+
+
+def dbt_failure_lines(
+    diagnostic: dict, model_id: str | None = None
+) -> list[str]:
+    command = diagnostic.get("dbt_command")
+    if not command:
+        return []
+    lines = [f"dbt phase: {command}"]
+    if model_id:
+        lines.append(f"dbt selected model: {model_id}")
+    if node_id := diagnostic.get("dbt_node_unique_id"):
+        lines.append(f"dbt failed node: {node_id}")
+    return lines
+
+
 def display_error(error: ScenarioError) -> str:
     diagnostic = error.diagnostic()
     text = f"ERROR {error.code}"
@@ -286,6 +314,8 @@ def display_error(error: ScenarioError) -> str:
         text += f" at {diagnostic['location']}"
     if "line" in diagnostic:
         text += f" at line {diagnostic['line']}, column {diagnostic['column']}"
+    for detail in dbt_failure_lines(diagnostic):
+        text += f"\n  {detail}"
     if diagnostic["hint"]:
         text += f"\n  {diagnostic['hint']}"
     return text

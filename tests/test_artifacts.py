@@ -81,6 +81,28 @@ def test_current_invocation_binds_manifest_and_results(invocation):
     artifacts.successful_model_result(results, "model.shop.orders")
 
 
+def test_failed_dbt_node_uses_only_structured_node_identity(tmp_path):
+    log = tmp_path / "dbt.log"
+    a_failure = {
+        "info": {"name": "NodeFinished", "msg": "private log content"},
+        "data": {
+            "run_result": {"status": "error", "message": "private error"},
+            "node_info": {"unique_id": "model.shop.orders"},
+        },
+    }
+    invalid = copy.deepcopy(a_failure)
+    invalid["data"]["node_info"]["unique_id"] = "model.shop.orders\nsecret"
+    passed = copy.deepcopy(a_failure)
+    passed["data"]["node_info"]["unique_id"] = "model.shop.other"
+    passed["data"]["run_result"]["status"] = "success"
+    events = [a_failure, invalid, passed]
+    log.write_text(
+        "\n".join(json.dumps(event) for event in events) + "\n{truncated",
+        encoding="utf-8",
+    )
+    assert artifacts.failed_dbt_node(log) == "model.shop.orders"
+
+
 @pytest.mark.parametrize("name", ["manifest.json", "run_results.json"])
 def test_required_artifact_cannot_be_missing(invocation, name):
     project, change = invocation

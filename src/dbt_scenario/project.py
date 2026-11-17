@@ -182,6 +182,8 @@ class Project:
             str(executable),
             "--no-use-colors",
             "--no-partial-parse",
+            "--log-format-file",
+            "json",
             "--log-path",
             str(artifact_dir / "logs"),
             command,
@@ -206,7 +208,10 @@ class Project:
         result = process.run_process(argv, environment, self.root, deadline)
         finished = datetime.datetime.now(datetime.UTC)
         if result:
-            raise errors.ScenarioError("DBT_EXECUTION_ERROR")
+            raise errors.DbtExecutionError(
+                command,
+                artifacts.failed_dbt_node(artifact_dir / "logs/dbt.log"),
+            )
         manifest = artifacts.read_artifact(artifact_dir, "manifest.json")
         invocation_id = artifacts.validate_metadata(
             manifest, "manifest", started, finished
