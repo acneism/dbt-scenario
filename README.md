@@ -191,7 +191,7 @@ From 0.1.0a11, the CLI checks that `--scenario-dir` names a directory and `--sce
 
 A [real CLI regression check](docs/evaluation/scenario-selection-postgresql16-windows.json) confirmed that alpha 10 ignored a file passed as `--scenario-dir` while successfully running the other selected scenario on PostgreSQL. The corrected CLI rejects the same arguments before loading configuration, including with password variables removed.
 
-Each run writes `summary.json`, `summary.md` and `junit.xml` beneath `artifacts/scenarios/<run_id>/`. Reports contain counts and column names, without row values or raw dbt errors. dbt logs and temporary profiles are deleted with the temporary workspace. GitHub branch rules must make your test job required if you want it to block merges.
+Each run writes `summary.json`, `summary.md` and `junit.xml` beneath `artifacts/scenarios/<run_id>/`. The terminal and Markdown summary show scenario and cleanup reason codes alongside step results. Reports contain counts and column names. Row values and raw dbt errors are omitted. dbt logs and temporary profiles are deleted with the temporary workspace. GitHub branch rules must make your test job required if you want it to block merges.
 
 For GitHub Actions, use the [ready workflow](docs/GITHUB-ACTIONS.md). It installs the verified public package, creates a disposable PostgreSQL service and restricted role, preserves failures and uploads summaries/JUnit even after a failed scenario. Configure the project/scenario paths and enable public dependency installation when needed; no production credentials or tool source checkout are required. Controlled runs verify success, an assertion failure followed by a passing scenario, and an empty selection.
 
@@ -256,7 +256,7 @@ The [recorded alpha 6 Linux benchmark](docs/BENCHMARK.md) completed 20 valid sam
 
 See [existing approaches and the comparison plan](docs/ALTERNATIVES.md) for the product hypothesis and alternatives that already support materialization checks.
 
-[Controlled evaluation](docs/EVALUATION.md) reproduces native-dbt checks, a manual gate and audit-helper-ext integration on synthetic cases, and measures the current runner under verified Linux resource limits. These checks do not establish a real-world bug discovery or adoption advantage.
+[Controlled evaluation](docs/EVALUATION.md) compares native dbt checks, a manual gate and audit-helper-ext on synthetic cases. The published Linux measurements cover alpha 6. Use the [benchmark instructions](docs/BENCHMARK.md) to measure this checkout.
 
 The [recorded comparison](docs/EVALUATION-RESULTS.md) includes a built-in unit test that passes despite duplicate append materialization; a native unique test after the retry catches those duplicates too. No new external-project bug discovery has been confirmed.
 

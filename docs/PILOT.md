@@ -2,7 +2,7 @@
 
 The open question is whether a team finds this runner easier to keep in CI than its existing tests and scripts. The [synthetic comparison](EVALUATION-RESULTS.md) and [historical replay](HISTORICAL-REGRESSION.md) do not answer that question. This protocol records a real trial without requiring access to production data.
 
-Open a [pilot interest or trial report](https://github.com/acneism/dbt-scenario/issues/new?template=01_pilot.yml) before starting or after an attempt. An anonymized project description and one concern are enough to begin. Update the same issue as the trial progresses; leave unobserved measurements blank. A [bug or compatibility report](https://github.com/acneism/dbt-scenario/issues/new?template=02_bug.yml) is available separately. Reports are public and manually submitted; no telemetry or automatic follow-up is enabled.
+Open a [pilot interest or trial report](https://github.com/acneism/dbt-scenario/issues/new?template=01_pilot.yml) before starting or after an attempt. An anonymized project description and one concern are enough to begin. Update the same issue as the trial progresses and leave unobserved measurements blank. Use the [bug or compatibility form](https://github.com/acneism/dbt-scenario/issues/new?template=02_bug.yml) for implementation problems.
 
 ## Choose one model
 
@@ -76,7 +76,7 @@ Record whether the team keeps the tests, removes them, or stops earlier, and why
 
 ## Report template
 
-Share only what the project permits; a public repository URL is optional. Posting a report is manual and optional. The tool does not send telemetry or automatically contact maintainers.
+Reports are public. Share only what the project permits. You can omit the repository URL. Posting a report is manual and optional. The tool does not send telemetry or automatically contact maintainers.
 
 ```text
 Project: public URL or private/anonymized
